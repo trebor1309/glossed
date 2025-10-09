@@ -1,7 +1,13 @@
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 
-export default function Home() {
+export default function Home({
+  onOpenLogin,
+  onOpenSignup,
+  onOpenProSignup,
+  onOpenDownload,
+}) {
   return (
     <>
       {/* Hero */}
@@ -47,17 +53,19 @@ export default function Home() {
               transition={{ delay: 0.6, duration: 0.7 }}
             >
               <a
-                href="#"
-                className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300 w-full sm:w-auto"
+                role="button"
+                onClick={onOpenLogin}
+                className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300 w-auto mx-auto sm:mx-0"
               >
                 Book now
               </a>
-              <a
-                href="#"
-                className="text-gray-700 font-semibold hover:text-rose-600 transition-all duration-300 flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 border border-gray-200 rounded-full hover:border-rose-300 w-full sm:w-auto"
+
+              <Link
+                to="/about"
+                className="text-gray-700 font-semibold hover:text-rose-600 transition-all duration-300 flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 border border-gray-200 rounded-full hover:shadow-md hover:scale-105 hover:border-rose-300 w-auto mx-auto sm:mx-0"
               >
                 Learn more →
-              </a>
+              </Link>
             </motion.div>
 
             <motion.div
@@ -79,17 +87,27 @@ export default function Home() {
 
           {/* Image du Hero */}
           <motion.div
-            className="relative mt-12 md:mt-0 group flex justify-center md:justify-end w-full md:w-auto"
+            className="relative mt-12 md:mt-0 group flex justify-center md:justify-end w-full md:w-auto px-4 sm:px-0"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.8, duration: 0.8, ease: "easeOut" }}
           >
-            <div className="absolute -inset-6 bg-gradient-to-r from-amber-300 to-rose-400 rounded-3xl blur-3xl opacity-30"></div>
-            <motion.img
-              src="https://images.unsplash.com/photo-1602910344008-22f323cc1817?q=80&w=1740&auto=format&fit=crop"
-              alt="Beauty service example"
-              className="relative rounded-3xl shadow-2xl max-w-xs sm:max-w-sm md:max-w-md transform transition-transform duration-700 ease-out group-hover:scale-105"
-            />
+            {/* Glow coloré autour */}
+            <div className="absolute -inset-3 sm:-inset-6 bg-gradient-to-r from-amber-300 to-rose-400 rounded-2xl sm:rounded-3xl blur-2xl sm:blur-3xl opacity-30"></div>
+
+            {/* Image principale avec effet glossy */}
+            <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden">
+              <motion.img
+                src="https://images.unsplash.com/photo-1602910344008-22f323cc1817?q=80&w=1740&auto=format&fit=crop"
+                alt="Beauty service example"
+                className="relative rounded-2xl sm:rounded-3xl shadow-2xl max-w-[80%] sm:max-w-sm md:max-w-md transform transition-transform duration-700 ease-out group-hover:scale-105 mx-auto"
+              />
+
+              {/* Reflet glossy au survol */}
+              <div className="absolute inset-1 sm:inset-2 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-white/25 via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-out pointer-events-none scale-97"></div>
+            </div>
+
+            {/* Encadré note 4.9 */}
             <div className="absolute -bottom-6 -right-6 bg-white rounded-2xl p-4 shadow-xl border border-gray-100">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-gradient-to-r from-rose-500 to-red-500 rounded-full flex items-center justify-center text-white font-bold">
@@ -205,13 +223,15 @@ export default function Home() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
             <a
-              href="#"
+              role="button"
+              onClick={onOpenSignup}
               className="bg-white text-rose-600 px-8 py-4 rounded-full font-bold hover:shadow-xl hover:scale-105 transition-all duration-300 text-lg"
             >
               Create your account
             </a>
             <a
-              href="#"
+              role="button"
+              onClick={onOpenDownload}
               className="bg-gradient-to-r from-rose-600 to-red-600 text-white font-semibold hover:opacity-90 hover:shadow-lg hover:scale-105 transition-all duration-300 flex items-center gap-2 px-8 py-4 rounded-full"
             >
               Download app →

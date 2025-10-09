@@ -5,15 +5,31 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import Logo from "./components/Logo";
 import { Routes, Route } from "react-router-dom";
+import LoginModal from "./components/modals/LoginModal";
+import SignupModal from "./components/modals/SignupModal";
+import ProSignupModal from "./components/modals/ProSignupModal";
+import DownloadModal from "./components/modals/DownloadModal";
+import AboutUs from "./pages/AboutUs";
+import Careers from "./pages/Careers";
+import Press from "./pages/Press";
+import Blog from "./pages/Blog";
+import HelpCenter from "./pages/HelpCenter";
+import Contact from "./pages/Contact";
+import Safety from "./pages/Safety";
 import About from "./pages/About";
 import Services from "./pages/Services";
 import Legal from "./pages/Legal";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import FAQ from "./pages/FAQ";
+import ScrollToTop from "./components/ScrollToTop";
 
 export default function App() {
   const [isOpen, setIsOpen] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
+  const [showProSignup, setShowProSignup] = useState(false);
+  const [showDownload, setShowDownload] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-50 to-white text-gray-900 font-sans">
@@ -48,27 +64,23 @@ export default function App() {
             >
               Services
             </a>
-            <a
-              href="/faq"
-              className="text-gray-500 hover:text-rose-600 transition-all duration-300 hover:scale-105"
-            >
-              FAQ
-            </a>
           </div>
 
           {/* Auth & CTA */}
           <div className="hidden md:flex items-center gap-5">
             <a
               href="#"
-              className="text-sm font-medium text-gray-700 hover:text-rose-600 transition-all duration-300 hover:scale-105"
+              onClick={() => setShowLogin(true)}
+              className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:shadow-md hover:scale-105 transition-all duration-300"
             >
               Sign in
             </a>
             <a
               href="#"
-              className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:shadow-md hover:scale-105 transition-all duration-300"
+              onClick={() => setShowProSignup(true)}
+              className="text-rose-600 border border-rose-300 px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-rose-50 hover:border-rose-400 hover:text-rose-700 hover:shadow-md hover:scale-105 transition-all duration-300"
             >
-              Book now
+              Join as a Pro
             </a>
           </div>
 
@@ -101,43 +113,66 @@ export default function App() {
             isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
           }`}
         >
-          {["Home", "About", "Services", "FAQ"].map((item) => (
+          {["Home", "About", "Services", "For Professionals"].map((item) => (
             <a
               key={item}
-              href={`/${item.toLowerCase()}`}
+              href="#"
               onClick={() => setIsOpen(false)}
               className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
             >
               {item}
             </a>
           ))}
+
+          {/* CTA principal */}
           <a
             href="#"
             onClick={() => setIsOpen(false)}
-            className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
+            className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-6 py-3 rounded-full text-sm font-semibold hover:shadow-md hover:scale-105 transition-all duration-300 text-center mx-auto w-auto"
           >
             Sign in
           </a>
+
+          {/* Lien secondaire */}
           <a
             href="#"
             onClick={() => setIsOpen(false)}
-            className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:shadow-lg hover:scale-105 transition-all duration-300 text-center"
+            className="text-rose-600 border border-rose-300 px-5 py-2 rounded-full text-sm font-semibold hover:bg-rose-50 hover:border-rose-400 hover:text-rose-700 transition-all duration-300 text-center mx-auto w-fit"
           >
-            Book now
+            Join as a Pro
           </a>
         </div>
       </nav>
+      <ScrollToTop />
 
       {/* Routes (pages visibles selon l'URL) */}
       <main className="flex-grow">
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route
+            path="/"
+            element={
+              <Home
+                onOpenLogin={() => setShowLogin(true)}
+                onOpenSignup={() => setShowSignup(true)}
+                onOpenProSignup={() => setShowProSignup(true)}
+                onOpenDownload={() => setShowDownload(true)}
+              />
+            }
+          />
+
           <Route path="/about" element={<About />} />
           <Route path="/services" element={<Services />} />
           <Route path="/legal" element={<Legal />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/faq" element={<FAQ />} />
+          <Route path="/about-us" element={<AboutUs />} />
+          <Route path="/careers" element={<Careers />} />
+          <Route path="/press" element={<Press />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/help-center" element={<HelpCenter />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/safety" element={<Safety />} />
         </Routes>
       </main>
 
@@ -145,6 +180,7 @@ export default function App() {
       <footer className="bg-gradient-to-b from-gray-900 to-black text-white">
         <div className="max-w-6xl mx-auto px-6 md:px-16 py-16">
           <div className="grid md:grid-cols-4 gap-8 mb-12">
+            {/* Logo + description + socials */}
             <div className="col-span-2">
               <Logo size="text-3xl" variant="light" />
               <p className="text-gray-400 mb-6 max-w-md leading-relaxed mt-4">
@@ -168,57 +204,141 @@ export default function App() {
               </div>
             </div>
 
+            {/* Company links */}
             <div>
               <h4 className="font-semibold mb-4 text-white">Company</h4>
               <div className="space-y-3 text-gray-400">
-                {["About Us", "Careers", "Press", "Blog"].map((link) => (
-                  <a
-                    key={link}
-                    href="#"
-                    className="block hover:text-rose-400 transition-colors duration-300"
-                  >
-                    {link}
-                  </a>
-                ))}
+                <a
+                  href="/about-us"
+                  className="block hover:text-rose-400 transition-colors duration-300"
+                >
+                  About Us
+                </a>
+                <a
+                  href="/careers"
+                  className="block hover:text-rose-400 transition-colors duration-300"
+                >
+                  Careers
+                </a>
+                <a
+                  href="/press"
+                  className="block hover:text-rose-400 transition-colors duration-300"
+                >
+                  Press
+                </a>
+                <a
+                  href="/blog"
+                  className="block hover:text-rose-400 transition-colors duration-300"
+                >
+                  Blog
+                </a>
               </div>
             </div>
 
+            {/* Support links */}
             <div>
               <h4 className="font-semibold mb-4 text-white">Support</h4>
               <div className="space-y-3 text-gray-400">
-                {["Help Center", "Contact", "FAQ", "Safety"].map((link) => (
-                  <a
-                    key={link}
-                    href="#"
-                    className="block hover:text-rose-400 transition-colors duration-300"
-                  >
-                    {link}
-                  </a>
-                ))}
+                <a
+                  href="/help-center"
+                  className="block hover:text-rose-400 transition-colors duration-300"
+                >
+                  Help Center
+                </a>
+                <a
+                  href="/contact"
+                  className="block hover:text-rose-400 transition-colors duration-300"
+                >
+                  Contact
+                </a>
+                <a
+                  href="/faq"
+                  className="block hover:text-rose-400 transition-colors duration-300"
+                >
+                  FAQ
+                </a>
+                <a
+                  href="/safety"
+                  className="block hover:text-rose-400 transition-colors duration-300"
+                >
+                  Safety
+                </a>
               </div>
             </div>
           </div>
 
+          {/* Bottom section */}
           <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-500 text-sm">
               &copy; 2025 Glossed. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm text-gray-500 mt-4 md:mt-0">
-              {["Legal", "Privacy Policy", "Terms of Service", "Cookies"].map(
-                (link) => (
-                  <a
-                    key={link}
-                    href="#"
-                    className="hover:text-rose-400 transition-colors duration-300"
-                  >
-                    {link}
-                  </a>
-                )
-              )}
+              <a
+                href="/legal"
+                className="hover:text-rose-400 transition-colors duration-300"
+              >
+                Legal
+              </a>
+              <a
+                href="/privacy"
+                className="hover:text-rose-400 transition-colors duration-300"
+              >
+                Privacy Policy
+              </a>
+              <a
+                href="/terms"
+                className="hover:text-rose-400 transition-colors duration-300"
+              >
+                Terms of Service
+              </a>
+              <a
+                href="#"
+                className="hover:text-rose-400 transition-colors duration-300"
+              >
+                Cookies
+              </a>
             </div>
           </div>
         </div>
       </footer>
+      {/* 🔹 LOGIN MODAL */}
+      {showLogin && (
+        <LoginModal
+          onClose={() => setShowLogin(false)}
+          onSignup={() => {
+            setShowLogin(false);
+            setShowSignup(true);
+          }}
+        />
+      )}
+
+      {/* 🔹 SIGNUP MODAL */}
+      {showSignup && (
+        <SignupModal
+          onClose={() => setShowSignup(false)}
+          onLogin={() => {
+            setShowSignup(false);
+            setShowLogin(true);
+          }}
+          onProSignup={() => {
+            setShowSignup(false);
+            setShowProSignup(true);
+          }}
+        />
+      )}
+
+      {/* 🔹 PRO SIGNUP MODAL */}
+      {showProSignup && (
+        <ProSignupModal
+          onClose={() => setShowProSignup(false)}
+          onClientSignup={() => {
+            setShowProSignup(false);
+            setShowSignup(true);
+          }}
+        />
+      )}
+      {/* 🔹 DOWNLOAD MODAL */}
+      {showDownload && <DownloadModal onClose={() => setShowDownload(false)} />}
     </div>
   );
 }
