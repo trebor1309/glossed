@@ -113,21 +113,35 @@ export default function App() {
             isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
           }`}
         >
-          {["Home", "About", "Services", "For Professionals"].map((item) => (
-            <a
-              key={item}
-              href="#"
-              onClick={() => setIsOpen(false)}
-              className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
-            >
-              {item}
-            </a>
-          ))}
+          <a
+            href="/"
+            onClick={() => setIsOpen(false)}
+            className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
+          >
+            Home
+          </a>
+          <a
+            href="/about"
+            onClick={() => setIsOpen(false)}
+            className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
+          >
+            About
+          </a>
+          <a
+            href="/services"
+            onClick={() => setIsOpen(false)}
+            className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
+          >
+            Services
+          </a>
 
           {/* CTA principal */}
           <a
             href="#"
-            onClick={() => setIsOpen(false)}
+            onClick={() => {
+              setIsOpen(false);
+              setShowLogin(true);
+            }}
             className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-6 py-3 rounded-full text-sm font-semibold hover:shadow-md hover:scale-105 transition-all duration-300 text-center mx-auto w-auto"
           >
             Sign in
@@ -136,7 +150,10 @@ export default function App() {
           {/* Lien secondaire */}
           <a
             href="#"
-            onClick={() => setIsOpen(false)}
+            onClick={() => {
+              setIsOpen(false);
+              setShowProSignup(true);
+            }}
             className="text-rose-600 border border-rose-300 px-5 py-2 rounded-full text-sm font-semibold hover:bg-rose-50 hover:border-rose-400 hover:text-rose-700 transition-all duration-300 text-center mx-auto w-fit"
           >
             Join as a Pro
