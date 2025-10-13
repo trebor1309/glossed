@@ -33,31 +33,32 @@ export default function DownloadModal({ onClose }) {
           Choose your platform — app coming soon!
         </p>
 
+        {/* Badges officiels */}
         <div className="flex justify-center gap-4 mt-6">
-          {/* App Store */}
+          {/* App Store Badge */}
           <a
             href="#"
-            className="flex items-center gap-3 bg-black text-white px-6 py-3 rounded-xl font-medium hover:scale-105 transition transform"
+            className="hover:scale-105 transition transform"
+            aria-label="Download on the App Store"
           >
             <img
-              src="https://upload.wikimedia.org/wikipedia/commons/9/96/Apple_logo.svg"
-              alt="Apple Store"
-              className="w-6 h-6"
+              src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg"
+              alt="Download on the App Store"
+              className="h-12"
             />
-            App Store
           </a>
 
-          {/* Play Store */}
+          {/* Google Play Badge */}
           <a
             href="#"
-            className="flex items-center gap-3 bg-[#3bcc54] text-white px-6 py-3 rounded-xl font-medium hover:scale-105 transition transform"
+            className="hover:scale-105 transition transform"
+            aria-label="Get it on Google Play"
           >
             <img
               src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg"
-              alt="Google Play"
-              className="w-6 h-6"
+              alt="Get it on Google Play"
+              className="h-12"
             />
-            Play Store
           </a>
         </div>
 

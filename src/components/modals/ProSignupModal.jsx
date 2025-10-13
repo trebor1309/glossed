@@ -1,7 +1,21 @@
-// src/components/modals/ProSignupModal.jsx
+// 📄 src/components/modals/ProSignupModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
+import { useUser } from "../../context/UserContext"; // ✅ Contexte utilisateur global
 
 export default function ProSignupModal({ onClose, onClientSignup }) {
+  const { login } = useUser();
+
+  const handleProSignup = (e) => {
+    e.preventDefault();
+
+    // 🧠 Faux "pro signup"
+    // Le UserContext se charge maintenant de rediriger automatiquement vers /prodashboard
+    login("pro@glossed.app", "pro");
+
+    // Fermer la modale
+    onClose();
+  };
+
   return (
     <AnimatePresence>
       <motion.div
@@ -19,6 +33,7 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ duration: 0.3 }}
         >
+          {/* ✖️ Fermer */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -26,17 +41,20 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
             ✕
           </button>
 
-          <h2 className="text-3xl font-bold text-center mb-6">Join as a Pro</h2>
+          <h2 className="text-3xl font-bold text-center mb-6">
+            Join Glossed as a Pro
+          </h2>
 
-          <form className="space-y-4">
+          {/* 🧾 Formulaire d'inscription pro */}
+          <form className="space-y-4" onSubmit={handleProSignup}>
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Full name
+                Business name
               </label>
               <input
                 type="text"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="Jane Doe"
+                placeholder="Your Salon or Brand"
               />
             </div>
 
@@ -47,37 +65,37 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
               <input
                 type="email"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="you@business.com"
+                placeholder="contact@yourbrand.com"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Profession
+                Password
               </label>
-              <select className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none">
-                <option>Hair stylist</option>
-                <option>Makeup artist</option>
-                <option>Nail technician</option>
-                <option>Other</option>
-              </select>
+              <input
+                type="password"
+                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                placeholder="••••••••"
+              />
             </div>
 
             <button
               type="submit"
               className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all"
             >
-              Create Pro Account
+              Join as a Pro
             </button>
           </form>
 
+          {/* 🔗 Liens secondaires */}
           <p className="text-center text-sm text-gray-500 mt-6">
-            Want a regular client account instead?{" "}
+            Want to sign up as a client instead?{" "}
             <button
               onClick={onClientSignup}
               className="text-rose-600 font-medium hover:underline"
             >
-              Sign up as Client
+              Create client account
             </button>
           </p>
         </motion.div>

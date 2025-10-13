@@ -1,6 +1,7 @@
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useUser } from "../context/UserContext";
 
 export default function Home({
   onOpenLogin,
@@ -8,6 +9,21 @@ export default function Home({
   onOpenProSignup,
   onOpenDownload,
 }) {
+  const { isAuthenticated, isClient, isPro, switchRole } = useUser();
+  const navigate = useNavigate();
+
+  const handleBookNow = () => {
+    if (!isAuthenticated) {
+      onOpenLogin();
+    } else if (isClient) {
+      navigate("/dashboard/new");
+    } else if (isPro) {
+      // on peut soit prévenir, soit switcher direct
+      switchRole();
+      navigate("/dashboard/new");
+    }
+  };
+
   return (
     <>
       {/* Hero */}
@@ -52,13 +68,12 @@ export default function Home({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6, duration: 0.7 }}
             >
-              <a
-                role="button"
-                onClick={onOpenLogin}
-                className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300 w-auto mx-auto sm:mx-0"
+              <button
+                onClick={handleBookNow}
+                className="bg-gradient-to-r from-rose-600 to-red-600 text-white font-semibold px-8 py-3 rounded-full hover:scale-105 transition-transform duration-300"
               >
-                Book now
-              </a>
+                Book Now
+              </button>
 
               <Link
                 to="/about"
@@ -68,6 +83,7 @@ export default function Home({
               </Link>
             </motion.div>
 
+            {/* petits indicateurs */}
             <motion.div
               className="flex flex-wrap justify-center md:justify-start gap-6 text-sm text-gray-500 mt-8"
               initial={{ opacity: 0 }}

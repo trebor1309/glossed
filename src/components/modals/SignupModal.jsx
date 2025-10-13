@@ -1,7 +1,24 @@
-// src/components/modals/SignupModal.jsx
+// 📄 src/components/modals/SignupModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
+import { useUser } from "../../context/UserContext"; // ✅ contexte utilisateur global
+import { useNavigate } from "react-router-dom"; // ✅ navigation
 
 export default function SignupModal({ onClose, onProSignup, onLogin }) {
+  const { login } = useUser();
+  const navigate = useNavigate();
+
+  const handleSignup = (e) => {
+    e.preventDefault();
+
+    // 🧠 Faux "signup" (simulation d'inscription)
+    // on pourrait ici récupérer les champs mais pour l’instant c’est simulé
+    login("newuser@glossed.app", "client");
+
+    // Fermer la modale et rediriger
+    onClose();
+    navigate("/dashboard");
+  };
+
   return (
     <AnimatePresence>
       <motion.div
@@ -19,6 +36,7 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ duration: 0.3 }}
         >
+          {/* ✖️ Fermer */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -30,7 +48,8 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
             Create your account
           </h2>
 
-          <form className="space-y-4">
+          {/* 🧾 Formulaire */}
+          <form className="space-y-4" onSubmit={handleSignup}>
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Full name
@@ -72,6 +91,7 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
             </button>
           </form>
 
+          {/* 🔗 Liens complémentaires */}
           <p className="text-center text-sm text-gray-500 mt-6">
             Are you a beauty professional?{" "}
             <button

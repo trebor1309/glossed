@@ -1,7 +1,23 @@
-// src/components/modals/LoginModal.jsx
+// 📄 src/components/modals/LoginModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
+import { useUser } from "../../context/UserContext"; // ✅ contexte utilisateur
+import { useNavigate } from "react-router-dom"; // ✅ navigation
 
 export default function LoginModal({ onClose, onSignup }) {
+  const { login } = useUser();
+  const navigate = useNavigate();
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    // 🧠 Faux login (à remplacer plus tard par Supabase)
+    login("robert@example.com", "client");
+
+    // Fermer la modale + rediriger vers le dashboard
+    onClose();
+    navigate("/dashboard");
+  };
+
   return (
     <AnimatePresence>
       <motion.div
@@ -19,7 +35,7 @@ export default function LoginModal({ onClose, onSignup }) {
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ duration: 0.3 }}
         >
-          {/* Close button */}
+          {/* ✖️ Close button */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -29,7 +45,8 @@ export default function LoginModal({ onClose, onSignup }) {
 
           <h2 className="text-3xl font-bold text-center mb-6">Sign in</h2>
 
-          <form className="space-y-4">
+          {/* 🧾 Formulaire */}
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Email
