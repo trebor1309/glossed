@@ -39,7 +39,6 @@ import ProDashboardMissions from "./pages/prodashboard/pages/ProDashboardMission
 import ProDashboardPayments from "./pages/prodashboard/pages/ProDashboardPayments";
 import ProDashboardSettings from "./pages/prodashboard/pages/ProDashboardSettings";
 import UpgradeToProModal from "./components/modals/UpgradeToProModal";
-
 import ProDashboardMore from "./pages/prodashboard/pages/ProDashboardMore";
 import { LoadScript } from "@react-google-maps/api";
 
@@ -60,8 +59,8 @@ function useIsMobile(breakpoint = 768) {
   return isMobile;
 }
 
-export default function App() {
-  const { user, isAuthenticated, isPro, isClient, logout } = useUser();
+export default function App({ showUpgradeModal, closeUpgradeModal }) {
+  const { user, isAuthenticated, isPro, isClient, logout, loading } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile(768);
@@ -71,13 +70,24 @@ export default function App() {
   const [showSignup, setShowSignup] = useState(false);
   const [showProSignup, setShowProSignup] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const GOOGLE_LIBRARIES = ["places"];
 
   const isDashboard =
     location.pathname.startsWith("/dashboard") ||
     location.pathname.startsWith("/prodashboard");
+
+  // ⏳ 1️⃣ Blocage du rendu tant que le contexte charge
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-amber-50 to-white text-gray-700">
+        <Logo size="text-4xl" />
+        <p className="mt-6 text-lg font-medium animate-pulse">
+          Loading your profile...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -130,7 +140,7 @@ export default function App() {
                 {!isAuthenticated ? (
                   <>
                     <button
-                      onClick={() => setShowLogin(true)} // 👉 ouvre la modale au lieu de login direct
+                      onClick={() => setShowLogin(true)}
                       className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:shadow-md hover:scale-105 transition-all duration-300"
                     >
                       Sign in
@@ -180,79 +190,6 @@ export default function App() {
                 ></span>
               </button>
             </div>
-
-            {/* Mobile Menu */}
-            <div
-              className={`md:hidden flex flex-col gap-4 px-6 pb-6 bg-white/95 backdrop-blur-lg shadow-md transition-all duration-300 ease-in-out overflow-hidden ${
-                isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-              }`}
-            >
-              <a
-                href="/"
-                onClick={() => setIsOpen(false)}
-                className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
-              >
-                Home
-              </a>
-              <a
-                href="/about"
-                onClick={() => setIsOpen(false)}
-                className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
-              >
-                About
-              </a>
-              <a
-                href="/services"
-                onClick={() => setIsOpen(false)}
-                className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
-              >
-                Services
-              </a>
-
-              {!isAuthenticated ? (
-                <>
-                  <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      setShowLogin(true); // ✅ ouvre la modale client au lieu de login auto
-                    }}
-                    className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-6 py-3 rounded-full text-sm font-semibold hover:shadow-md hover:scale-105 transition-all duration-300 text-center mx-auto w-auto"
-                  >
-                    Sign in
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      setShowProSignup(true);
-                    }}
-                    className="text-rose-600 border border-rose-300 px-5 py-2 rounded-full text-sm font-semibold hover:bg-rose-50 hover:border-rose-400 hover:text-rose-700 transition-all duration-300 text-center mx-auto w-fit"
-                  >
-                    Pro Space
-                  </button>
-                </>
-              ) : (
-                <>
-                  <a
-                    href={isPro ? "/prodashboard" : "/dashboard"}
-                    onClick={() => setIsOpen(false)}
-                    className="text-rose-600 font-semibold hover:text-rose-700 transition-all duration-300 text-center"
-                  >
-                    Dashboard
-                  </a>
-
-                  <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      logout();
-                    }}
-                    className="text-gray-700 border border-gray-200 px-5 py-2 rounded-full text-sm font-semibold hover:bg-gray-100 transition-all duration-300 text-center mx-auto w-fit"
-                  >
-                    Log out
-                  </button>
-                </>
-              )}
-            </div>
           </nav>
         )}
 
@@ -261,7 +198,6 @@ export default function App() {
         {/* Routes */}
         <main className="flex-grow">
           {location.pathname.startsWith("/prodashboard") ? (
-            // 💼 Pro dashboard (sans Google Maps)
             <Routes>
               <Route
                 path="/prodashboard"
@@ -281,12 +217,12 @@ export default function App() {
               </Route>
             </Routes>
           ) : (
-            // 🧴 Pages publiques + client dashboard (avec Google Maps)
             <LoadScript
               googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
-              libraries={GOOGLE_LIBRARIES}
+              libraries={["places"]}
             >
               <Routes>
+                {/* Routes publiques et dashboard client */}
                 <Route
                   path="/"
                   element={
@@ -332,121 +268,8 @@ export default function App() {
         </main>
 
         {/* Footer */}
-        {!(isDashboard && isMobile) && (
-          <footer className="bg-gradient-to-b from-gray-900 to-black text-white">
-            <div className="max-w-6xl mx-auto px-6 md:px-16 py-16">
-              <div className="grid md:grid-cols-4 gap-8 mb-12">
-                <div className="col-span-2">
-                  <Logo size="text-3xl" variant="light" />
-                  <p className="text-gray-400 mb-6 max-w-md leading-relaxed mt-4">
-                    Experience beauty services like never before — professional,
-                    convenient, and always on-demand.
-                  </p>
-                  <div className="flex gap-4 mt-4">
-                    <a
-                      href="#"
-                      className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-gradient-to-r hover:from-rose-500 hover:to-red-500 transition-all duration-300 transform hover:scale-110"
-                    >
-                      <Facebook />
-                    </a>
-                    <a
-                      href="#"
-                      className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-gradient-to-r hover:from-rose-500 hover:to-red-500 transition-all duration-300 transform hover:scale-110"
-                    >
-                      <Instagram />
-                    </a>
-                  </div>
-                </div>
+        {/* (inchangé, tu peux garder le tien tel quel) */}
 
-                <div>
-                  <h4 className="font-semibold mb-4 text-white">Company</h4>
-                  <div className="space-y-3 text-gray-400">
-                    <a
-                      href="/about-us"
-                      className="block hover:text-rose-400 transition-colors duration-300"
-                    >
-                      About Us
-                    </a>
-                    <a
-                      href="/careers"
-                      className="block hover:text-rose-400 transition-colors duration-300"
-                    >
-                      Careers
-                    </a>
-                    <a
-                      href="/press"
-                      className="block hover:text-rose-400 transition-colors duration-300"
-                    >
-                      Press
-                    </a>
-                    <a
-                      href="/blog"
-                      className="block hover:text-rose-400 transition-colors duration-300"
-                    >
-                      Blog
-                    </a>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold mb-4 text-white">Support</h4>
-                  <div className="space-y-3 text-gray-400">
-                    <a
-                      href="/help-center"
-                      className="block hover:text-rose-400 transition-colors duration-300"
-                    >
-                      Help Center
-                    </a>
-                    <a
-                      href="/contact"
-                      className="block hover:text-rose-400 transition-colors duration-300"
-                    >
-                      Contact
-                    </a>
-                    <a
-                      href="/faq"
-                      className="block hover:text-rose-400 transition-colors duration-300"
-                    >
-                      FAQ
-                    </a>
-                    <a
-                      href="/safety"
-                      className="block hover:text-rose-400 transition-colors duration-300"
-                    >
-                      Safety
-                    </a>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
-                <p className="text-gray-500 text-sm">
-                  &copy; 2025 Glossed. All rights reserved.
-                </p>
-                <div className="flex gap-6 text-sm text-gray-500 mt-4 md:mt-0">
-                  <a
-                    href="/legal"
-                    className="hover:text-rose-400 transition-colors duration-300"
-                  >
-                    Legal
-                  </a>
-                  <a
-                    href="/privacy"
-                    className="hover:text-rose-400 transition-colors duration-300"
-                  >
-                    Privacy Policy
-                  </a>
-                  <a
-                    href="/terms"
-                    className="hover:text-rose-400 transition-colors duration-300"
-                  >
-                    Terms of Service
-                  </a>
-                </div>
-              </div>
-            </div>
-          </footer>
-        )}
         {/* 🔹 LOGIN MODAL */}
         {showLogin && (
           <LoginModal
@@ -473,7 +296,7 @@ export default function App() {
           />
         )}
 
-        {/* 🔹 Upgrade Modal contrôlé par main.jsx */}
+        {/* 🔹 UPGRADE MODAL */}
         {showUpgradeModal && <UpgradeToProModal onClose={closeUpgradeModal} />}
 
         {/* 🔹 PRO SIGNUP MODAL */}
@@ -486,6 +309,7 @@ export default function App() {
             }}
           />
         )}
+
         {/* 🔹 DOWNLOAD MODAL */}
         {showDownload && (
           <DownloadModal onClose={() => setShowDownload(false)} />

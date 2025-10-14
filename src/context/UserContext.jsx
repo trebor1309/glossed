@@ -1,4 +1,4 @@
-// 📄 src/context/UserContext.jsx
+// src/context/UserContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -13,6 +13,7 @@ export function UserProvider({ children, openUpgradeModal }) {
   const [proBadge, setProBadge] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  // Charger la session Supabase au démarrage
   useEffect(() => {
     (async () => {
       const { data } = await supabase.auth.getSession();
@@ -32,6 +33,7 @@ export function UserProvider({ children, openUpgradeModal }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Récupère le profil utilisateur depuis Supabase
   async function fetchUserProfile(supaUser) {
     const { data: profile, error } = await supabase
       .from("users")
@@ -40,6 +42,7 @@ export function UserProvider({ children, openUpgradeModal }) {
       .single();
 
     if (error) {
+      console.warn("Création profil manquant pour :", supaUser.email);
       await supabase.from("users").insert([
         {
           id: supaUser.id,
@@ -67,9 +70,11 @@ export function UserProvider({ children, openUpgradeModal }) {
     });
   }
 
+  // Inscription (client ou pro)
   const signup = async (email, password, role = "client", extra = {}) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
+
     const { user } = data;
 
     await supabase.from("users").insert([
@@ -92,27 +97,44 @@ export function UserProvider({ children, openUpgradeModal }) {
     });
   };
 
+  // Connexion (redirige automatiquement selon le rôle)
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) throw error;
+
     const { user } = data;
     await fetchUserProfile(user);
+
+    // Récupère le profil complet pour déterminer le rôle actif
+    const { data: profile } = await supabase
+      .from("users")
+      .select("active_role")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.active_role === "pro") {
+      window.location.href = "/prodashboard";
+    } else {
+      window.location.href = "/dashboard";
+    }
   };
 
+  // Déconnexion
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
     window.location.href = "/";
   };
 
-  // ✅ version avec déclenchement du modal
+  // Basculement entre rôles (et déclenchement modal)
   const switchRole = async () => {
     if (!user) return;
 
-    if (user.roles[0] !== "pro") {
+    // si le compte n'est pas pro → ouverture du modal d’upgrade
+    if (user.roles[0] !== "pro" && user.activeRole !== "pro") {
       if (typeof openUpgradeModal === "function") openUpgradeModal();
       return;
     }
@@ -125,8 +147,7 @@ export function UserProvider({ children, openUpgradeModal }) {
       .eq("id", user.id);
 
     setUser({ ...user, activeRole: nextRole });
-    window.location.href =
-      nextRole === "pro" ? "/prodashboard" : "/dashboard";
+    window.location.href = nextRole === "pro" ? "/prodashboard" : "/dashboard";
   };
 
   const isAuthenticated = !!user;
