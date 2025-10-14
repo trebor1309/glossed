@@ -1,23 +1,26 @@
-// 📄 src/components/modals/SignupModal.jsx
+// src/components/modals/SignupModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "../../context/UserContext"; // ✅ contexte utilisateur global
-import { useNavigate } from "react-router-dom"; // ✅ navigation
+import { useUser } from "../../context/UserContext"; // contexte utilisateur global
+import { useNavigate } from "react-router-dom"; // navigation
 
 export default function SignupModal({ onClose, onProSignup, onLogin }) {
   const { login } = useUser();
   const navigate = useNavigate();
 
-  const handleSignup = (e) => {
-    e.preventDefault();
+  const handleSignup = async (e) => {
+  e.preventDefault();
+  const email = e.target.email.value.trim();
+  const password = e.target.password.value.trim();
 
-    // 🧠 Faux "signup" (simulation d'inscription)
-    // on pourrait ici récupérer les champs mais pour l’instant c’est simulé
-    login("newuser@glossed.app", "client");
-
-    // Fermer la modale et rediriger
+  try {
+    await signup(email, password, "client"); // fonction Supabase du UserContext
     onClose();
     navigate("/dashboard");
-  };
+  } catch (error) {
+    alert(" Signup failed: " + error.message);
+  }
+};
+
 
   return (
     <AnimatePresence>
@@ -48,7 +51,7 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
             Create your account
           </h2>
 
-          {/* 🧾 Formulaire */}
+          {/* Formulaire */}
           <form className="space-y-4" onSubmit={handleSignup}>
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -67,6 +70,7 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
               </label>
               <input
                 type="email"
+                name="email"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="you@example.com"
               />
@@ -78,6 +82,7 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
               </label>
               <input
                 type="password"
+                name="password"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="••••••••"
               />
@@ -91,7 +96,7 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
             </button>
           </form>
 
-          {/* 🔗 Liens complémentaires */}
+          {/* Liens complémentaires */}
           <p className="text-center text-sm text-gray-500 mt-6">
             Are you a beauty professional?{" "}
             <button

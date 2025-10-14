@@ -13,10 +13,12 @@
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.7",
+    "@supabase/supabase-js": "^2.75.0",
     "bootstrap-icons": "^1.13.1",
     "framer-motion": "^12.23.22",
     "lucide-react": "^0.545.0",
     "react": "^19.1.1",
+    "react-calendar": "^6.0.0",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.4",
     "uuid": "^13.0.0"

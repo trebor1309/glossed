@@ -1,21 +1,25 @@
-// 📄 src/components/modals/LoginModal.jsx
+// src/components/modals/LoginModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "../../context/UserContext"; // ✅ contexte utilisateur
-import { useNavigate } from "react-router-dom"; // ✅ navigation
+import { useUser } from "../../context/UserContext"; // contexte utilisateur
+import { useNavigate } from "react-router-dom"; // navigation
 
 export default function LoginModal({ onClose, onSignup }) {
   const { login } = useUser();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 🧠 Faux login (à remplacer plus tard par Supabase)
-    login("robert@example.com", "client");
+    const email = e.target.email.value.trim();
+    const password = e.target.password.value.trim();
 
-    // Fermer la modale + rediriger vers le dashboard
-    onClose();
-    navigate("/dashboard");
+    try {
+      await login(email, password); // vraie fonction Supabase
+      onClose(); // ferme après succès
+      navigate("/dashboard"); // redirige selon rôle (on peut ajuster ensuite)
+    } catch (error) {
+      alert(" Login failed: " + error.message);
+    }
   };
 
   return (
@@ -35,7 +39,7 @@ export default function LoginModal({ onClose, onSignup }) {
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ duration: 0.3 }}
         >
-          {/* ✖️ Close button */}
+          {/* Close button */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -45,7 +49,7 @@ export default function LoginModal({ onClose, onSignup }) {
 
           <h2 className="text-3xl font-bold text-center mb-6">Sign in</h2>
 
-          {/* 🧾 Formulaire */}
+          {/* Formulaire */}
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -53,8 +57,10 @@ export default function LoginModal({ onClose, onSignup }) {
               </label>
               <input
                 type="email"
+                name="email"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="you@example.com"
+                required
               />
             </div>
 
@@ -64,8 +70,10 @@ export default function LoginModal({ onClose, onSignup }) {
               </label>
               <input
                 type="password"
+                name="password"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="••••••••"
+                required
               />
             </div>
 

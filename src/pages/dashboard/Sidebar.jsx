@@ -17,13 +17,20 @@ export default function Sidebar() {
 
   const links = [
     { to: "/dashboard", label: "Dashboard", icon: Home },
-    { to: "/dashboard/reservations", label: "My Reservations", icon: CalendarDays },
+    {
+      to: "/dashboard/reservations",
+      label: "My Reservations",
+      icon: CalendarDays,
+    },
     { to: "/dashboard/account", label: "Account", icon: User },
     { to: "/dashboard/settings", label: "Settings", icon: Settings },
   ];
 
   return (
-    <nav className="flex flex-col p-6 h-full bg-white border-r border-gray-100 shadow-sm">
+    <nav
+      className="flex flex-col p-6 bg-white border-r border-gray-100 shadow-sm
+                sticky top-0 self-start"
+    >
       {/* 🔹 Logo */}
       <h2
         className="text-2xl font-bold text-rose-600 mb-6 cursor-pointer"

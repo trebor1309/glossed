@@ -1,19 +1,25 @@
-// 📄 src/components/modals/ProSignupModal.jsx
+// src/components/modals/ProSignupModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "../../context/UserContext"; // ✅ Contexte utilisateur global
+import { useUser } from "../../context/UserContext";
 
 export default function ProSignupModal({ onClose, onClientSignup }) {
-  const { login } = useUser();
+  const { signup } = useUser();
 
-  const handleProSignup = (e) => {
+  const handleProSignup = async (e) => {
     e.preventDefault();
 
-    // 🧠 Faux "pro signup"
-    // Le UserContext se charge maintenant de rediriger automatiquement vers /prodashboard
-    login("pro@glossed.app", "pro");
+    const businessName = e.target.businessName.value.trim();
+    const email = e.target.email.value.trim();
+    const password = e.target.password.value.trim();
 
-    // Fermer la modale
-    onClose();
+    try {
+      // Création du compte pro avec le businessName
+      await signup(email, password, "pro", { businessName });
+      onClose();
+      window.location.href = "/prodashboard";
+    } catch (error) {
+      alert("Erreur lors de l'inscription : " + error.message);
+    }
   };
 
   return (
@@ -33,7 +39,6 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ duration: 0.3 }}
         >
-          {/* ✖️ Fermer */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -45,7 +50,6 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
             Join Glossed as a Pro
           </h2>
 
-          {/* 🧾 Formulaire d'inscription pro */}
           <form className="space-y-4" onSubmit={handleProSignup}>
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -53,8 +57,10 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
               </label>
               <input
                 type="text"
+                name="businessName"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="Your Salon or Brand"
+                required
               />
             </div>
 
@@ -64,8 +70,10 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
               </label>
               <input
                 type="email"
+                name="email"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="contact@yourbrand.com"
+                required
               />
             </div>
 
@@ -75,8 +83,10 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
               </label>
               <input
                 type="password"
+                name="password"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="••••••••"
+                required
               />
             </div>
 
@@ -88,7 +98,6 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
             </button>
           </form>
 
-          {/* 🔗 Liens secondaires */}
           <p className="text-center text-sm text-gray-500 mt-6">
             Want to sign up as a client instead?{" "}
             <button

@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, useEffect } from "react";
+// 📄 src/context/UserContext.jsx
+import { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
 const UserContext = createContext();
 
@@ -6,60 +8,127 @@ export function useUser() {
   return useContext(UserContext);
 }
 
-export function UserProvider({ children }) {
+export function UserProvider({ children, openUpgradeModal }) {
   const [user, setUser] = useState(null);
-  const [proBadge, setProBadge] = useState(0); // 🆕 badge missions pro
+  const [proBadge, setProBadge] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  // 🔁 Charger le user depuis localStorage au démarrage
   useEffect(() => {
-    const storedUser = localStorage.getItem("glossed_user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem("glossed_user");
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const sessionUser = data.session?.user;
+      if (sessionUser) await fetchUserProfile(sessionUser);
+      setLoading(false);
+    })();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        const supaUser = session?.user;
+        if (supaUser) await fetchUserProfile(supaUser);
+        else setUser(null);
       }
-    }
+    );
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
-  // 💾 Sauvegarde automatique
-  useEffect(() => {
-    if (user) localStorage.setItem("glossed_user", JSON.stringify(user));
-    else localStorage.removeItem("glossed_user");
-  }, [user]);
+  async function fetchUserProfile(supaUser) {
+    const { data: profile, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", supaUser.id)
+      .single();
 
-  // ✅ Connexion simulée (création d’un compte)
-  const login = (email = "guest@glossed.app", type = "client") => {
-    const baseUser = {
-      email,
-      roles: type === "pro" ? ["pro"] : ["client"],
-      activeRole: type,
-    };
-    setUser(baseUser);
-    window.location.href = type === "pro" ? "/prodashboard" : "/dashboard";
+    if (error) {
+      await supabase.from("users").insert([
+        {
+          id: supaUser.id,
+          email: supaUser.email,
+          role: "client",
+          active_role: "client",
+        },
+      ]);
+      setUser({
+        id: supaUser.id,
+        email: supaUser.email,
+        roles: ["client"],
+        activeRole: "client",
+      });
+      return;
+    }
+
+    setUser({
+      id: supaUser.id,
+      email: supaUser.email,
+      roles: [profile.role],
+      activeRole: profile.active_role,
+      name: profile.name || "",
+      city: profile.city || "",
+    });
+  }
+
+  const signup = async (email, password, role = "client", extra = {}) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    const { user } = data;
+
+    await supabase.from("users").insert([
+      {
+        id: user.id,
+        email: user.email,
+        role,
+        active_role: role,
+        name: extra.name || "",
+        company: extra.businessName || "",
+        city: extra.city || "",
+      },
+    ]);
+
+    setUser({
+      id: user.id,
+      email: user.email,
+      roles: [role],
+      activeRole: role,
+    });
   };
 
-  // ✅ Déconnexion complète
-  const logout = () => {
+  const login = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+    const { user } = data;
+    await fetchUserProfile(user);
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem("glossed_user");
     window.location.href = "/";
   };
 
-  // 🔁 Changer de rôle actif avec redirection automatique
-  const switchRole = () => {
-    if (!user?.roles?.length) return;
+  // ✅ version avec déclenchement du modal
+  const switchRole = async () => {
+    if (!user) return;
+
+    if (user.roles[0] !== "pro") {
+      if (typeof openUpgradeModal === "function") openUpgradeModal();
+      return;
+    }
+
     const nextRole = user.activeRole === "client" ? "pro" : "client";
-    const updatedRoles = user.roles.includes(nextRole)
-      ? user.roles
-      : [...user.roles, nextRole];
-    const updatedUser = { ...user, roles: updatedRoles, activeRole: nextRole };
-    setUser(updatedUser);
+
+    await supabase
+      .from("users")
+      .update({ active_role: nextRole })
+      .eq("id", user.id);
+
+    setUser({ ...user, activeRole: nextRole });
     window.location.href =
       nextRole === "pro" ? "/prodashboard" : "/dashboard";
   };
 
-  // 🧠 Indicateurs utiles
   const isAuthenticated = !!user;
   const isPro = user?.activeRole === "pro";
   const isClient = user?.activeRole === "client";
@@ -68,14 +137,16 @@ export function UserProvider({ children }) {
     <UserContext.Provider
       value={{
         user,
+        signup,
         login,
         logout,
         switchRole,
         isAuthenticated,
         isPro,
         isClient,
-        proBadge,     // 🆕 exposé
-        setProBadge,  // 🆕 exposé
+        proBadge,
+        setProBadge,
+        loading,
       }}
     >
       {children}

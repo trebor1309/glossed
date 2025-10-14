@@ -38,6 +38,8 @@ import ProDashboardHome from "./pages/prodashboard/pages/ProDashboardHome";
 import ProDashboardMissions from "./pages/prodashboard/pages/ProDashboardMissions";
 import ProDashboardPayments from "./pages/prodashboard/pages/ProDashboardPayments";
 import ProDashboardSettings from "./pages/prodashboard/pages/ProDashboardSettings";
+import UpgradeToProModal from "./components/modals/UpgradeToProModal";
+
 import ProDashboardMore from "./pages/prodashboard/pages/ProDashboardMore";
 import { LoadScript } from "@react-google-maps/api";
 
@@ -69,6 +71,8 @@ export default function App() {
   const [showSignup, setShowSignup] = useState(false);
   const [showProSignup, setShowProSignup] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
   const GOOGLE_LIBRARIES = ["places"];
 
   const isDashboard =
@@ -261,7 +265,13 @@ export default function App() {
             <Routes>
               <Route
                 path="/prodashboard"
-                element={isAuthenticated ? <ProDashboardLayout /> : <Home />}
+                element={
+                  isAuthenticated && isPro && user.roles.includes("pro") ? (
+                    <ProDashboardLayout />
+                  ) : (
+                    <Home />
+                  )
+                }
               >
                 <Route index element={<ProDashboardHome />} />
                 <Route path="missions" element={<ProDashboardMissions />} />
@@ -462,6 +472,9 @@ export default function App() {
             }}
           />
         )}
+
+        {/* 🔹 Upgrade Modal contrôlé par main.jsx */}
+        {showUpgradeModal && <UpgradeToProModal onClose={closeUpgradeModal} />}
 
         {/* 🔹 PRO SIGNUP MODAL */}
         {showProSignup && (
