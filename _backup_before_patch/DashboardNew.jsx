@@ -1,8 +1,5 @@
 import { useState } from "react";
 import { Autocomplete } from "@react-google-maps/api";
-import { motion } from "framer-motion";
-import { v4 as uuid } from "uuid";
-import { saveBooking } from "@/lib/storage"; // 🆕 pour simuler backend local
 
 export default function DashboardNew() {
   const [service, setService] = useState("");
@@ -15,9 +12,6 @@ export default function DashboardNew() {
     country: "Belgium",
   });
   const [notes, setNotes] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
-
-  // 🗺️ Lecture de l’adresse via Google Maps Autocomplete
   const handlePlaceSelect = (autocomplete) => {
     const place = autocomplete.getPlace();
     if (!place || !place.address_components) return;
@@ -47,57 +41,26 @@ export default function DashboardNew() {
     { label: "Evening (18:00 - 21:00)", value: "evening" },
   ];
 
-  // 📝 Gestion manuelle d’un champ adresse
-  const handleAddressChange = (field, value) => {
-    setAddress((prev) => ({ ...prev, [field]: value }));
-  };
-
-  // 💾 Sauvegarde du booking dans le localStorage
   const handleSubmit = (e) => {
     e.preventDefault();
 
     const booking = {
-      id: uuid(),
       service,
       date,
       timeSlot,
       address,
       notes,
-      status: "pending",
-      createdAt: new Date().toISOString(),
     };
 
-    // Sauvegarde locale (sera plus tard envoyée à Supabase)
-    saveBooking(booking);
-
-    // Confirmation visuelle
-    setConfirmed(true);
-    setService("");
-    setDate("");
-    setTimeSlot("");
-    setAddress({
-      street: "",
-      postalCode: "",
-      city: "",
-      country: "Belgium",
-    });
-    setNotes("");
-    setTimeout(() => setConfirmed(false), 4000);
+    console.log("📦 Booking data:", booking);
+    alert("Your booking request has been sent ✨");
+    // 👉 futur: envoyer à ton backend ou à Supabase
   };
 
-  {
-    confirmed && (
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0, y: -10 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50"
-      >
-        <div className="bg-white rounded-2xl shadow-xl px-6 py-4 text-green-700 border border-green-200 text-center max-w-sm">
-          <p className="font-semibold text-lg">Booking confirmed! 🎉</p>
-        </div>
-      </motion.div>
-    );
-  }
+  // à venir: on branchera ici une API Google Maps Autocomplete pour "street"
+  const handleAddressChange = (field, value) => {
+    setAddress((prev) => ({ ...prev, [field]: value }));
+  };
 
   return (
     <div className="mt-10 max-w-xl mx-auto text-center">
@@ -107,17 +70,6 @@ export default function DashboardNew() {
       <p className="text-gray-600 mb-8">
         Choose your service, select a time slot and enter your address ✨
       </p>
-
-      {/* ✅ Confirmation */}
-      {confirmed && (
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-3 mb-4"
-        >
-          Booking confirmed! 🎉
-        </motion.div>
-      )}
 
       <form
         onSubmit={handleSubmit}
@@ -177,7 +129,7 @@ export default function DashboardNew() {
           </select>
         </div>
 
-        {/* Address details */}
+        {/* Adresse complète */}
         <div className="space-y-3">
           <h3 className="text-md font-semibold text-gray-800 mt-4 mb-2">
             Address details
@@ -194,8 +146,6 @@ export default function DashboardNew() {
               <input
                 type="text"
                 placeholder="e.g. Avenue Louise 123"
-                value={address.street}
-                onChange={(e) => handleAddressChange("street", e.target.value)}
                 required
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-rose-400"
               />

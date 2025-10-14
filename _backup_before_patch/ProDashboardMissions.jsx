@@ -1,52 +1,46 @@
 import { CheckCircle, XCircle, Clock, Calendar } from "lucide-react";
-import { useState, useEffect } from "react";
-import { useUser } from "@/context/UserContext";
-import {
-  getAllBookings,
-  upsertMission,
-  updateBookingStatus, // 🆕 pour modifier le statut côté client
-} from "@/lib/storage";
+import { useState } from "react";
 
 export default function ProDashboardMissions() {
-  const { setProBadge } = useUser();
+  const [missions, setMissions] = useState([
+    {
+      id: 1,
+      client: "Alice Dupont",
+      service: "Makeup session",
+      date: "Oct 22, 2025",
+      status: "pending",
+    },
+    {
+      id: 2,
+      client: "Marie Thomas",
+      service: "Haircut & Styling",
+      date: "Oct 25, 2025",
+      status: "upcoming",
+    },
+    {
+      id: 3,
+      client: "Emma Leroy",
+      service: "Wedding Makeup",
+      date: "Sep 30, 2025",
+      status: "completed",
+    },
+  ]);
 
-  const [missions, setMissions] = useState([]);
-
-  // 🔁 Charger les missions en attente (bookings "pending")
-  useEffect(() => {
-    const all = getAllBookings().filter((b) => b.status === "pending");
-    setMissions(all);
-    setProBadge(all.length);
-
-    // Écouter les nouveaux bookings créés côté client
-    const handleNewBooking = () => {
-      const updated = getAllBookings().filter((b) => b.status === "pending");
-      setMissions(updated);
-      setProBadge(updated.length);
-    };
-    window.addEventListener("glossed:new-booking", handleNewBooking);
-    return () =>
-      window.removeEventListener("glossed:new-booking", handleNewBooking);
-  }, [setProBadge]);
-
-  // ✅ Accept → passe en "upcoming" pour le pro + "confirmed" pour le client
   const handleAccept = (id) => {
     setMissions((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, status: "upcoming" } : m))
+      prev.map((m) =>
+        m.id === id ? { ...m, status: "upcoming" } : m
+      )
     );
-    updateBookingStatus(id, "confirmed"); // 🆕 met à jour côté client
-    setProBadge((n) => Math.max(0, n - 1));
   };
 
-  // ❌ Decline → supprime côté pro + passe "cancelled" côté client
   const handleDecline = (id) => {
     setMissions((prev) => prev.filter((m) => m.id !== id));
-    updateBookingStatus(id, "cancelled"); // 🆕 met à jour côté client
-    setProBadge((n) => Math.max(0, n - 1));
   };
 
   const pending = missions.filter((m) => m.status === "pending");
   const upcoming = missions.filter((m) => m.status === "upcoming");
+  const completed = missions.filter((m) => m.status === "completed");
 
   return (
     <section className="space-y-8">
@@ -63,12 +57,9 @@ export default function ProDashboardMissions() {
                 className="flex justify-between items-center border-b border-gray-100 pb-3"
               >
                 <div>
-                  <p className="font-medium text-gray-800">{m.service}</p>
+                  <p className="font-medium text-gray-800">{m.client}</p>
                   <p className="text-sm text-gray-500">
-                    {m.date} — {m.timeSlot}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {m.address?.street}, {m.address?.city}
+                    {m.service} — {m.date}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -106,9 +97,9 @@ export default function ProDashboardMissions() {
                 className="flex justify-between items-center border-b border-gray-100 pb-3"
               >
                 <div>
-                  <p className="font-medium text-gray-800">{m.service}</p>
+                  <p className="font-medium text-gray-800">{m.client}</p>
                   <p className="text-sm text-gray-500">
-                    {m.date} — {m.timeSlot}
+                    {m.service} — {m.date}
                   </p>
                 </div>
                 <span className="text-rose-600 font-semibold text-sm">
@@ -119,6 +110,35 @@ export default function ProDashboardMissions() {
           </ul>
         ) : (
           <p className="text-gray-500 text-sm italic">No upcoming missions</p>
+        )}
+      </div>
+
+      {/* Completed */}
+      <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+          <CheckCircle size={20} className="text-green-600" /> Completed
+        </h2>
+        {completed.length ? (
+          <ul className="space-y-4">
+            {completed.map((m) => (
+              <li
+                key={m.id}
+                className="flex justify-between items-center border-b border-gray-100 pb-3"
+              >
+                <div>
+                  <p className="font-medium text-gray-800">{m.client}</p>
+                  <p className="text-sm text-gray-500">
+                    {m.service} — {m.date}
+                  </p>
+                </div>
+                <span className="text-green-600 font-semibold text-sm">
+                  Done
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-gray-500 text-sm italic">No completed missions</p>
         )}
       </div>
     </section>

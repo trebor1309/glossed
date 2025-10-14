@@ -1,10 +1,17 @@
-import { Home, Calendar, DollarSign, Settings, MoreHorizontal } from "lucide-react";
+import {
+  Home,
+  Calendar,
+  DollarSign,
+  Settings,
+  MoreHorizontal,
+} from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
+import { useUser } from "@/context/UserContext";
 
 export default function ProBottomNav() {
   const navigate = useNavigate();
-  const pendingJobs = 3; // 💡 à rendre dynamique plus tard
+  const { proBadge = 0 } = useUser(); // 🆕 dynamique
 
   const nav = (
     <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-lg flex justify-around items-center py-2 md:hidden z-[9999]">
@@ -17,9 +24,9 @@ export default function ProBottomNav() {
           title="Pending Jobs"
         >
           <Calendar className="h-6 w-6 text-white" />
-          {pendingJobs > 0 && (
+          {proBadge > 0 && (
             <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-              {pendingJobs}
+              {proBadge}
             </span>
           )}
         </button>

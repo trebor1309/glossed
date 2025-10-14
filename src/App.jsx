@@ -69,6 +69,7 @@ export default function App() {
   const [showSignup, setShowSignup] = useState(false);
   const [showProSignup, setShowProSignup] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
+  const GOOGLE_LIBRARIES = ["places"];
 
   const isDashboard =
     location.pathname.startsWith("/dashboard") ||
@@ -76,11 +77,6 @@ export default function App() {
 
   return (
     <>
-      <LoadScript
-        googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
-        libraries={["places"]}
-      />
-
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-50 to-white text-gray-900 font-sans">
         {/* Navbar */}
         {!(isDashboard && isMobile) && (
@@ -260,54 +256,69 @@ export default function App() {
 
         {/* Routes */}
         <main className="flex-grow">
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <Home
-                  onOpenLogin={() => setShowLogin(true)}
-                  onOpenSignup={() => setShowSignup(true)}
-                  onOpenProSignup={() => setShowProSignup(true)}
-                  onOpenDownload={() => setShowDownload(true)}
+          {location.pathname.startsWith("/prodashboard") ? (
+            // 💼 Pro dashboard (sans Google Maps)
+            <Routes>
+              <Route
+                path="/prodashboard"
+                element={isAuthenticated ? <ProDashboardLayout /> : <Home />}
+              >
+                <Route index element={<ProDashboardHome />} />
+                <Route path="missions" element={<ProDashboardMissions />} />
+                <Route path="payments" element={<ProDashboardPayments />} />
+                <Route path="settings" element={<ProDashboardSettings />} />
+                <Route path="more" element={<ProDashboardMore />} />
+              </Route>
+            </Routes>
+          ) : (
+            // 🧴 Pages publiques + client dashboard (avec Google Maps)
+            <LoadScript
+              googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+              libraries={GOOGLE_LIBRARIES}
+            >
+              <Routes>
+                <Route
+                  path="/"
+                  element={
+                    <Home
+                      onOpenLogin={() => setShowLogin(true)}
+                      onOpenSignup={() => setShowSignup(true)}
+                      onOpenProSignup={() => setShowProSignup(true)}
+                      onOpenDownload={() => setShowDownload(true)}
+                    />
+                  }
                 />
-              }
-            />
-            <Route path="/about" element={<About />} />
-            <Route path="/services" element={<Services />} />
-            <Route path="/legal" element={<Legal />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/faq" element={<FAQ />} />
-            <Route path="/about-us" element={<AboutUs />} />
-            <Route path="/careers" element={<Careers />} />
-            <Route path="/press" element={<Press />} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/help-center" element={<HelpCenter />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/safety" element={<Safety />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/services" element={<Services />} />
+                <Route path="/legal" element={<Legal />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/faq" element={<FAQ />} />
+                <Route path="/about-us" element={<AboutUs />} />
+                <Route path="/careers" element={<Careers />} />
+                <Route path="/press" element={<Press />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/help-center" element={<HelpCenter />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/safety" element={<Safety />} />
 
-            <Route
-              path="/dashboard"
-              element={isAuthenticated ? <DashboardLayout /> : <Home />}
-            >
-              <Route index element={<DashboardHome />} />
-              <Route path="reservations" element={<DashboardReservations />} />
-              <Route path="new" element={<DashboardNew />} />
-              <Route path="account" element={<DashboardAccount />} />
-              <Route path="settings" element={<DashboardSettings />} />
-              <Route path="more" element={<DashboardMore />} />
-            </Route>
-            <Route
-              path="/prodashboard"
-              element={isAuthenticated ? <ProDashboardLayout /> : <Home />}
-            >
-              <Route index element={<ProDashboardHome />} />
-              <Route path="missions" element={<ProDashboardMissions />} />
-              <Route path="payments" element={<ProDashboardPayments />} />
-              <Route path="settings" element={<ProDashboardSettings />} />
-              <Route path="more" element={<ProDashboardMore />} />
-            </Route>
-          </Routes>
+                <Route
+                  path="/dashboard"
+                  element={isAuthenticated ? <DashboardLayout /> : <Home />}
+                >
+                  <Route index element={<DashboardHome />} />
+                  <Route
+                    path="reservations"
+                    element={<DashboardReservations />}
+                  />
+                  <Route path="new" element={<DashboardNew />} />
+                  <Route path="account" element={<DashboardAccount />} />
+                  <Route path="settings" element={<DashboardSettings />} />
+                  <Route path="more" element={<DashboardMore />} />
+                </Route>
+              </Routes>
+            </LoadScript>
+          )}
         </main>
 
         {/* Footer */}

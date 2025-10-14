@@ -1,23 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "tailwindcss";
+import path from "path";
 
 export default defineConfig({
   plugins: [react()],
-
-  // ✅ Permet à Vite de servir index.html pour toutes les routes (utile en dev ou sur d'autres hébergeurs)
-  server: {
-    historyApiFallback: true,
-  },
-
-  // ✅ Optimisation pour Tailwind CSS
-  css: {
-    transformer: tailwindcss,
-  },
-
-  // ✅ (optionnel mais utile) : support propre des chemins relatifs lors du build
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-  },
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  server: { historyApiFallback: true },
+  css: { transformer: tailwindcss },
+  build: { outDir: "dist", emptyOutDir: true },
 });

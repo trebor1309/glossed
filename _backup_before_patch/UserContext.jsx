@@ -8,7 +8,6 @@ export function useUser() {
 
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [proBadge, setProBadge] = useState(0); // 🆕 badge missions pro
 
   // 🔁 Charger le user depuis localStorage au démarrage
   useEffect(() => {
@@ -36,6 +35,8 @@ export function UserProvider({ children }) {
       activeRole: type,
     };
     setUser(baseUser);
+
+    // Redirection immédiate selon le type
     window.location.href = type === "pro" ? "/prodashboard" : "/dashboard";
   };
 
@@ -49,14 +50,23 @@ export function UserProvider({ children }) {
   // 🔁 Changer de rôle actif avec redirection automatique
   const switchRole = () => {
     if (!user?.roles?.length) return;
+
     const nextRole = user.activeRole === "client" ? "pro" : "client";
+
+    // Si l’utilisateur n’a pas encore l’autre rôle, on l’ajoute
     const updatedRoles = user.roles.includes(nextRole)
       ? user.roles
       : [...user.roles, nextRole];
+
     const updatedUser = { ...user, roles: updatedRoles, activeRole: nextRole };
     setUser(updatedUser);
-    window.location.href =
-      nextRole === "pro" ? "/prodashboard" : "/dashboard";
+
+    // 🚀 Redirection automatique
+    if (nextRole === "pro") {
+      window.location.href = "/prodashboard";
+    } else {
+      window.location.href = "/dashboard";
+    }
   };
 
   // 🧠 Indicateurs utiles
@@ -74,8 +84,6 @@ export function UserProvider({ children }) {
         isAuthenticated,
         isPro,
         isClient,
-        proBadge,     // 🆕 exposé
-        setProBadge,  // 🆕 exposé
       }}
     >
       {children}
