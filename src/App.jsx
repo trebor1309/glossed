@@ -80,13 +80,24 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
   // ⏳ 1️⃣ Blocage du rendu tant que le contexte charge
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-amber-50 to-white text-gray-700">
-        <Logo size="text-4xl" />
-        <p className="mt-6 text-lg font-medium animate-pulse">
-          Loading your profile...
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-rose-50 via-white to-amber-50 text-gray-700 overflow-hidden">
+        <div className="animate-bounce-slow">
+          <Logo size="text-5xl" />
+        </div>
+        <p className="mt-6 text-base font-medium text-gray-500 animate-pulse">
+          Preparing your experience...
         </p>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-rose-100/30 via-transparent to-transparent blur-3xl"></div>
       </div>
     );
+  }
+  if (
+    isAuthenticated &&
+    !isPro &&
+    location.pathname.startsWith("/prodashboard")
+  ) {
+    navigate("/dashboard", { replace: true });
+    return null;
   }
 
   return (
@@ -202,7 +213,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               <Route
                 path="/prodashboard"
                 element={
-                  isAuthenticated && isPro && user.roles.includes("pro") ? (
+                  isAuthenticated && (isPro || user?.roles?.includes("pro")) ? (
                     <ProDashboardLayout />
                   ) : (
                     <Home />
@@ -219,7 +230,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
           ) : (
             <LoadScript
               googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
-              libraries={["places"]}
+              libraries={GOOGLE_LIBRARIES}
             >
               <Routes>
                 {/* Routes publiques et dashboard client */}

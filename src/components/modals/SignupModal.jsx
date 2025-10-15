@@ -4,7 +4,7 @@ import { useUser } from "../../context/UserContext"; // contexte utilisateur glo
 import { useNavigate } from "react-router-dom"; // navigation
 
 export default function SignupModal({ onClose, onProSignup, onLogin }) {
-  const { login } = useUser();
+  const { signup } = useUser();
   const navigate = useNavigate();
 
   const handleSignup = async (e) => {

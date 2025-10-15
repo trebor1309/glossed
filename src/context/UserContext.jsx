@@ -1,4 +1,6 @@
 // src/context/UserContext.jsx
+import { useNavigate } from "react-router-dom";
+
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -12,14 +14,30 @@ export function UserProvider({ children, openUpgradeModal }) {
   const [user, setUser] = useState(null);
   const [proBadge, setProBadge] = useState(0);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   // Charger la session Supabase au démarrage
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      const sessionUser = data.session?.user;
-      if (sessionUser) await fetchUserProfile(sessionUser);
-      setLoading(false);
+      console.log("🔍 Checking Supabase session...");
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) console.error("Session error:", error);
+        console.log("Session data:", data);
+
+        const sessionUser = data?.session?.user;
+        if (sessionUser) {
+          console.log("✅ Found session user:", sessionUser.email);
+          await fetchUserProfile(sessionUser);
+        } else {
+          console.log("ℹ️ No active session");
+        }
+      } catch (err) {
+        console.error("❌ Error in session check:", err);
+      } finally {
+        console.log("🏁 Setting loading to false");
+        setLoading(false);
+      }
     })();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
@@ -95,10 +113,18 @@ export function UserProvider({ children, openUpgradeModal }) {
       roles: [role],
       activeRole: role,
     });
+    // ✅ redirection sans rechargement
+    navigate(role === "pro" ? "/prodashboard" : "/dashboard", {
+      replace: true,
+    });
   };
 
   // Connexion (redirige automatiquement selon le rôle)
+  // Connexion (redirige automatiquement selon le rôle)
   const login = async (email, password) => {
+    console.log("LOGIN START");
+
+    // Étape 1 — Authentification via Supabase
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -106,48 +132,91 @@ export function UserProvider({ children, openUpgradeModal }) {
     if (error) throw error;
 
     const { user } = data;
+
+    // Étape 2 — Récupération du profil complet
     await fetchUserProfile(user);
 
-    // Récupère le profil complet pour déterminer le rôle actif
-    const { data: profile } = await supabase
+    // Étape 3 — Lecture du rôle actif depuis la table users
+    const { data: profile, error: profileError } = await supabase
       .from("users")
       .select("active_role")
       .eq("id", user.id)
       .single();
 
-    if (profile?.active_role === "pro") {
-      window.location.href = "/prodashboard";
-    } else {
-      window.location.href = "/dashboard";
-    }
-  };
-
-  // Déconnexion
-  const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    window.location.href = "/";
-  };
-
-  // Basculement entre rôles (et déclenchement modal)
-  const switchRole = async () => {
-    if (!user) return;
-
-    // si le compte n'est pas pro → ouverture du modal d’upgrade
-    if (user.roles[0] !== "pro" && user.activeRole !== "pro") {
-      if (typeof openUpgradeModal === "function") openUpgradeModal();
+    if (profileError) {
+      console.error("Erreur lors de la récupération du profil :", profileError);
       return;
     }
 
-    const nextRole = user.activeRole === "client" ? "pro" : "client";
+    console.log("LOGIN PROFILE:", profile);
 
-    await supabase
-      .from("users")
-      .update({ active_role: nextRole })
-      .eq("id", user.id);
+    // Étape 4 — Synchronisation immédiate du contexte utilisateur
+    setUser((prev) => ({
+      ...prev,
+      activeRole: profile?.active_role || "client",
+    }));
 
-    setUser({ ...user, activeRole: nextRole });
-    window.location.href = nextRole === "pro" ? "/prodashboard" : "/dashboard";
+    // Étape 5 — Redirection sans rechargement selon le rôle
+    if (profile?.active_role === "pro") {
+      navigate("/prodashboard", { replace: true });
+    } else {
+      navigate("/dashboard", { replace: true });
+    }
+  };
+
+  // Déconnexion (sans rechargement complet)
+  const logout = async () => {
+    try {
+      // Étape 1 — Déconnexion Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      // Étape 2 — Réinitialiser le contexte utilisateur
+      setUser(null);
+
+      // Étape 3 — Redirection douce vers la page d'accueil
+      navigate("/", { replace: true });
+      console.log("LOGOUT SUCCESS");
+    } catch (err) {
+      console.error("Erreur lors de la déconnexion :", err.message);
+    }
+  };
+
+  // Changement de rôle (client ⇄ pro) sans rechargement
+  const switchRole = async () => {
+    if (!user) return;
+
+    // Étape 1 — si le compte n’est pas pro, ouverture du modal d’upgrade
+    if (user.roles[0] !== "pro" && user.activeRole !== "pro") {
+      if (typeof openUpgradeModal === "function") {
+        openUpgradeModal();
+        return;
+      }
+    }
+
+    try {
+      // Étape 2 — Déterminer le rôle suivant
+      const nextRole = user.activeRole === "client" ? "pro" : "client";
+
+      // Étape 3 — Mettre à jour la base Supabase
+      const { error } = await supabase
+        .from("users")
+        .update({ active_role: nextRole })
+        .eq("id", user.id);
+      if (error) throw error;
+
+      // Étape 4 — Mettre à jour le contexte local
+      setUser((prev) => ({ ...prev, activeRole: nextRole }));
+
+      // Étape 5 — Navigation instantanée sans reload
+      navigate(nextRole === "pro" ? "/prodashboard" : "/dashboard", {
+        replace: true,
+      });
+
+      console.log("ROLE SWITCHED:", nextRole);
+    } catch (err) {
+      console.error("Erreur lors du changement de rôle :", err.message);
+    }
   };
 
   const isAuthenticated = !!user;

@@ -1,6 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Animation déjà présente */
 @keyframes soft-pulse {
   0% {
     box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.5);
@@ -11,4 +13,18 @@
   100% {
     box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
   }
+}
+
+/* Nouvelle animation pour le logo de chargement */
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 2s infinite;
 }
