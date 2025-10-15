@@ -1,5 +1,6 @@
 // src/context/UserContext.jsx
 import { useNavigate } from "react-router-dom";
+import UpgradeToProModal from "@/components/modals/UpgradeToProModal";
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -221,6 +222,7 @@ export function UserProvider({ children, openUpgradeModal }) {
   const isAuthenticated = !!user;
   const isPro = user?.activeRole === "pro";
   const isClient = user?.activeRole === "client";
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   return (
     <UserContext.Provider
@@ -236,9 +238,14 @@ export function UserProvider({ children, openUpgradeModal }) {
         proBadge,
         setProBadge,
         loading,
+        showUpgradeModal,
+        setShowUpgradeModal, // ✅ ajout manquant
       }}
     >
       {children}
+      {showUpgradeModal && (
+        <UpgradeToProModal onClose={() => setShowUpgradeModal(false)} />
+      )}
     </UserContext.Provider>
   );
 }

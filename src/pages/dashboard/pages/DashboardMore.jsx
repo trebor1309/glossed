@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useUser } from "../../../context/UserContext";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabaseClient";
 import {
   Settings,
   HelpCircle,
@@ -13,12 +14,10 @@ import {
   LogOut,
   Repeat,
 } from "lucide-react";
-import ProSignupModal from "../../../components/modals/ProSignupModal";
 
 export default function DashboardMore() {
   const navigate = useNavigate();
-  const { user, logout, switchRole } = useUser();
-  const [showProSignup, setShowProSignup] = useState(false);
+  const { user, logout, switchRole, setShowUpgradeModal } = useUser();
 
   const sections = [
     {
@@ -48,13 +47,21 @@ export default function DashboardMore() {
     },
   ];
 
-  const handleSwitchToPro = () => {
+  // 🌹 Nouveau comportement intelligent du bouton "Switch to Pro"
+  const handleSwitchToPro = async () => {
     if (user?.roles?.includes("pro")) {
-      // déjà pro → bascule direct
-      switchRole();
+      try {
+        await supabase
+          .from("users")
+          .update({ active_role: "pro" })
+          .eq("id", user.id);
+      } catch (e) {
+        console.warn("⚠️ Erreur lors de la mise à jour du rôle actif :", e);
+      }
+      navigate("/prodashboard", { replace: true });
     } else {
-      // pas encore pro → ouvre la modale d’inscription
-      setShowProSignup(true);
+      // client uniquement → ouvre le modal d’upgrade via le contexte
+      setShowUpgradeModal(true);
     }
   };
 
@@ -137,14 +144,6 @@ export default function DashboardMore() {
           Log out
         </button>
       </div>
-
-      {/* ✨ Modale d’inscription Pro (si besoin) */}
-      {showProSignup && (
-        <ProSignupModal
-          onClose={() => setShowProSignup(false)}
-          onClientSignup={() => setShowProSignup(false)}
-        />
-      )}
     </section>
   );
 }
