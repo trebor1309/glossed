@@ -60,10 +60,21 @@ function useIsMobile(breakpoint = 768) {
 }
 
 export default function App({ showUpgradeModal, closeUpgradeModal }) {
-  const { user, isAuthenticated, isPro, isClient, logout, loading } = useUser();
+  const { user, isAuthenticated, isPro, logout, loading } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile(768);
+
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      if (isPro && location.pathname === "/dashboard") {
+        navigate("/prodashboard", { replace: true });
+      }
+      if (!isPro && location.pathname === "/prodashboard") {
+        navigate("/dashboard", { replace: true });
+      }
+    }
+  }, [isAuthenticated, isPro, loading, location.pathname]);
 
   const [isOpen, setIsOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -92,6 +103,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
     );
   }
   if (
+    !loading &&
     isAuthenticated &&
     !isPro &&
     location.pathname.startsWith("/prodashboard")

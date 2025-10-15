@@ -120,7 +120,6 @@ export function UserProvider({ children, openUpgradeModal }) {
   };
 
   // Connexion (redirige automatiquement selon le rôle)
-  // Connexion (redirige automatiquement selon le rôle)
   const login = async (email, password) => {
     console.log("LOGIN START");
 
@@ -239,7 +238,6 @@ export function UserProvider({ children, openUpgradeModal }) {
         loading,
       }}
     >
-      {children}
       {children}
     </UserContext.Provider>
   );
