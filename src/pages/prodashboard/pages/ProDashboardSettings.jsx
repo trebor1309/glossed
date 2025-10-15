@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { User, MapPin, Banknote, CheckCircle } from "lucide-react";
+import ProRadiusSettings from "./ProRadiusSettings";
 
 export default function ProDashboardSettings() {
   const [profile, setProfile] = useState({
