@@ -240,6 +240,9 @@ export function UserProvider({ children, openUpgradeModal }) {
       }}
     >
       {children}
+      {children}
     </UserContext.Provider>
   );
 }
+
+export default UserProvider;

@@ -16,7 +16,7 @@ export default function Careers() {
         </div>
         <h1 className="text-4xl font-bold mb-4">Careers at Glossed</h1>
         <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          Help us shape the future of beauty-on-demand. Whether you're a
+          Help us shape the future of beauty-on-demand. Whether you&apos;re a
           creative, a developer, or a beauty professional, your talent can make
           Glossed shine brighter.
         </p>
@@ -37,7 +37,7 @@ export default function Careers() {
           Current Openings
         </h2>
         <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
-          At the moment, there are no open positions. But we're always looking
+          At the moment, there are no open positions. But we&apos;re always looking
           for passionate people who love innovation, creativity and good
           energy.
         </p>

@@ -1,30 +1,48 @@
 import js from "@eslint/js";
 import globals from "globals";
-import reactHooks from "eslint-plugin-react-hooks";
-import reactRefresh from "eslint-plugin-react-refresh";
-import { defineConfig, globalIgnores } from "eslint/config";
+import pluginReact from "eslint-plugin-react";
+import pluginReactHooks from "eslint-plugin-react-hooks";
+import babelParser from "@babel/eslint-parser";
+import { defineConfig } from "eslint/config";
 
 export default defineConfig([
-  globalIgnores(["dist"]),
   {
-    files: ["**/*.{js,jsx}"],
-    extends: [
-      js.configs.recommended,
-      reactHooks.configs["recommended-latest"],
-      reactRefresh.configs.vite,
-    ],
+    files: ["**/*.{js,mjs,cjs,jsx}"],
     languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
+      parser: babelParser,
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
       parserOptions: {
-        ecmaVersion: "latest",
-        ecmaFeatures: { jsx: true },
-        sourceType: "module",
+        requireConfigFile: false,
+        babelOptions: {
+          presets: ["@babel/preset-react"],
+        },
       },
     },
+    plugins: {
+      react: pluginReact,
+      "react-hooks": pluginReactHooks,
+    },
+    ignores: ["dist/", "node_modules/", "vite.config.js", "tailwind.config.js"],
     rules: {
-      "no-unused-vars": ["warn"],
-      "react-refresh/only-export-components": "off",
+      ...js.configs.recommended.rules,
+      ...pluginReact.configs.recommended.rules,
+      ...pluginReactHooks.configs.recommended.rules,
+      "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "no-console": "off",
+      "react/prop-types": "off",
+      "react/react-in-jsx-scope": "off",
+      "react-hooks/exhaustive-deps": "warn",
+      "no-undef": "error",
+    },
+    settings: {
+      react: {
+        version: "detect",
+      },
     },
   },
 ]);
