@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 import Logo from "./components/Logo";
+import Footer from "@/components/Footer";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import LoginModal from "./components/modals/LoginModal";
 import SignupModal from "./components/modals/SignupModal";
@@ -284,6 +285,8 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
             </Routes>
           )}
         </main>
+
+        {(!isMobile || !isAuthenticated) && <Footer />}
 
         {/* 🔹 LOGIN MODAL */}
         {showLogin && (
