@@ -228,58 +228,50 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               </Route>
             </Routes>
           ) : (
-            <LoadScript
-              googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
-              libraries={GOOGLE_LIBRARIES}
-            >
-              <Routes>
-                {/* Routes publiques et dashboard client */}
-                <Route
-                  path="/"
-                  element={
-                    <Home
-                      onOpenLogin={() => setShowLogin(true)}
-                      onOpenSignup={() => setShowSignup(true)}
-                      onOpenProSignup={() => setShowProSignup(true)}
-                      onOpenDownload={() => setShowDownload(true)}
-                    />
-                  }
-                />
-                <Route path="/about" element={<About />} />
-                <Route path="/services" element={<Services />} />
-                <Route path="/legal" element={<Legal />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms" element={<Terms />} />
-                <Route path="/faq" element={<FAQ />} />
-                <Route path="/about-us" element={<AboutUs />} />
-                <Route path="/careers" element={<Careers />} />
-                <Route path="/press" element={<Press />} />
-                <Route path="/blog" element={<Blog />} />
-                <Route path="/help-center" element={<HelpCenter />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/safety" element={<Safety />} />
-
-                <Route
-                  path="/dashboard"
-                  element={isAuthenticated ? <DashboardLayout /> : <Home />}
-                >
-                  <Route index element={<DashboardHome />} />
-                  <Route
-                    path="reservations"
-                    element={<DashboardReservations />}
+            <Routes>
+              {/* Routes publiques et dashboard client */}
+              <Route
+                path="/"
+                element={
+                  <Home
+                    onOpenLogin={() => setShowLogin(true)}
+                    onOpenSignup={() => setShowSignup(true)}
+                    onOpenProSignup={() => setShowProSignup(true)}
+                    onOpenDownload={() => setShowDownload(true)}
                   />
-                  <Route path="new" element={<DashboardNew />} />
-                  <Route path="account" element={<DashboardAccount />} />
-                  <Route path="settings" element={<DashboardSettings />} />
-                  <Route path="more" element={<DashboardMore />} />
-                </Route>
-              </Routes>
-            </LoadScript>
+                }
+              />
+              <Route path="/about" element={<About />} />
+              <Route path="/services" element={<Services />} />
+              <Route path="/legal" element={<Legal />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/faq" element={<FAQ />} />
+              <Route path="/about-us" element={<AboutUs />} />
+              <Route path="/careers" element={<Careers />} />
+              <Route path="/press" element={<Press />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/help-center" element={<HelpCenter />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/safety" element={<Safety />} />
+
+              <Route
+                path="/dashboard"
+                element={isAuthenticated ? <DashboardLayout /> : <Home />}
+              >
+                <Route index element={<DashboardHome />} />
+                <Route
+                  path="reservations"
+                  element={<DashboardReservations />}
+                />
+                <Route path="new" element={<DashboardNew />} />
+                <Route path="account" element={<DashboardAccount />} />
+                <Route path="settings" element={<DashboardSettings />} />
+                <Route path="more" element={<DashboardMore />} />
+              </Route>
+            </Routes>
           )}
         </main>
-
-        {/* Footer */}
-        {/* (inchangé, tu peux garder le tien tel quel) */}
 
         {/* 🔹 LOGIN MODAL */}
         {showLogin && (
