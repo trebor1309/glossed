@@ -23,10 +23,13 @@ export default function LegalSettings() {
 
   // 🧠 Charger les infos existantes
   useEffect(() => {
-    const fetchData = async () => {
-      if (!session?.user) return;
-      setLoading(true);
+    let isMounted = true;
 
+    const fetchData = async () => {
+      if (!session?.user?.id) return;
+      if (!isMounted) return;
+
+      setLoading(true);
       const { data, error } = await supabase
         .from("users")
         .select(
@@ -35,12 +38,20 @@ export default function LegalSettings() {
         .eq("id", session.user.id)
         .single();
 
-      if (!error && data) setForm((prev) => ({ ...prev, ...data }));
-      setLoading(false);
+      if (isMounted && !error && data) {
+        setForm((prev) => ({ ...prev, ...data }));
+      }
+      if (isMounted) setLoading(false);
     };
 
-    fetchData();
-  }, [session]);
+    // ⚡ petit délai pour éviter le refetch au retour d’onglet
+    const timer = setTimeout(fetchData, 250);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [session?.user?.id]);
 
   // ✍️ Gestion des inputs
   const handleChange = (e) => {
@@ -53,18 +64,16 @@ export default function LegalSettings() {
 
   // 💾 Sauvegarde Supabase
   const handleSave = async () => {
-    if (!session?.user) return;
+    if (!session?.user?.id) return;
     setSaving(true);
 
     const updates = { ...form, updated_at: new Date().toISOString() };
-
     const { error } = await supabase
       .from("users")
       .update(updates)
       .eq("id", session.user.id);
 
     setSaving(false);
-
     if (error) {
       console.error("Supabase error:", error);
       setToast({ message: "❌ Error while saving your info.", type: "error" });
@@ -89,7 +98,6 @@ export default function LegalSettings() {
         Legal & Billing Information
       </h3>
 
-      {/* Grid principale */}
       <div className="grid md:grid-cols-2 gap-4">
         <InputField
           label="Full Name"
@@ -106,7 +114,6 @@ export default function LegalSettings() {
           required
         />
 
-        {/* VAT + case "Not subject" */}
         <div>
           <label className="block text-sm font-medium text-gray-700 flex items-center justify-between">
             <span>VAT Number</span>
@@ -121,7 +128,6 @@ export default function LegalSettings() {
               Not subject to VAT
             </label>
           </label>
-
           <input
             type="text"
             name="vat_number"
@@ -162,7 +168,6 @@ export default function LegalSettings() {
         />
       </div>
 
-      {/* Adresse entreprise */}
       <div>
         <label className="block text-sm font-medium text-gray-700">
           Business Address
@@ -177,7 +182,6 @@ export default function LegalSettings() {
         />
       </div>
 
-      {/* Bouton Save */}
       <div className="text-right">
         <button
           onClick={handleSave}
@@ -189,7 +193,6 @@ export default function LegalSettings() {
         </button>
       </div>
 
-      {/* Toast feedback */}
       {toast && (
         <Toast
           message={toast.message}
@@ -201,7 +204,6 @@ export default function LegalSettings() {
   );
 }
 
-// Sous-composant champ
 function InputField({ label, name, value, onChange, type = "text", ...props }) {
   return (
     <div>

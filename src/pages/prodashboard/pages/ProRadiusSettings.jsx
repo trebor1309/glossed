@@ -1,4 +1,3 @@
-// src/pages/prodashboard/pages/ProRadiusSettings.jsx
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -29,52 +28,53 @@ export default function ProRadiusSettings() {
     libraries,
   });
 
-  // 🧠 Charger la localisation existante depuis Supabase
+  // ✅ Fix rechargement infini
   useEffect(() => {
-    const fetchLocation = async () => {
-      if (!session?.user) return;
-      setLoading(true);
+    let isMounted = true;
 
+    const fetchLocation = async () => {
+      if (!session?.user?.id || !isMounted) return;
+
+      setLoading(true);
       const { data, error } = await supabase
         .from("users")
         .select("latitude, longitude, radius_km")
         .eq("id", session.user.id)
         .single();
 
-      if (!error && data) {
+      if (isMounted && !error && data) {
         if (data.latitude && data.longitude)
           setPosition({ lat: data.latitude, lng: data.longitude });
         if (data.radius_km) setRadius(data.radius_km);
       }
-
-      setLoading(false);
+      if (isMounted) setLoading(false);
     };
 
-    fetchLocation();
-  }, [session]);
+    const timer = setTimeout(fetchLocation, 250);
 
-  // 📍 Mise à jour du marker quand une adresse est choisie
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [session?.user?.id]);
+
+  // 📍 Sélection d’adresse manuelle
   const handlePlaceChanged = () => {
     const place = autocompleteRef.current?.getPlace();
     if (place?.geometry?.location) {
-      const newPos = {
+      setPosition({
         lat: place.geometry.location.lat(),
         lng: place.geometry.location.lng(),
-      };
-      setPosition(newPos);
+      });
     }
   };
 
-  // 📡 Utiliser la géolocalisation du navigateur
+  // 📡 Localisation navigateur
   const handleLocate = () => {
     if (!navigator.geolocation) {
-      setToast({
-        message: "❌ Geolocation not supported by your browser.",
-        type: "error",
-      });
+      alert("❌ Geolocation not supported by your browser.");
       return;
     }
-
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -83,46 +83,33 @@ export default function ProRadiusSettings() {
           lng: pos.coords.longitude,
         });
         setLocating(false);
-        setToast({
-          message: "📍 Location updated successfully!",
-          type: "success",
-        });
       },
-      (err) => {
-        console.error("Geolocation error:", err);
-        setToast({
-          message: "❌ Unable to retrieve your location.",
-          type: "error",
-        });
+      () => {
+        alert("❌ Unable to retrieve your location.");
         setLocating(false);
       }
     );
   };
 
-  // 💾 Sauvegarde dans Supabase
+  // 💾 Sauvegarde Supabase
   const handleSave = async () => {
-    if (!session?.user) return;
+    if (!session?.user?.id) return;
     setSaving(true);
-
-    const updates = {
-      latitude: position.lat,
-      longitude: position.lng,
-      radius_km: radius,
-      updated_at: new Date().toISOString(),
-    };
 
     const { error } = await supabase
       .from("users")
-      .update(updates)
+      .update({
+        latitude: position.lat,
+        longitude: position.lng,
+        radius_km: radius,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", session.user.id);
 
     setSaving(false);
-    if (error) {
-      console.error("Supabase error:", error);
-      setToast({ message: "❌ Error while saving your area.", type: "error" });
-    } else {
-      setToast({ message: "✅ Area saved successfully!", type: "success" });
-    }
+    if (error)
+      setToast({ message: "❌ Error saving your area.", type: "error" });
+    else setToast({ message: "✅ Area saved successfully!", type: "success" });
   };
 
   if (loadError)
@@ -134,7 +121,6 @@ export default function ProRadiusSettings() {
 
   return (
     <div className="space-y-4">
-      {/* 🏙️ Champ d’adresse */}
       <Autocomplete
         onLoad={(ref) => (autocompleteRef.current = ref)}
         onPlaceChanged={handlePlaceChanged}
@@ -146,7 +132,6 @@ export default function ProRadiusSettings() {
         />
       </Autocomplete>
 
-      {/* 🎚️ Slider de rayon */}
       <div className="flex items-center gap-4">
         <label className="text-sm text-gray-600 font-medium min-w-[120px]">
           Working radius:
@@ -164,7 +149,6 @@ export default function ProRadiusSettings() {
         </span>
       </div>
 
-      {/* 🗺️ Carte */}
       <div className="w-full h-96 rounded-xl overflow-hidden border relative">
         {loading && (
           <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10">
@@ -190,7 +174,6 @@ export default function ProRadiusSettings() {
         </GoogleMap>
       </div>
 
-      {/* Boutons */}
       <div className="flex justify-between items-center">
         <button
           onClick={handleLocate}
@@ -210,6 +193,7 @@ export default function ProRadiusSettings() {
           {saving ? "Saving..." : "Save Area"}
         </button>
       </div>
+
       {toast && (
         <Toast
           message={toast.message}

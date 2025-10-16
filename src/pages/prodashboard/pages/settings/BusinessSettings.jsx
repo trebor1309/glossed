@@ -6,64 +6,85 @@ import Toast from "@/components/ui/Toast";
 
 export default function BusinessSettings() {
   const { session } = useUser();
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
-
   const [form, setForm] = useState({
     business_name: "",
-    business_type: "",
     description: "",
+    category: "",
+    subcategory: "",
+    website: "",
+    accepting_new_clients: true,
   });
 
-  // 🧠 Charger les données existantes
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!session?.user) return;
-      setLoading(true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
 
+  // 🧠 Charger les infos du pro (avec logs)
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchData = async () => {
+      console.log("📡 FetchData triggered | session:", session);
+      if (!session?.user?.id) {
+        console.log("⚠️ No session.user.id found, skipping fetch");
+        return;
+      }
+
+      setLoading(true);
       const { data, error } = await supabase
         .from("users")
-        .select("business_name, business_type, description")
+        .select(
+          "business_name, description, category, subcategory, website, accepting_new_clients"
+        )
         .eq("id", session.user.id)
         .single();
 
-      if (!error && data) setForm((prev) => ({ ...prev, ...data }));
-      setLoading(false);
+      if (error) console.error("❌ Supabase error:", error);
+      else console.log("✅ Supabase data received:", data);
+
+      if (isMounted && !error && data) {
+        setForm((prev) => ({ ...prev, ...data }));
+      }
+      if (isMounted) setLoading(false);
     };
 
     fetchData();
-  }, [session]);
+    const timer = setTimeout(fetchData, 300); // deuxième tentative
 
-  // ✍️ Gestion des champs
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [session, session?.user?.id]);
+
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
-  // 💾 Sauvegarde dans Supabase
   const handleSave = async () => {
-    if (!session?.user) return;
+    if (!session?.user?.id) return;
     setSaving(true);
 
-    const updates = {
-      ...form,
-      updated_at: new Date().toISOString(),
-    };
-
+    const updates = { ...form, updated_at: new Date().toISOString() };
     const { error } = await supabase
       .from("users")
       .update(updates)
       .eq("id", session.user.id);
 
     setSaving(false);
-
     if (error) {
-      console.error("Supabase error:", error);
-      setToast({ message: "❌ Error while saving info.", type: "error" });
+      console.error(error);
+      setToast({
+        message: "❌ Error while saving business info.",
+        type: "error",
+      });
     } else {
       setToast({
-        message: "✅ Business info saved successfully!",
+        message: "✅ Business information saved successfully!",
         type: "success",
       });
     }
@@ -71,71 +92,72 @@ export default function BusinessSettings() {
 
   if (loading)
     return (
-      <p className="text-gray-500 text-sm">Loading your business info...</p>
+      <div className="text-gray-500 text-sm">
+        Loading your business info...
+      </div>
     );
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold text-gray-800">
-        Business Information
-      </h3>
+      <h3 className="text-lg font-semibold text-gray-800">Business Info</h3>
 
-      {/* Formulaire */}
-      <div className="space-y-4">
-        {/* Business Name */}
+      <div className="grid md:grid-cols-2 gap-4">
         <InputField
           label="Business Name"
           name="business_name"
           value={form.business_name}
           onChange={handleChange}
-          placeholder="e.g. Beauty by Marie"
           required
         />
-        <p className="text-xs text-gray-500">
-          This name will appear publicly on your profile.
-        </p>
-
-        {/* Business Type */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Business Type
-          </label>
-          <select
-            name="business_type"
-            value={form.business_type}
-            onChange={handleChange}
-            className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-          >
-            <option value="">Select your main activity</option>
-            <option value="hair">Hair & Styling</option>
-            <option value="makeup">Makeup Artist</option>
-            <option value="nails">Nails & Beauty</option>
-            <option value="aesthetics">Aesthetics</option>
-            <option value="massage">Massage / Wellness</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Short Description
-          </label>
-          <textarea
-            name="description"
-            value={form.description || ""}
-            onChange={handleChange}
-            rows={3}
-            placeholder="Describe your services in a few lines..."
-            className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Clients will see this description on your public profile.
-          </p>
-        </div>
+        <InputField
+          label="Website (optional)"
+          name="website"
+          value={form.website}
+          onChange={handleChange}
+          placeholder="https://your-site.com"
+        />
       </div>
 
-      {/* Bouton Save */}
+      <InputField
+        label="Category"
+        name="category"
+        value={form.category}
+        onChange={handleChange}
+      />
+
+      <InputField
+        label="Subcategory"
+        name="subcategory"
+        value={form.subcategory}
+        onChange={handleChange}
+      />
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          Description
+        </label>
+        <textarea
+          name="description"
+          value={form.description}
+          onChange={handleChange}
+          rows={3}
+          className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+        />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <input
+          type="checkbox"
+          name="accepting_new_clients"
+          checked={form.accepting_new_clients}
+          onChange={handleChange}
+          className="w-5 h-5 accent-rose-600"
+        />
+        <span className="text-gray-700 text-sm font-medium">
+          Accepting new clients
+        </span>
+      </div>
+
       <div className="text-right">
         <button
           onClick={handleSave}
@@ -143,11 +165,10 @@ export default function BusinessSettings() {
           className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.02] transition-transform flex items-center gap-2 ml-auto disabled:opacity-70"
         >
           <Save size={18} />
-          {saving ? "Saving..." : "Save Info"}
+          {saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
 
-      {/* Toast feedback */}
       {toast && (
         <Toast
           message={toast.message}
@@ -159,7 +180,6 @@ export default function BusinessSettings() {
   );
 }
 
-// Sous-composant champ
 function InputField({ label, name, value, onChange, type = "text", ...props }) {
   return (
     <div>

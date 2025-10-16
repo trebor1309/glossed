@@ -25,10 +25,12 @@ export default function VisualSettings() {
 
   // --- RÉCUPÉRATION DES DONNÉES ---
   useEffect(() => {
-    const fetchData = async () => {
-      if (!session?.user) return;
-      setLoading(true);
+    let isMounted = true;
 
+    const fetchData = async () => {
+      if (!session?.user?.id || !isMounted) return;
+
+      setLoading(true);
       const { data, error } = await supabase
         .from("users")
         .select(
@@ -37,19 +39,23 @@ export default function VisualSettings() {
         .eq("id", session.user.id)
         .single();
 
-      if (!error && data) {
+      if (isMounted && !error && data) {
         setProfileUrl(data.profile_photo || "");
         setPortfolio(data.portfolio || []);
         setVerification(data.verification_status || "unverified");
         setIdDoc(data.id_document || null);
         setCertDoc(data.certificate_document || null);
       }
-
-      setLoading(false);
+      if (isMounted) setLoading(false);
     };
 
-    fetchData();
-  }, [session]);
+    const timer = setTimeout(fetchData, 250);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [session?.user?.id]);
 
   // --- CONFIRMATION GÉNÉRALE ---
   const handleConfirmAction = async () => {
