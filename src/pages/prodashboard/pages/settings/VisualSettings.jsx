@@ -7,6 +7,8 @@ import ConfirmModal from "@/components/ui/ConfirmModal";
 
 export default function VisualSettings() {
   const { session } = useUser();
+
+  // --- ÉTATS GÉNÉRAUX ---
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
@@ -21,7 +23,7 @@ export default function VisualSettings() {
     data: null,
   });
 
-  // Charger les infos utilisateur
+  // --- RÉCUPÉRATION DES DONNÉES ---
   useEffect(() => {
     const fetchData = async () => {
       if (!session?.user) return;
@@ -42,35 +44,39 @@ export default function VisualSettings() {
         setIdDoc(data.id_document || null);
         setCertDoc(data.certificate_document || null);
       }
+
       setLoading(false);
     };
+
     fetchData();
   }, [session]);
 
-  // ---------- 🧩 Modale de confirmation ----------
+  // --- CONFIRMATION GÉNÉRALE ---
   const handleConfirmAction = async () => {
     const { type, data } = confirmModal;
 
     if (type === "upload") await performPortfolioUpload(data);
     else if (type === "delete") await performDeleteImage(data);
+    else if (type === "docUpload")
+      await performDocUpload(data.file, data.docType);
 
     setConfirmModal({ open: false, type: null, data: null });
   };
 
-  // ---------- 📸 Upload / replace profile photo ----------
+  // --- UPLOAD / REPLACE PROFILE PHOTO ---
   const handleProfileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !session?.user) return;
 
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${session.user.id}_profile.${fileExt}`;
+    const ext = file.name.split(".").pop();
+    const fileName = `${session.user.id}_profile.${ext}`;
     const filePath = `profiles/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
+    const { error } = await supabase.storage
       .from("glossed-media")
       .upload(filePath, file, { upsert: true, contentType: file.type });
 
-    if (uploadError) {
+    if (error) {
       setToast({ message: "❌ Upload failed.", type: "error" });
       return;
     }
@@ -78,6 +84,7 @@ export default function VisualSettings() {
     const { data } = supabase.storage
       .from("glossed-media")
       .getPublicUrl(filePath);
+
     const newUrl = `${data.publicUrl}?t=${Date.now()}`;
 
     await supabase
@@ -89,13 +96,9 @@ export default function VisualSettings() {
     setToast({ message: "✅ Profile photo updated!", type: "success" });
   };
 
-  // ---------- 🗑️ Remove profile photo ----------
-  const handleDeleteProfilePhoto = async () => {
-    setConfirmModal({
-      open: true,
-      type: "deleteProfile",
-      data: null,
-    });
+  // --- SUPPRIMER PROFILE PHOTO ---
+  const handleDeleteProfilePhoto = () => {
+    setConfirmModal({ open: true, type: "deleteProfile", data: null });
   };
 
   const confirmDeleteProfile = async () => {
@@ -114,11 +117,12 @@ export default function VisualSettings() {
     } catch {
       setToast({ message: "❌ Failed to delete photo.", type: "error" });
     }
+
     setConfirmModal({ open: false, type: null, data: null });
   };
 
-  // ---------- 🖼️ Upload Portfolio (avec modale) ----------
-  const handlePortfolioUpload = async (e) => {
+  // --- UPLOAD PORTFOLIO ---
+  const handlePortfolioUpload = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
     setConfirmModal({ open: true, type: "upload", data: files });
@@ -126,12 +130,15 @@ export default function VisualSettings() {
 
   const performPortfolioUpload = async (files) => {
     const uploadedUrls = [];
+
     for (const file of files) {
       const ext = file.name.split(".").pop();
       const filePath = `portfolio/${session.user.id}_${Date.now()}.${ext}`;
+
       const { error } = await supabase.storage
         .from("glossed-media")
         .upload(filePath, file, { upsert: false });
+
       if (!error) {
         const { data } = supabase.storage
           .from("glossed-media")
@@ -145,13 +152,15 @@ export default function VisualSettings() {
       .from("users")
       .update({ portfolio: newPortfolio })
       .eq("id", session.user.id);
+
     setPortfolio(newPortfolio);
     setToast({ message: "✅ Portfolio updated!", type: "success" });
   };
 
-  // ---------- 🗑️ Supprimer une image ----------
-  const handleDeleteImage = (url) =>
+  // --- SUPPRIMER IMAGE ---
+  const handleDeleteImage = (url) => {
     setConfirmModal({ open: true, type: "delete", data: url });
+  };
 
   const performDeleteImage = async (urlToDelete) => {
     try {
@@ -163,6 +172,7 @@ export default function VisualSettings() {
         .from("users")
         .update({ portfolio: newPortfolio })
         .eq("id", session.user.id);
+
       setPortfolio(newPortfolio);
       setToast({ message: "🗑️ Image deleted.", type: "success" });
     } catch {
@@ -170,13 +180,22 @@ export default function VisualSettings() {
     }
   };
 
-  // ---------- 📤 Upload ID / Certificate ----------
-  const handleDocUpload = async (e, type) => {
+  // --- UPLOAD ID / CERTIFICATE (avec modale) ---
+  const handleDocUpload = (e, type) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setConfirmModal({
+      open: true,
+      type: "docUpload",
+      data: { file, docType: type },
+    });
+  };
+
+  const performDocUpload = async (file, type) => {
     const ext = file.name.split(".").pop();
     const filePath = `verification/${type}/${session.user.id}_${type}.${ext}`;
+
     const { error } = await supabase.storage
       .from("glossed-media")
       .upload(filePath, file, { upsert: true, contentType: file.type });
@@ -193,21 +212,25 @@ export default function VisualSettings() {
     };
 
     await supabase.from("users").update(updates).eq("id", session.user.id);
-    type === "id" ? setIdDoc(filePath) : setCertDoc(filePath);
+    if (type === "id") setIdDoc(filePath);
+    else setCertDoc(filePath);
+
     setToast({
       message: `✅ ${type === "id" ? "ID" : "Certificate"} uploaded.`,
       type: "success",
     });
   };
 
-  // ---------- 💾 Sauvegarde du statut ----------
+  // --- SAUVEGARDE DU STATUT ---
   const handleSave = async () => {
     if (!session?.user) return;
     setSaving(true);
+
     const { error } = await supabase
       .from("users")
       .update({ verification_status: verification })
       .eq("id", session.user.id);
+
     setSaving(false);
     setToast({
       message: error ? "❌ Error saving." : "✅ Status saved!",
@@ -224,21 +247,18 @@ export default function VisualSettings() {
         Visual & Verification
       </h3>
 
-      {/* Profile photo */}
       <ProfileSection
         profileUrl={profileUrl}
         onUpload={handleProfileUpload}
         onDelete={handleDeleteProfilePhoto}
       />
 
-      {/* Portfolio */}
       <PortfolioSection
         portfolio={portfolio}
         onUpload={handlePortfolioUpload}
         onDelete={handleDeleteImage}
       />
 
-      {/* Verification */}
       <VerificationSection
         verification={verification}
         setVerification={setVerification}
@@ -249,7 +269,6 @@ export default function VisualSettings() {
         saving={saving}
       />
 
-      {/* Toast + Confirm */}
       {toast && (
         <Toast
           message={toast.message}
@@ -257,23 +276,42 @@ export default function VisualSettings() {
           onClose={() => setToast(null)}
         />
       )}
+
       <ConfirmModal
         open={confirmModal.open}
+        type={
+          confirmModal.type === "deleteProfile" ||
+          confirmModal.type === "delete"
+            ? "delete"
+            : confirmModal.type === "docUpload"
+            ? "verify"
+            : "upload"
+        }
         title={
           confirmModal.type === "upload"
             ? "Confirm Upload"
             : confirmModal.type === "deleteProfile"
             ? "Delete Profile Photo?"
+            : confirmModal.type === "docUpload"
+            ? "Confirm Document Upload"
             : "Delete Image?"
         }
         message={
-          confirmModal.type === "upload"
+          confirmModal.type === "docUpload"
+            ? "Your document will be stored securely and reviewed confidentially by the Glossed team within 48 hours. You’ll receive a notification once it’s validated."
+            : confirmModal.type === "upload"
             ? "Do you want to upload these photos to your portfolio?"
             : confirmModal.type === "deleteProfile"
             ? "Your profile picture will be permanently deleted."
             : "This image will be permanently removed."
         }
-        confirmLabel={confirmModal.type === "upload" ? "Upload" : "Delete"}
+        confirmLabel={
+          confirmModal.type === "upload"
+            ? "Upload"
+            : confirmModal.type === "docUpload"
+            ? "Send"
+            : "Delete"
+        }
         onConfirm={
           confirmModal.type === "deleteProfile"
             ? confirmDeleteProfile
@@ -357,7 +395,6 @@ function PortfolioSection({ portfolio, onUpload, onDelete }) {
         className="hidden"
         onChange={onUpload}
       />
-
       {portfolio.length > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mt-4">
           {portfolio.map((url, i) => (
