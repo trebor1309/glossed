@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import ProBottomNav from "./ProBottomNav";
 import SidebarPro from "./SidebarPro";
+console.log("⚙️ ProDashboardSettings mounted");
 
 export default function ProDashboardLayout() {
   const { logout, switchRole } = useUser();
@@ -52,7 +53,7 @@ export default function ProDashboardLayout() {
             </button>
           </header>
 
-          <main className="p-6 pb-20 md:pb-6 flex-1">
+          <main className="p-6 pb-20 md:pb-6 flex-1 overflow-y-auto">
             <Outlet />
           </main>
         </div>

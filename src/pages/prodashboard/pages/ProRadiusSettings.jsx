@@ -1,28 +1,40 @@
-import { useState, useEffect } from "react";
+// src/pages/prodashboard/pages/ProRadiusSettings.jsx
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
-import { Loader } from "lucide-react";
+import {
+  GoogleMap,
+  Marker,
+  Circle,
+  useLoadScript,
+  Autocomplete,
+} from "@react-google-maps/api";
+import { Loader, Save, MapPin } from "lucide-react";
+import Toast from "@/components/ui/Toast";
 
-// Google Maps
-import { GoogleMap, Marker, Circle, useLoadScript } from "@react-google-maps/api";
+const libraries = ["places"];
 
 export default function ProRadiusSettings() {
   const { session } = useUser();
+  const [position, setPosition] = useState({ lat: 50.8503, lng: 4.3517 });
   const [radius, setRadius] = useState(20);
-  const [position, setPosition] = useState({ lat: 50.8503, lng: 4.3517 }); // Par défaut: Bruxelles
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const autocompleteRef = useRef(null);
+  const [toast, setToast] = useState(null);
 
-  // Charger Google Maps API
-  const { isLoaded } = useLoadScript({
+  const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries: ["places"],
+    libraries,
   });
 
-  // Charger les infos du pro depuis Supabase
+  // 🧠 Charger la localisation existante depuis Supabase
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchLocation = async () => {
       if (!session?.user) return;
       setLoading(true);
+
       const { data, error } = await supabase
         .from("users")
         .select("latitude, longitude, radius_km")
@@ -30,117 +42,181 @@ export default function ProRadiusSettings() {
         .single();
 
       if (!error && data) {
-        setPosition({
-          lat: data.latitude || 50.8503,
-          lng: data.longitude || 4.3517,
-        });
-        setRadius(data.radius_km || 20);
+        if (data.latitude && data.longitude)
+          setPosition({ lat: data.latitude, lng: data.longitude });
+        if (data.radius_km) setRadius(data.radius_km);
       }
+
       setLoading(false);
     };
-    fetchProfile();
+
+    fetchLocation();
   }, [session]);
 
-  // Détecter la position actuelle via le navigateur
-  const handleLocate = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setPosition({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          });
-        },
-        (err) => console.error("Erreur de géoloc :", err)
-      );
+  // 📍 Mise à jour du marker quand une adresse est choisie
+  const handlePlaceChanged = () => {
+    const place = autocompleteRef.current?.getPlace();
+    if (place?.geometry?.location) {
+      const newPos = {
+        lat: place.geometry.location.lat(),
+        lng: place.geometry.location.lng(),
+      };
+      setPosition(newPos);
     }
   };
 
-  // Sauvegarde Supabase
-  const handleSave = async () => {
-    if (!session?.user) return;
-    setLoading(true);
-    const { error } = await supabase
-      .from("users")
-      .update({
-        latitude: position.lat,
-        longitude: position.lng,
-        radius_km: radius,
-      })
-      .eq("id", session.user.id);
+  // 📡 Utiliser la géolocalisation du navigateur
+  const handleLocate = () => {
+    if (!navigator.geolocation) {
+      setToast({
+        message: "❌ Geolocation not supported by your browser.",
+        type: "error",
+      });
+      return;
+    }
 
-    setLoading(false);
-    if (error) alert("Erreur lors de l'enregistrement 😕");
-    else alert("Zone d'activité mise à jour ✅");
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setPosition({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+        setLocating(false);
+        setToast({
+          message: "📍 Location updated successfully!",
+          type: "success",
+        });
+      },
+      (err) => {
+        console.error("Geolocation error:", err);
+        setToast({
+          message: "❌ Unable to retrieve your location.",
+          type: "error",
+        });
+        setLocating(false);
+      }
+    );
   };
 
-  if (!isLoaded)
+  // 💾 Sauvegarde dans Supabase
+  const handleSave = async () => {
+    if (!session?.user) return;
+    setSaving(true);
+
+    const updates = {
+      latitude: position.lat,
+      longitude: position.lng,
+      radius_km: radius,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from("users")
+      .update(updates)
+      .eq("id", session.user.id);
+
+    setSaving(false);
+    if (error) {
+      console.error("Supabase error:", error);
+      setToast({ message: "❌ Error while saving your area.", type: "error" });
+    } else {
+      setToast({ message: "✅ Area saved successfully!", type: "success" });
+    }
+  };
+
+  if (loadError)
     return (
-      <div className="flex justify-center items-center h-64">
-        <Loader className="animate-spin w-6 h-6 text-gray-500" />
-      </div>
+      <p className="text-red-500">❌ Google Maps error: {loadError.message}</p>
     );
+  if (!isLoaded)
+    return <p className="text-gray-500">⏳ Loading Google Maps...</p>;
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Zone d’activité</h2>
-      <p className="text-gray-600">
-        Définissez votre position et le rayon dans lequel vous acceptez des missions.
-      </p>
+      {/* 🏙️ Champ d’adresse */}
+      <Autocomplete
+        onLoad={(ref) => (autocompleteRef.current = ref)}
+        onPlaceChanged={handlePlaceChanged}
+      >
+        <input
+          type="text"
+          placeholder="Enter your main working location..."
+          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+        />
+      </Autocomplete>
 
-      {/* Carte Google */}
-      <div className="w-full h-72 rounded-xl overflow-hidden border">
+      {/* 🎚️ Slider de rayon */}
+      <div className="flex items-center gap-4">
+        <label className="text-sm text-gray-600 font-medium min-w-[120px]">
+          Working radius:
+        </label>
+        <input
+          type="range"
+          min={1}
+          max={200}
+          value={radius}
+          onChange={(e) => setRadius(parseInt(e.target.value))}
+          className="w-full accent-rose-600 cursor-pointer"
+        />
+        <span className="text-sm font-semibold text-gray-700 w-12 text-right">
+          {radius} km
+        </span>
+      </div>
+
+      {/* 🗺️ Carte */}
+      <div className="w-full h-96 rounded-xl overflow-hidden border relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/60 flex items-center justify-center z-10">
+            <Loader className="animate-spin text-rose-500" size={28} />
+          </div>
+        )}
+
         <GoogleMap
           zoom={10}
           center={position}
           mapContainerStyle={{ width: "100%", height: "100%" }}
-          onClick={(e) =>
-            setPosition({ lat: e.latLng.lat(), lng: e.latLng.lng() })
-          }
         >
           <Marker position={position} />
           <Circle
             center={position}
             radius={radius * 1000}
             options={{
-              fillColor: "#3b82f6",
-              fillOpacity: 0.15,
-              strokeColor: "#2563eb",
-              strokeOpacity: 0.6,
+              strokeColor: "#fb7185",
+              fillColor: "#fda4af55",
+              strokeWeight: 1.5,
             }}
           />
         </GoogleMap>
       </div>
 
-      {/* Contrôles */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      {/* Boutons */}
+      <div className="flex justify-between items-center">
         <button
           onClick={handleLocate}
-          className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition mb-3 sm:mb-0"
+          disabled={locating}
+          className="px-4 py-2 border rounded-full flex items-center gap-2 text-gray-700 hover:bg-gray-50 transition disabled:opacity-60"
         >
-          📍 Utiliser ma position actuelle
+          <MapPin size={18} className="text-rose-600" />
+          {locating ? "Locating..." : "Use my location"}
         </button>
 
-        <div className="flex flex-col items-center sm:flex-row gap-3">
-          <input
-            type="range"
-            min="1"
-            max="200"
-            value={radius}
-            onChange={(e) => setRadius(Number(e.target.value))}
-            className="w-40"
-          />
-          <span className="font-medium">{radius} km</span>
-        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.02] transition-transform flex items-center gap-2 disabled:opacity-70"
+        >
+          <Save size={18} />
+          {saving ? "Saving..." : "Save Area"}
+        </button>
       </div>
-
-      <button
-        onClick={handleSave}
-        disabled={loading}
-        className="w-full sm:w-auto bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-      >
-        {loading ? "Enregistrement..." : "💾 Enregistrer"}
-      </button>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
