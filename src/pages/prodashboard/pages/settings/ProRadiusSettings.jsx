@@ -8,14 +8,13 @@ import {
   useLoadScript,
   Autocomplete,
 } from "@react-google-maps/api";
-import { Edit2, Save, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
 import Toast from "@/components/ui/Toast";
 
 const libraries = ["places"];
 
 export default function ProRadiusSettings() {
   const { user } = useUser();
-  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const autocompleteRef = useRef(null);
@@ -32,7 +31,6 @@ export default function ProRadiusSettings() {
   useEffect(() => {
     const loadLocation = async () => {
       if (!user?.id) return;
-
       const { data, error } = await supabase
         .from("users")
         .select("latitude, longitude, radius_km")
@@ -51,42 +49,40 @@ export default function ProRadiusSettings() {
     loadLocation();
   }, [user?.id]);
 
-  // Sauvegarde Supabase
-  const handleSave = async () => {
+  // 🔄 Sauvegarde automatique
+  const autoSave = async (newPosition = position, newRadius = radius) => {
     if (!user?.id) return;
     setSaving(true);
-
     const { error } = await supabase
       .from("users")
       .update({
-        latitude: position.lat,
-        longitude: position.lng,
-        radius_km: radius,
+        latitude: newPosition.lat,
+        longitude: newPosition.lng,
+        radius_km: newRadius,
         updated_at: new Date().toISOString(),
       })
       .eq("id", user.id);
-
     setSaving(false);
 
     if (error)
       setToast({ message: "❌ Error saving working area.", type: "error" });
-    else {
+    else
       setToast({
-        message: "✅ Working area updated successfully!",
+        message: "✅ Working area saved automatically!",
         type: "success",
       });
-      setEditing(false);
-    }
   };
 
-  // Sélection d'adresse manuelle
+  // Sélection d’adresse manuelle
   const handlePlaceChanged = () => {
     const place = autocompleteRef.current?.getPlace();
     if (place?.geometry?.location) {
-      setPosition({
+      const newPos = {
         lat: place.geometry.location.lat(),
         lng: place.geometry.location.lng(),
-      });
+      };
+      setPosition(newPos);
+      autoSave(newPos, radius);
     }
   };
 
@@ -98,20 +94,27 @@ export default function ProRadiusSettings() {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setPosition({
+        const newPos = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
-        });
+        };
+        setPosition(newPos);
+        autoSave(newPos, radius);
       },
       () => alert("❌ Unable to retrieve your location.")
     );
   };
 
+  // Mise à jour du rayon
+  const handleRadiusChange = (e) => {
+    const newRadius = parseInt(e.target.value);
+    setRadius(newRadius);
+    autoSave(position, newRadius);
+  };
+
   if (loadError)
     return (
-      <p className="text-red-500">
-        ❌ Google Maps error: {loadError.message}
-      </p>
+      <p className="text-red-500">❌ Google Maps error: {loadError.message}</p>
     );
   if (!isLoaded) return <p className="text-gray-500">⏳ Loading map...</p>;
 
@@ -120,34 +123,22 @@ export default function ProRadiusSettings() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-800">Working Area</h3>
-        <button
-          onClick={() => (editing ? handleSave() : setEditing(true))}
-          disabled={saving}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition
-            ${
-              editing
-                ? "bg-gradient-to-r from-rose-600 to-red-600 text-white"
-                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-            }`}
-        >
-          {editing ? <Save size={16} /> : <Edit2 size={16} />}
-          {editing ? (saving ? "Saving..." : "Save") : "Modify"}
-        </button>
+        {saving && (
+          <span className="text-sm text-gray-500 animate-pulse">Saving...</span>
+        )}
       </div>
 
       {/* Autocomplete */}
-      {editing && (
-        <Autocomplete
-          onLoad={(ref) => (autocompleteRef.current = ref)}
-          onPlaceChanged={handlePlaceChanged}
-        >
-          <input
-            type="text"
-            placeholder="Enter your main working location..."
-            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-          />
-        </Autocomplete>
-      )}
+      <Autocomplete
+        onLoad={(ref) => (autocompleteRef.current = ref)}
+        onPlaceChanged={handlePlaceChanged}
+      >
+        <input
+          type="text"
+          placeholder="Enter your main working location..."
+          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+        />
+      </Autocomplete>
 
       {/* Radius slider */}
       <div className="flex items-center gap-4">
@@ -159,8 +150,7 @@ export default function ProRadiusSettings() {
           min={1}
           max={200}
           value={radius}
-          disabled={!editing}
-          onChange={(e) => setRadius(parseInt(e.target.value))}
+          onChange={handleRadiusChange}
           className="w-full accent-rose-600 cursor-pointer"
         />
         <span className="text-sm font-semibold text-gray-700 w-12 text-right">
@@ -174,14 +164,16 @@ export default function ProRadiusSettings() {
           zoom={10}
           center={position}
           mapContainerStyle={{ width: "100%", height: "100%" }}
-          onClick={(e) =>
-            editing &&
-            e.latLng &&
-            setPosition({
-              lat: e.latLng.lat(),
-              lng: e.latLng.lng(),
-            })
-          }
+          onClick={(e) => {
+            if (e.latLng) {
+              const newPos = {
+                lat: e.latLng.lat(),
+                lng: e.latLng.lng(),
+              };
+              setPosition(newPos);
+              autoSave(newPos, radius);
+            }
+          }}
         >
           <Marker position={position} />
           <Circle
@@ -195,15 +187,13 @@ export default function ProRadiusSettings() {
           />
         </GoogleMap>
 
-        {editing && (
-          <button
-            onClick={handleLocate}
-            className="absolute bottom-3 left-3 bg-white border rounded-full shadow px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-100"
-          >
-            <MapPin size={16} className="text-rose-600" />
-            Use my location
-          </button>
-        )}
+        <button
+          onClick={handleLocate}
+          className="absolute bottom-3 left-3 bg-white border rounded-full shadow px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-100"
+        >
+          <MapPin size={16} className="text-rose-600" />
+          Use my location
+        </button>
       </div>
 
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}

@@ -9,8 +9,16 @@ export default function ConfirmModal({
   cancelLabel = "Cancel",
   onConfirm,
   onCancel,
+  imagePreview,
+  previews = [], // 👈 support multiple
   type = "default", // "default" | "delete" | "upload" | "verify"
 }) {
+  const allPreviews = previews.length
+    ? previews
+    : imagePreview
+    ? [imagePreview]
+    : [];
+
   return (
     <AnimatePresence>
       {open && (
@@ -46,6 +54,26 @@ export default function ConfirmModal({
             <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
             <p className="text-sm text-gray-600 leading-relaxed">{message}</p>
 
+            {/* 🖼️ Preview(s) */}
+            {allPreviews.length > 0 && (
+              <div
+                className={`${
+                  allPreviews.length > 1
+                    ? "grid grid-cols-3 gap-2"
+                    : "flex justify-center"
+                } mt-3 mb-1`}
+              >
+                {allPreviews.map((src, i) => (
+                  <img
+                    key={i}
+                    src={src}
+                    alt={`Preview ${i + 1}`}
+                    className="w-24 h-24 object-cover rounded-lg shadow mx-auto"
+                  />
+                ))}
+              </div>
+            )}
+
             {/* Boutons */}
             <div className="flex justify-center gap-3 mt-4">
               <button
@@ -66,7 +94,7 @@ export default function ConfirmModal({
               </button>
             </div>
 
-            {/* Message “Glossed secure” */}
+            {/* Message de vérification spécifique */}
             {type === "verify" && (
               <p className="text-xs text-gray-400 mt-3">
                 Your document will be stored securely and reviewed
