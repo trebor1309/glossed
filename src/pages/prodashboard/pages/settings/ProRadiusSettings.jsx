@@ -18,6 +18,7 @@ export default function ProRadiusSettings() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const autocompleteRef = useRef(null);
+  const saveTimeoutRef = useRef(null); // 🕒 pour le délai de sauvegarde
 
   const [position, setPosition] = useState({ lat: 50.8503, lng: 4.3517 });
   const [radius, setRadius] = useState(20);
@@ -27,7 +28,7 @@ export default function ProRadiusSettings() {
     libraries,
   });
 
-  // Charger la localisation depuis Supabase
+  // Charger localisation depuis Supabase
   useEffect(() => {
     const loadLocation = async () => {
       if (!user?.id) return;
@@ -45,13 +46,13 @@ export default function ProRadiusSettings() {
         if (data.radius_km) setRadius(data.radius_km);
       }
     };
-
     loadLocation();
   }, [user?.id]);
 
-  // 🔄 Sauvegarde automatique
+  // 🔄 Sauvegarde automatique (appelée avec délai)
   const autoSave = async (newPosition = position, newRadius = radius) => {
     if (!user?.id) return;
+
     setSaving(true);
     const { error } = await supabase
       .from("users")
@@ -62,7 +63,8 @@ export default function ProRadiusSettings() {
         updated_at: new Date().toISOString(),
       })
       .eq("id", user.id);
-    setSaving(false);
+
+    setTimeout(() => setSaving(false), 1200); // effet visuel d’environ 1 s
 
     if (error)
       setToast({ message: "❌ Error saving working area.", type: "error" });
@@ -71,6 +73,14 @@ export default function ProRadiusSettings() {
         message: "✅ Working area saved automatically!",
         type: "success",
       });
+  };
+
+  // ⏳ Fonction de délai (debounce)
+  const scheduleSave = (newPosition, newRadius) => {
+    clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      autoSave(newPosition, newRadius);
+    }, 500); // 0.5 seconde après la dernière modif
   };
 
   // Sélection d’adresse manuelle
@@ -82,7 +92,7 @@ export default function ProRadiusSettings() {
         lng: place.geometry.location.lng(),
       };
       setPosition(newPos);
-      autoSave(newPos, radius);
+      scheduleSave(newPos, radius);
     }
   };
 
@@ -99,17 +109,26 @@ export default function ProRadiusSettings() {
           lng: pos.coords.longitude,
         };
         setPosition(newPos);
-        autoSave(newPos, radius);
+        scheduleSave(newPos, radius);
       },
       () => alert("❌ Unable to retrieve your location.")
     );
   };
 
-  // Mise à jour du rayon
+  // Slider (radius)
   const handleRadiusChange = (e) => {
     const newRadius = parseInt(e.target.value);
     setRadius(newRadius);
-    autoSave(position, newRadius);
+    scheduleSave(position, newRadius); // ⏳ appel différé
+  };
+
+  // Map click
+  const handleMapClick = (e) => {
+    if (e.latLng) {
+      const newPos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+      setPosition(newPos);
+      scheduleSave(newPos, radius);
+    }
   };
 
   if (loadError)
@@ -119,13 +138,20 @@ export default function ProRadiusSettings() {
   if (!isLoaded) return <p className="text-gray-500">⏳ Loading map...</p>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Overlay central lors de la sauvegarde */}
+      {saving && (
+        <div className="fixed inset-0 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center z-[9999] transition-opacity animate-fadeIn">
+          <div className="w-12 h-12 border-4 border-rose-400 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-rose-600 font-semibold text-lg tracking-wide">
+            Saving…
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-800">Working Area</h3>
-        {saving && (
-          <span className="text-sm text-gray-500 animate-pulse">Saving...</span>
-        )}
       </div>
 
       {/* Autocomplete */}
@@ -141,7 +167,7 @@ export default function ProRadiusSettings() {
       </Autocomplete>
 
       {/* Radius slider */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 relative">
         <label className="text-sm text-gray-600 font-medium min-w-[120px]">
           Working radius:
         </label>
@@ -164,16 +190,7 @@ export default function ProRadiusSettings() {
           zoom={10}
           center={position}
           mapContainerStyle={{ width: "100%", height: "100%" }}
-          onClick={(e) => {
-            if (e.latLng) {
-              const newPos = {
-                lat: e.latLng.lat(),
-                lng: e.latLng.lng(),
-              };
-              setPosition(newPos);
-              autoSave(newPos, radius);
-            }
-          }}
+          onClick={handleMapClick}
         >
           <Marker position={position} />
           <Circle

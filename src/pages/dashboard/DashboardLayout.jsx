@@ -7,11 +7,14 @@ import {
   Calendar,
   CreditCard,
   Settings,
-  LogOut,
   Repeat,
+  Plus,
 } from "lucide-react";
 import BottomNav from "./BottomNav";
 import Sidebar from "./Sidebar";
+
+// 🧠 Import du wrapper pour le formulaire de réservation
+import DashboardNewWrapper from "@/pages/dashboard/pages/DashboardNewWrapper";
 
 export default function DashboardLayout() {
   const { logout, switchRole, isPro } = useUser();
@@ -19,6 +22,20 @@ export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // --- Nouveaux états pour le modal ---
+  const [showNewBookingModal, setShowNewBookingModal] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [shouldCloseModal, setShouldCloseModal] = useState(false);
+
+  // --- Détection du viewport ---
+  useEffect(() => {
+    const checkViewport = () => setIsDesktop(window.innerWidth >= 768);
+    checkViewport();
+    window.addEventListener("resize", checkViewport);
+    return () => window.removeEventListener("resize", checkViewport);
+  }, []);
+
+  // --- Définir la page active ---
   useEffect(() => {
     if (location.pathname.includes("reservations"))
       setActive("My Reservations");
@@ -40,6 +57,22 @@ export default function DashboardLayout() {
     { name: "Settings", icon: Settings, path: "/dashboard/settings" },
   ];
 
+  // --- Action du bouton "+ New Booking" ---
+  const handleNewBookingClick = () => {
+    if (isDesktop) {
+      setShowNewBookingModal(true);
+      setShouldCloseModal(false);
+    } else {
+      navigate("/dashboard/new");
+    }
+  };
+
+  // --- Fonction appelée par le formulaire quand succès ---
+  const handleBookingSuccess = () => {
+    setShouldCloseModal(true);
+    setTimeout(() => setShowNewBookingModal(false), 400); // petit délai pour la transition
+  };
+
   return (
     <>
       <div className="min-h-screen flex bg-gray-50 text-gray-900">
@@ -53,15 +86,28 @@ export default function DashboardLayout() {
           <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-10 flex items-center justify-between">
             <h1 className="text-xl font-semibold text-gray-800">{active}</h1>
 
-            {!isPro && (
-              <button
-                onClick={switchRole}
-                className="hidden md:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 text-sm font-medium shadow hover:bg-gray-200 transition"
-              >
-                <Repeat size={18} />
-                Switch to Pro
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {/* 🔘 Nouveau bouton “+ New Booking” (visible si client) */}
+              {!isPro && (
+                <button
+                  onClick={handleNewBookingClick}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-rose-600 to-red-600 text-white text-sm font-medium shadow hover:scale-[1.03] transition"
+                >
+                  <Plus size={18} />
+                  New Booking
+                </button>
+              )}
+
+              {!isPro && (
+                <button
+                  onClick={switchRole}
+                  className="hidden md:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 text-sm font-medium shadow hover:bg-gray-200 transition"
+                >
+                  <Repeat size={18} />
+                  Switch to Pro
+                </button>
+              )}
+            </div>
           </header>
 
           <main className="p-6 pb-20 md:pb-6 flex-1">
@@ -72,6 +118,16 @@ export default function DashboardLayout() {
 
       {/* 🧭 Navigation mobile */}
       <BottomNav />
+
+      {/* 🪟 Modal desktop */}
+      {showNewBookingModal && (
+        <DashboardNewWrapper
+          isModal={true}
+          onClose={() => setShowNewBookingModal(false)}
+          onSuccess={handleBookingSuccess} // ✅ ferme automatiquement en cas de succès
+          shouldClose={shouldCloseModal}
+        />
+      )}
     </>
   );
 }

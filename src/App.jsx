@@ -37,7 +37,7 @@ import DashboardReservations from "./pages/dashboard/pages/DashboardReservations
 import DashboardAccount from "./pages/dashboard/pages/DashboardAccount";
 import DashboardSettings from "./pages/dashboard/pages/DashboardSettings";
 import DashboardMore from "./pages/dashboard/pages/DashboardMore";
-import DashboardNew from "./pages/dashboard/pages/DashboardNew";
+import DashboardNewWrapper from "@/pages/dashboard/pages/DashboardNewWrapper";
 
 // Pro dashboard
 import ProDashboardLayout from "./pages/prodashboard/ProDashboardLayout";
@@ -149,6 +149,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               />
             }
           />
+          <Route path="/dashboard/new" element={<DashboardNewWrapper />} />
           <Route path="/about" element={<About />} />
           <Route path="/services" element={<Services />} />
           <Route path="/legal" element={<Legal />} />
@@ -170,7 +171,6 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
           >
             <Route index element={<DashboardHome />} />
             <Route path="reservations" element={<DashboardReservations />} />
-            <Route path="new" element={<DashboardNew />} />
             <Route path="account" element={<DashboardAccount />} />
             <Route path="settings" element={<DashboardSettings />} />
             <Route path="more" element={<DashboardMore />} />
