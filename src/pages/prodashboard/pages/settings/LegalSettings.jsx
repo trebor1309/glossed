@@ -1,196 +1,249 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
-import { Save } from "lucide-react";
+import { Edit2, Save } from "lucide-react";
 import Toast from "@/components/ui/Toast";
 
 export default function LegalSettings() {
-  const { session } = useUser();
+  const { user, session } = useUser();
+
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
   const [form, setForm] = useState({
-    full_name: "",
-    company_number: "",
-    vat_number: "",
-    no_vat: false,
-    business_address: "",
-    professional_email: "",
-    phone_number: "",
     iban: "",
+    vat_number: "",
+    company_number: "",
+    address: "",
   });
 
-  // 🧠 Charger les infos existantes
+  // 🔍 Charger les infos depuis Supabase
   useEffect(() => {
-    let isMounted = true;
+    const loadLegal = async () => {
+      if (!user?.id) return;
 
-    const fetchData = async () => {
-      if (!session?.user?.id) return;
-      if (!isMounted) return;
-
-      setLoading(true);
       const { data, error } = await supabase
         .from("users")
-        .select(
-          "full_name, company_number, vat_number, no_vat, business_address, professional_email, phone_number, iban"
-        )
-        .eq("id", session.user.id)
-        .single();
+        .select("iban, vat_number, company_number, address")
+        .eq("id", user.id)
+        .maybeSingle();
 
-      if (isMounted && !error && data) {
-        setForm((prev) => ({ ...prev, ...data }));
-      }
-      if (isMounted) setLoading(false);
+      if (error) console.error("❌ Supabase error:", error.message);
+      if (data) setForm((prev) => ({ ...prev, ...data }));
     };
+    loadLegal();
+  }, [user?.id]);
 
-    // ⚡ petit délai pour éviter le refetch au retour d’onglet
-    const timer = setTimeout(fetchData, 250);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [session?.user?.id]);
-
-  // ✍️ Gestion des inputs
+  // ✏️ Changement de champ
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // 💾 Sauvegarde Supabase
+  // 💾 Sauvegarde
   const handleSave = async () => {
-    if (!session?.user?.id) return;
+    if (!user?.id) return;
     setSaving(true);
 
     const updates = { ...form, updated_at: new Date().toISOString() };
+
     const { error } = await supabase
       .from("users")
       .update(updates)
-      .eq("id", session.user.id);
+      .eq("id", user.id);
 
     setSaving(false);
-    if (error) {
-      console.error("Supabase error:", error);
-      setToast({ message: "❌ Error while saving your info.", type: "error" });
-    } else {
+
+    if (error)
       setToast({
-        message: "✅ Legal info saved successfully!",
+        message: "❌ Error saving legal information.",
+        type: "error",
+      });
+    else {
+      setEditing(false);
+      setToast({
+        message: "✅ Legal & billing info saved successfully!",
         type: "success",
       });
     }
   };
 
-  if (loading)
-    return (
-      <div className="text-gray-500 text-sm">
-        Loading your legal information...
-      </div>
-    );
-
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold text-gray-800">
-        Legal & Billing Information
-      </h3>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <InputField
-          label="Full Name"
-          name="full_name"
-          value={form.full_name}
-          onChange={handleChange}
-          required
-        />
-        <InputField
-          label="Company Number"
-          name="company_number"
-          value={form.company_number}
-          onChange={handleChange}
-          required
-        />
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 flex items-center justify-between">
-            <span>VAT Number</span>
-            <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
-              <input
-                type="checkbox"
-                name="no_vat"
-                checked={form.no_vat}
-                onChange={handleChange}
-                className="accent-rose-600"
-              />
-              Not subject to VAT
-            </label>
-          </label>
-          <input
-            type="text"
-            name="vat_number"
-            value={form.vat_number || ""}
-            onChange={handleChange}
-            placeholder="e.g. BE0123456789"
-            disabled={form.no_vat}
-            className={`w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none ${
-              form.no_vat ? "bg-gray-100 cursor-not-allowed" : ""
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-gray-800">
+          Legal & Billing Information
+        </h3>
+        <button
+          onClick={() => (editing ? handleSave() : setEditing(true))}
+          disabled={saving}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition
+            ${
+              editing
+                ? "bg-gradient-to-r from-rose-600 to-red-600 text-white"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
             }`}
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Required only if you are VAT-registered or exceed €25,000/year.
+        >
+          {editing ? <Save size={16} /> : <Edit2 size={16} />}
+          {editing ? (saving ? "Saving..." : "Save") : "Modify"}
+        </button>
+      </div>
+
+      {/* Mode lecture / édition */}
+      {!editing ? (
+        <div className="space-y-3 text-gray-700">
+          <p>
+            <strong>IBAN:</strong>{" "}
+            {form.iban ? (
+              <span className="text-gray-800">{form.iban}</span>
+            ) : (
+              <span className="text-gray-400 italic">Not provided</span>
+            )}
+          </p>
+          <p>
+            <strong>VAT Number:</strong>{" "}
+            {form.vat_number ? (
+              <span className="text-gray-800">{form.vat_number}</span>
+            ) : (
+              <span className="text-gray-400 italic">Not provided</span>
+            )}
+          </p>
+          <p>
+            <strong>Company Number:</strong>{" "}
+            {form.company_number ? (
+              <span className="text-gray-800">{form.company_number}</span>
+            ) : (
+              <span className="text-gray-400 italic">Not provided</span>
+            )}
+          </p>
+          <p>
+            <strong>Registered Address:</strong>{" "}
+            {form.address ? (
+              <span className="text-gray-800">{form.address}</span>
+            ) : (
+              <span className="text-gray-400 italic">Not provided</span>
+            )}
           </p>
         </div>
+      ) : (
+        <div className="space-y-4">
+          {/* IBAN */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              IBAN
+            </label>
+            <input
+              name="iban"
+              value={form.iban}
+              onChange={handleChange}
+              type="text"
+              placeholder="ex: BE12 3456 7890 1234"
+              className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+            />
+          </div>
 
-        <InputField
-          label="Professional Email"
-          name="professional_email"
-          type="email"
-          value={form.professional_email}
-          onChange={handleChange}
-          required
-        />
-        <InputField
-          label="Phone Number"
-          name="phone_number"
-          value={form.phone_number}
-          onChange={handleChange}
-        />
-        <InputField
-          label="IBAN"
-          name="iban"
-          value={form.iban}
-          onChange={handleChange}
-          placeholder="e.g. BE12 3456 7890 1234"
-          required
-        />
-      </div>
+          {/* VAT */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              VAT Number
+            </label>
+            <input
+              name="vat_number"
+              value={form.vat_number}
+              onChange={handleChange}
+              type="text"
+              placeholder="ex: BE0123456789"
+              className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+            />
+          </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700">
-          Business Address
-        </label>
-        <textarea
-          name="business_address"
-          value={form.business_address || ""}
-          onChange={handleChange}
-          className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-          rows={2}
-          required
-        />
-      </div>
+          {/* Company Number */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Company Number
+            </label>
+            <input
+              name="company_number"
+              value={form.company_number}
+              onChange={handleChange}
+              type="text"
+              placeholder="ex: 0123.456.789"
+              className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+            />
+          </div>
 
-      <div className="text-right">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.02] transition-transform flex items-center gap-2 ml-auto disabled:opacity-70"
-        >
-          <Save size={18} />
-          {saving ? "Saving..." : "Save Info"}
-        </button>
+          {/* Address */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Registered Address
+            </label>
+            <input
+              name="address"
+              value={form.address}
+              onChange={handleChange}
+              type="text"
+              placeholder="Street, number, postal code, city"
+              className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+            />
+          </div>
+        </div>
+      )}
+      {/* --- Stripe Connect --- */}
+      <div className="mt-8 border-t pt-4">
+        <h4 className="font-semibold text-gray-800 mb-2">
+          Payouts (Stripe Connect)
+        </h4>
+
+        {form.payouts_enabled ? (
+          <p className="text-green-600 text-sm flex items-center gap-1">
+            ✅ Connected to Stripe — payouts enabled
+          </p>
+        ) : (
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch(
+                  "https://cdcnylgokphyltkctymi.functions.supabase.co/create-stripe-account",
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${session?.access_token}`,
+                    },
+                    body: JSON.stringify({
+                      user_id: user?.id,
+                      email: user?.email,
+                    }),
+                  }
+                );
+                const data = await res.json();
+                if (data.url) {
+                  // on sauvegarde le stripe_account_id dans Supabase
+                  await supabase
+                    .from("users")
+                    .update({ stripe_account_id: data.account_id })
+                    .eq("id", user.id);
+
+                  // redirection vers Stripe
+                  window.location.href = data.url;
+                } else {
+                  setToast({
+                    message: "❌ Error creating Stripe account.",
+                    type: "error",
+                  });
+                }
+              } catch (err) {
+                console.error(err);
+                setToast({ message: "❌ Connection error.", type: "error" });
+              }
+            }}
+            className="px-4 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.02] transition-transform"
+          >
+            Connect to Stripe
+          </button>
+        )}
       </div>
 
       {toast && (
@@ -200,22 +253,6 @@ export default function LegalSettings() {
           onClose={() => setToast(null)}
         />
       )}
-    </div>
-  );
-}
-
-function InputField({ label, name, value, onChange, type = "text", ...props }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
-      <input
-        type={type}
-        name={name}
-        value={value || ""}
-        onChange={onChange}
-        className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-        {...props}
-      />
     </div>
   );
 }

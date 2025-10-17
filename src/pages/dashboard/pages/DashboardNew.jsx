@@ -1,271 +1,278 @@
-import { useState } from "react";
-import { Autocomplete, LoadScript } from "@react-google-maps/api";
-import { motion } from "framer-motion";
+import { useState, useRef } from "react";
 import { v4 as uuid } from "uuid";
-// import { saveBooking } from "@/lib/storage"; // facultatif
-
-const GOOGLE_LIBRARIES = ["places"];
+import { supabase } from "@/lib/supabaseClient";
+import { Autocomplete } from "@react-google-maps/api";
+import { motion } from "framer-motion";
+import { Calendar, Clock, MapPin, Search } from "lucide-react";
+import Toast from "@/components/ui/Toast";
+import { useUser } from "@/context/UserContext";
 
 export default function DashboardNew() {
+  const { session } = useUser();
+  // --- FORM STATES ---
   const [service, setService] = useState("");
   const [date, setDate] = useState("");
   const [timeSlot, setTimeSlot] = useState("");
-  const [address, setAddress] = useState({
-    street: "",
-    postalCode: "",
-    city: "",
-    country: "Belgium",
-  });
+  const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
+  const [clientLocation, setClientLocation] = useState({
+    lat: null,
+    lng: null,
+  });
+
+  // --- UI STATES ---
+  const [loading, setLoading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [pros, setPros] = useState([]);
+  const [toast, setToast] = useState(null);
 
-  const handlePlaceSelect = (autocomplete) => {
-    const place = autocomplete.getPlace();
-    if (!place || !place.address_components) return;
+  // --- GOOGLE AUTOCOMPLETE ---
+  const autocompleteRef = useRef(null);
 
-    const components = place.address_components.reduce((acc, comp) => {
-      if (comp.types.includes("route")) acc.street = comp.long_name;
-      if (comp.types.includes("street_number"))
-        acc.streetNumber = comp.long_name;
-      if (comp.types.includes("postal_code")) acc.postalCode = comp.long_name;
-      if (comp.types.includes("locality")) acc.city = comp.long_name;
-      if (comp.types.includes("country")) acc.country = comp.long_name;
-      return acc;
-    }, {});
-
-    setAddress({
-      street: `${components.street || ""} ${
-        components.streetNumber || ""
-      }`.trim(),
-      postalCode: components.postalCode || "",
-      city: components.city || "",
-      country: components.country || "Belgium",
-    });
+  const onLoad = (ref) => {
+    autocompleteRef.current = ref;
   };
 
-  const handleAddressChange = (field, value) => {
-    setAddress((prev) => ({ ...prev, [field]: value }));
+  const onPlaceChanged = () => {
+    if (autocompleteRef.current) {
+      const place = autocompleteRef.current.getPlace();
+      if (!place.geometry) return;
+
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+
+      setAddress(place.formatted_address);
+      setClientLocation({ lat, lng });
+
+      console.log("📍 Client location:", lat, lng);
+    }
   };
 
-  const handleSubmit = (e) => {
+  // --- SUBMIT HANDLER ---
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setConfirmed(false);
+    setPros([]);
+    setToast(null);
 
-    const booking = {
-      id: uuid(),
-      service,
-      date,
-      timeSlot,
-      address,
-      notes,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-    };
+    if (!service || !date || !timeSlot || !address) {
+      setToast({
+        message: "⚠️ Please fill all required fields.",
+        type: "error",
+      });
+      setLoading(false);
+      return;
+    }
 
-    // saveBooking(booking); // facultatif
-    setConfirmed(true);
+    if (!clientLocation.lat || !clientLocation.lng) {
+      setToast({ message: "⚠️ Please select a valid address.", type: "error" });
+      setLoading(false);
+      return;
+    }
 
-    setService("");
-    setDate("");
-    setTimeSlot("");
-    setAddress({
-      street: "",
-      postalCode: "",
-      city: "",
-      country: "Belgium",
-    });
-    setNotes("");
+    try {
+      // 🔍 Recherche des pros via RPC
+      const serviceType = service.replace(/^[^A-Za-z]+/, "").trim();
 
-    setTimeout(() => setConfirmed(false), 4000);
-  };
+      const { data: matchedPros, error } = await supabase.rpc(
+        "match_pros_for_multiple_services",
+        {
+          services: [serviceType],
+          client_lat: clientLocation.lat,
+          client_lng: clientLocation.lng,
+        }
+      );
 
-  const timeSlots = [
-    { label: "Morning (8:00 - 12:00)", value: "morning" },
-    { label: "Midday (12:00 - 14:00)", value: "noon" },
-    { label: "Afternoon (14:00 - 18:00)", value: "afternoon" },
-    { label: "Evening (18:00 - 21:00)", value: "evening" },
-  ];
+      if (error) throw error;
 
-  return (
-    <LoadScript
-      googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
-      libraries={GOOGLE_LIBRARIES}
-    >
-      {confirmed && (
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0, y: -10 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50"
-        >
-          <div className="bg-white rounded-2xl shadow-xl px-6 py-4 text-green-700 border border-green-200 text-center max-w-sm">
-            <p className="font-semibold text-lg">Booking confirmed! 🎉</p>
-          </div>
-        </motion.div>
-      )}
+      if (!matchedPros?.length) {
+        setToast({
+          message: "😕 No professionals found nearby for this service.",
+          type: "error",
+        });
+        setLoading(false);
+        return;
+      }
 
-      <div className="mt-10 max-w-xl mx-auto text-center">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">
-          Book a New Service
-        </h1>
-        <p className="text-gray-600 mb-8">
-          Choose your service, select a time slot and enter your address ✨
-        </p>
+      console.log("✅ Found pros:", matchedPros);
+      setPros(matchedPros);
+      setToast({
+        message: `✅ ${matchedPros.length} professional(s) found nearby!`,
+        type: "success",
+      });
+      setConfirmed(true);
 
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-xl shadow p-6 space-y-4 text-left"
-        >
+      // 💾 Création réelle de la réservation
+      const { error: insertError } = await supabase.from("bookings").insert([
+        {
+          client_id: session?.user?.id, // ✅ session récupérée depuis UserContext
+          service,
+          date,
+          time_slot: timeSlot,
+          address,
+          notes,
+          client_lat: clientLocation.lat,
+          client_lng: clientLocation.lng,
+          status: "pending",
+        },
+      ]);
+
+      if (insertError) throw insertError;
+
+      setToast({
+        message: "✅ Booking created successfully!",
+        type: "success",
+      });
+    } catch (err) {
+      setToast({
+        message: `❌ Error: ${err.message || err}`,
+        type: "error",
+      });
+      setLoading(false);
+    }
+
+    // --- UI ---
+    return (
+      <motion.div
+        className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg space-y-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <Search size={20} /> New Booking Request
+        </h2>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Service */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Service
+              Select Service
             </label>
             <select
               value={service}
               onChange={(e) => setService(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-rose-400"
+              className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
             >
-              <option value="">Select a service</option>
-              <option>💅 Nail Styling</option>
-              <option>💇 Hair Styling</option>
-              <option>💄 Makeup Session</option>
-              <option>🧖 Facial Treatment</option>
-              <option>👻 Child Makeup</option>
+              <option value="">Choose a service...</option>
+              <option value="Hair Stylist">💇 Hair Stylist</option>
+              <option value="Barber">💈 Barber</option>
+              <option value="Makeup Artist">💄 Makeup Artist</option>
+              <option value="Nail Technician">💅 Nail Technician</option>
+              <option value="Wellness">🧘 Wellness</option>
+              <option value="Aesthetician">🌸 Aesthetician</option>
             </select>
           </div>
 
-          {/* Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-rose-400"
-            />
+          {/* Date & Time */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <Calendar size={14} /> Date
+              </label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <Clock size={14} /> Time
+              </label>
+              <input
+                type="time"
+                value={timeSlot}
+                onChange={(e) => setTimeSlot(e.target.value)}
+                className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+              />
+            </div>
           </div>
 
-          {/* Time slot */}
+          {/* Address (Google Autocomplete) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Preferred time
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+              <MapPin size={14} /> Address
             </label>
-            <select
-              value={timeSlot}
-              onChange={(e) => setTimeSlot(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-rose-400"
-            >
-              <option value="">Select a time slot</option>
-              {timeSlots.map((slot) => (
-                <option key={slot.value} value={slot.value}>
-                  {slot.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Address details */}
-          <div className="space-y-3">
-            <h3 className="text-md font-semibold text-gray-800 mt-4 mb-2">
-              Address details
-            </h3>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Street and number
-              </label>
-              <Autocomplete
-                onLoad={(auto) => (window.autocomplete = auto)}
-                onPlaceChanged={() => handlePlaceSelect(window.autocomplete)}
-              >
-                <input
-                  type="text"
-                  placeholder="e.g. Avenue Louise 123"
-                  value={address.street}
-                  onChange={(e) =>
-                    handleAddressChange("street", e.target.value)
-                  }
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-rose-400"
-                />
-              </Autocomplete>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Postal code
-                </label>
-                <input
-                  type="text"
-                  value={address.postalCode}
-                  onChange={(e) =>
-                    handleAddressChange("postalCode", e.target.value)
-                  }
-                  placeholder="1050"
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-rose-400"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  City
-                </label>
-                <input
-                  type="text"
-                  value={address.city}
-                  onChange={(e) => handleAddressChange("city", e.target.value)}
-                  placeholder="Ixelles"
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-rose-400"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Country
-              </label>
-              <select
-                value={address.country}
-                onChange={(e) => handleAddressChange("country", e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-rose-400"
-              >
-                <option>Belgium</option>
-                <option>France</option>
-                <option>Germany</option>
-                <option>Luxembourg</option>
-                <option>Netherlands</option>
-              </select>
-            </div>
+            <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+              <input
+                type="text"
+                placeholder="Enter your address..."
+                className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+              />
+            </Autocomplete>
           </div>
 
           {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Additional notes (optional)
+              Notes (optional)
             </label>
             <textarea
               rows="3"
+              placeholder="Add any important details..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any preferences or details..."
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-rose-400"
-            ></textarea>
+              className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+            />
           </div>
 
-          <button
-            type="submit"
-            className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white px-6 py-3 rounded-full font-semibold hover:scale-105 transition"
-          >
-            Confirm Booking
-          </button>
+          {/* Submit */}
+          <div className="text-right">
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.02] transition-transform disabled:opacity-70"
+            >
+              {loading ? "Searching..." : "Confirm Booking"}
+            </button>
+          </div>
         </form>
-      </div>
-    </LoadScript>
-  );
+
+        {/* Results */}
+        {confirmed && pros.length > 0 && (
+          <div className="border-t pt-4 space-y-3">
+            <h3 className="text-lg font-semibold text-gray-800">
+              Matching Professionals
+            </h3>
+            {pros.map((pro) => (
+              <div
+                key={pro.id}
+                className="p-4 border rounded-xl flex items-center justify-between hover:bg-gray-50 transition"
+              >
+                <div>
+                  <p className="font-medium text-gray-800">
+                    {pro.business_name}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {pro.business_type.join(", ")} —{" "}
+                    {pro.distance_km
+                      ? `${pro.distance_km.toFixed(2)} km`
+                      : "N/A"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => alert(`Booking sent to ${pro.business_name}`)}
+                  className="px-4 py-1.5 bg-rose-600 text-white text-sm rounded-full hover:scale-[1.05] transition"
+                >
+                  Select
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
+      </motion.div>
+    );
+  };
 }

@@ -1,196 +1,207 @@
+// src/pages/dashboard/pages/settings/BusinessSettings.jsx
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
-import { Save } from "lucide-react";
+import { Save, Edit2, CheckSquare } from "lucide-react";
 import Toast from "@/components/ui/Toast";
 
 export default function BusinessSettings() {
-  const { session } = useUser();
-  const [form, setForm] = useState({
-    business_name: "",
-    description: "",
-    category: "",
-    subcategory: "",
-    website: "",
-    accepting_new_clients: true,
-  });
-
-  const [loading, setLoading] = useState(true);
+  const { user } = useUser();
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // 🧠 Charger les infos du pro (avec logs)
+  const [form, setForm] = useState({
+    business_name: "",
+    business_type: [], // array instead of string
+    description: "",
+  });
+
+  // Charger données Supabase
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchData = async () => {
-      console.log("📡 FetchData triggered | session:", session);
-      if (!session?.user?.id) {
-        console.log("⚠️ No session.user.id found, skipping fetch");
-        return;
-      }
-
-      setLoading(true);
+    const fetchInfo = async () => {
+      if (!user?.id) return;
       const { data, error } = await supabase
         .from("users")
-        .select(
-          "business_name, description, category, subcategory, website, accepting_new_clients"
-        )
-        .eq("id", session.user.id)
-        .single();
+        .select("business_name, business_type, description")
+        .eq("id", user.id)
+        .maybeSingle();
 
-      if (error) console.error("❌ Supabase error:", error);
-      else console.log("✅ Supabase data received:", data);
-
-      if (isMounted && !error && data) {
-        setForm((prev) => ({ ...prev, ...data }));
+      if (error) console.error(error);
+      if (data) {
+        setForm({
+          business_name: data.business_name || "",
+          business_type: Array.isArray(data.business_type)
+            ? data.business_type
+            : data.business_type
+            ? [data.business_type]
+            : [],
+          description: data.description || "",
+        });
       }
-      if (isMounted) setLoading(false);
     };
+    fetchInfo();
+  }, [user?.id]);
 
-    fetchData();
-    const timer = setTimeout(fetchData, 300); // deuxième tentative
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [session, session?.user?.id]);
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  };
-
+  // Sauvegarde Supabase
   const handleSave = async () => {
-    if (!session?.user?.id) return;
+    if (!user?.id) return;
     setSaving(true);
 
-    const updates = { ...form, updated_at: new Date().toISOString() };
-    const { error } = await supabase
+    const updates = {
+      business_name: form.business_name,
+      business_type: form.business_type,
+      description: form.description,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error, data } = await supabase
       .from("users")
       .update(updates)
-      .eq("id", session.user.id);
-
+      .eq("id", user.id)
+      .select();
+    console.log("🔍 UPDATE RESULT:", { error, data });
     setSaving(false);
-    if (error) {
-      console.error(error);
+
+    if (error) setToast({ message: "❌ Error saving data.", type: "error" });
+    else {
       setToast({
-        message: "❌ Error while saving business info.",
-        type: "error",
-      });
-    } else {
-      setToast({
-        message: "✅ Business information saved successfully!",
+        message: "✅ Information updated successfully!",
         type: "success",
       });
+      setEditing(false);
     }
   };
 
-  if (loading)
-    return (
-      <div className="text-gray-500 text-sm">
-        Loading your business info...
-      </div>
-    );
+  const handleTypeToggle = (type) => {
+    setForm((prev) => {
+      const selected = prev.business_type.includes(type)
+        ? prev.business_type.filter((t) => t !== type)
+        : [...prev.business_type, type];
+      return { ...prev, business_type: selected };
+    });
+  };
+
+  const types = [
+    "Hair Stylist",
+    "Makeup Artist",
+    "Nail Technician",
+    "Wellness",
+    "Aesthetician",
+    "Barber",
+  ];
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold text-gray-800">Business Info</h3>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <InputField
-          label="Business Name"
-          name="business_name"
-          value={form.business_name}
-          onChange={handleChange}
-          required
-        />
-        <InputField
-          label="Website (optional)"
-          name="website"
-          value={form.website}
-          onChange={handleChange}
-          placeholder="https://your-site.com"
-        />
-      </div>
-
-      <InputField
-        label="Category"
-        name="category"
-        value={form.category}
-        onChange={handleChange}
-      />
-
-      <InputField
-        label="Subcategory"
-        name="subcategory"
-        value={form.subcategory}
-        onChange={handleChange}
-      />
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700">
-          Description
-        </label>
-        <textarea
-          name="description"
-          value={form.description}
-          onChange={handleChange}
-          rows={3}
-          className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-        />
-      </div>
-
-      <div className="flex items-center gap-3">
-        <input
-          type="checkbox"
-          name="accepting_new_clients"
-          checked={form.accepting_new_clients}
-          onChange={handleChange}
-          className="w-5 h-5 accent-rose-600"
-        />
-        <span className="text-gray-700 text-sm font-medium">
-          Accepting new clients
-        </span>
-      </div>
-
-      <div className="text-right">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-gray-800">
+          Business Information
+        </h3>
         <button
-          onClick={handleSave}
+          onClick={() => (editing ? handleSave() : setEditing(true))}
           disabled={saving}
-          className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.02] transition-transform flex items-center gap-2 ml-auto disabled:opacity-70"
+          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition
+            ${
+              editing
+                ? "bg-gradient-to-r from-rose-600 to-red-600 text-white"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+            }`}
         >
-          <Save size={18} />
-          {saving ? "Saving..." : "Save Changes"}
+          {editing ? <Save size={16} /> : <Edit2 size={16} />}
+          {editing ? (saving ? "Saving..." : "Save") : "Modify"}
         </button>
       </div>
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
+      {!editing ? (
+        // --- MODE LECTURE ---
+        <div className="space-y-4 text-gray-700">
+          <p>
+            <strong>Business Name:</strong> {form.business_name || "—"}
+          </p>
+          <p>
+            <strong>Business Type:</strong>{" "}
+            {form.business_type.length ? form.business_type.join(", ") : "—"}
+          </p>
+          <p>
+            <strong>Description:</strong> {form.description || "—"}
+          </p>
+        </div>
+      ) : (
+        // --- MODE ÉDITION ---
+        <div className="space-y-4">
+          <InputField
+            label="Business Name"
+            name="business_name"
+            value={form.business_name}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, business_name: e.target.value }))
+            }
+          />
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Business Type
+            </label>
+            <div className="flex flex-wrap gap-3">
+              {types.map((t) => (
+                <label
+                  key={t}
+                  className={`flex items-center gap-2 border rounded-full px-3 py-1 cursor-pointer select-none ${
+                    form.business_type.includes(t)
+                      ? "bg-rose-100 border-rose-500 text-rose-700"
+                      : "border-gray-300 hover:border-rose-400"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="hidden"
+                    checked={form.business_type.includes(t)}
+                    onChange={() => handleTypeToggle(t)}
+                  />
+                  <CheckSquare size={16} />
+                  {t}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <InputArea
+            label="Description"
+            name="description"
+            value={form.description}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, description: e.target.value }))
+            }
+            rows={3}
+            placeholder="Describe your services..."
+          />
+        </div>
       )}
+
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
 
-function InputField({ label, name, value, onChange, type = "text", ...props }) {
+function InputField({ label, ...props }) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700">{label}</label>
       <input
-        type={type}
-        name={name}
-        value={value || ""}
-        onChange={onChange}
-        className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
         {...props}
+        className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+      />
+    </div>
+  );
+}
+
+function InputArea({ label, ...props }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      <textarea
+        {...props}
+        className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none resize-none"
       />
     </div>
   );

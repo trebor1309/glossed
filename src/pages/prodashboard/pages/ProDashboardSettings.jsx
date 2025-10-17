@@ -1,8 +1,8 @@
+// src/pages/dashboard/pages/ProDashboardSettings.jsx
 import { useState } from "react";
-import { User, FileText, MapPin, Camera, Settings } from "lucide-react";
 import BusinessSettings from "./settings/BusinessSettings";
 import LegalSettings from "./settings/LegalSettings";
-import ProRadiusSettings from "./ProRadiusSettings";
+import ProRadiusSettings from "./settings/ProRadiusSettings";
 import VisualSettings from "./settings/VisualSettings";
 import PreferencesSettings from "./settings/PreferencesSettings";
 
@@ -10,47 +10,51 @@ export default function ProDashboardSettings() {
   const [active, setActive] = useState("business");
 
   const tabs = [
-    { id: "business", label: "Business Info", icon: User },
-    { id: "legal", label: "Legal & Billing", icon: FileText },
-    { id: "area", label: "Working Area", icon: MapPin },
-    { id: "visual", label: "Visual & Verification", icon: Camera },
-    { id: "preferences", label: "Preferences", icon: Settings },
+    { key: "business", label: "Business Info" },
+    { key: "legal", label: "Legal & Billing" },
+    { key: "area", label: "Working Area" },
+    { key: "visual", label: "Visual & Verification" },
+    { key: "preferences", label: "Preferences" }, // 👈 5e onglet
   ];
 
   return (
-    <section className="w-full max-w-5xl mx-auto space-y-8">
-      {/* Header */}
-      <h2 className="text-2xl font-bold text-gray-800">Settings</h2>
-
-      {/* Tabs — responsive */}
-      <div className="flex flex-wrap gap-2 justify-center border-b pb-2">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActive(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
-                active === tab.id
-                  ? "bg-gradient-to-r from-rose-600 to-red-600 text-white shadow"
-                  : "text-gray-600 hover:text-rose-600"
-              }`}
-            >
-              <Icon size={16} />
-              {tab.label}
-            </button>
-          );
-        })}
+    <div className="p-6 space-y-8">
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-3 border-b pb-2">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActive(tab.key)}
+            className={`px-4 py-2 rounded-t-lg font-medium transition ${
+              active === tab.key
+                ? "bg-rose-100 text-rose-700 border-b-2 border-rose-600"
+                : "text-gray-600 hover:text-rose-500"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Active Tab Content */}
+      {/* Content — components stay mounted, we only hide/show */}
       <div className="bg-white rounded-2xl shadow p-6 border border-gray-100">
-        {active === "business" && <BusinessSettings />}
-        {active === "legal" && <LegalSettings />}
-        {active === "area" && <ProRadiusSettings />}
-        {active === "visual" && <VisualSettings />}
-        {active === "preferences" && <PreferencesSettings />}
+        <div hidden={active !== "business"}>
+          <BusinessSettings />
+        </div>
+        <div hidden={active !== "legal"}>
+          <LegalSettings />
+        </div>
+        <div hidden={active !== "area"}>
+          <ProRadiusSettings />
+        </div>
+        <div hidden={active !== "visual"}>
+          <VisualSettings />
+        </div>
+        <div hidden={active !== "preferences"}>
+          <PreferencesSettings />
+        </div>{" "}
+        {/* 👈 */}
       </div>
-    </section>
+    </div>
   );
 }

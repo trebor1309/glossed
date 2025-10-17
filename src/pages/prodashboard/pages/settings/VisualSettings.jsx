@@ -1,17 +1,16 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
-import { Upload, Save, FileText, IdCard } from "lucide-react";
+import { Edit2, Save, Upload, FileText, IdCard } from "lucide-react";
 import Toast from "@/components/ui/Toast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 
 export default function VisualSettings() {
-  const { session } = useUser();
-
-  // --- ÉTATS GÉNÉRAUX ---
-  const [loading, setLoading] = useState(true);
+  const { user } = useUser();
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+
   const [profileUrl, setProfileUrl] = useState("");
   const [portfolio, setPortfolio] = useState([]);
   const [verification, setVerification] = useState("unverified");
@@ -23,133 +22,100 @@ export default function VisualSettings() {
     data: null,
   });
 
-  // --- RÉCUPÉRATION DES DONNÉES ---
+  // 🔍 Charger les données
   useEffect(() => {
-    let isMounted = true;
+    const loadVisuals = async () => {
+      if (!user?.id) return;
 
-    const fetchData = async () => {
-      if (!session?.user?.id || !isMounted) return;
-
-      setLoading(true);
       const { data, error } = await supabase
         .from("users")
         .select(
           "profile_photo, portfolio, verification_status, id_document, certificate_document"
         )
-        .eq("id", session.user.id)
-        .single();
+        .eq("id", user.id)
+        .maybeSingle();
 
-      if (isMounted && !error && data) {
+      if (error) console.error(error);
+      if (data) {
         setProfileUrl(data.profile_photo || "");
-        setPortfolio(data.portfolio || []);
+        setPortfolio(Array.isArray(data.portfolio) ? data.portfolio : []);
         setVerification(data.verification_status || "unverified");
         setIdDoc(data.id_document || null);
         setCertDoc(data.certificate_document || null);
       }
-      if (isMounted) setLoading(false);
     };
 
-    const timer = setTimeout(fetchData, 250);
+    loadVisuals();
+  }, [user?.id]);
 
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [session?.user?.id]);
+  // 💾 Sauvegarde du statut
+  const handleSave = async () => {
+    if (!user?.id) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("users")
+      .update({ verification_status: verification })
+      .eq("id", user.id);
 
-  // --- CONFIRMATION GÉNÉRALE ---
-  const handleConfirmAction = async () => {
-    const { type, data } = confirmModal;
-
-    if (type === "upload") await performPortfolioUpload(data);
-    else if (type === "delete") await performDeleteImage(data);
-    else if (type === "docUpload")
-      await performDocUpload(data.file, data.docType);
-
-    setConfirmModal({ open: false, type: null, data: null });
+    setSaving(false);
+    if (error)
+      setToast({
+        message: "❌ Error saving verification status.",
+        type: "error",
+      });
+    else {
+      setToast({ message: "✅ Visual information updated!", type: "success" });
+      setEditing(false);
+    }
   };
 
-  // --- UPLOAD / REPLACE PROFILE PHOTO ---
-  const handleProfileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file || !session?.user) return;
+  // --- Gestion des uploads ---
 
-    const ext = file.name.split(".").pop();
-    const fileName = `${session.user.id}_profile.${ext}`;
-    const filePath = `profiles/${fileName}`;
-
+  const uploadFile = async (path, file) => {
     const { error } = await supabase.storage
       .from("glossed-media")
-      .upload(filePath, file, { upsert: true, contentType: file.type });
-
-    if (error) {
-      setToast({ message: "❌ Upload failed.", type: "error" });
-      return;
-    }
-
-    const { data } = supabase.storage
-      .from("glossed-media")
-      .getPublicUrl(filePath);
-
-    const newUrl = `${data.publicUrl}?t=${Date.now()}`;
-
-    await supabase
-      .from("users")
-      .update({ profile_photo: newUrl })
-      .eq("id", session.user.id);
-
-    setProfileUrl(newUrl);
-    setToast({ message: "✅ Profile photo updated!", type: "success" });
+      .upload(path, file, { upsert: true, contentType: file.type });
+    if (error) throw error;
+    const { data } = supabase.storage.from("glossed-media").getPublicUrl(path);
+    return data.publicUrl;
   };
 
-  // --- SUPPRIMER PROFILE PHOTO ---
-  const handleDeleteProfilePhoto = () => {
-    setConfirmModal({ open: true, type: "deleteProfile", data: null });
-  };
-
-  const confirmDeleteProfile = async () => {
-    if (!profileUrl) return;
+  const handleProfileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
     try {
-      const path = profileUrl.split("/").slice(-2).join("/");
-      await supabase.storage.from("glossed-media").remove([path]);
+      const ext = file.name.split(".").pop();
+      const filePath = `profiles/${user.id}_profile.${ext}`;
+      const publicUrl = await uploadFile(filePath, file);
+
       await supabase
         .from("users")
-        .update({ profile_photo: null })
-        .eq("id", session.user.id);
-
-      setProfileUrl("");
-      setToast({ message: "🗑️ Profile photo removed.", type: "success" });
+        .update({ profile_photo: publicUrl })
+        .eq("id", user.id);
+      setProfileUrl(publicUrl);
+      setToast({ message: "✅ Profile photo updated!", type: "success" });
     } catch {
-      setToast({ message: "❌ Failed to delete photo.", type: "error" });
+      setToast({
+        message: "❌ Failed to upload profile photo.",
+        type: "error",
+      });
     }
-
-    setConfirmModal({ open: false, type: null, data: null });
   };
 
-  // --- UPLOAD PORTFOLIO ---
-  const handlePortfolioUpload = (e) => {
+  const handlePortfolioUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    setConfirmModal({ open: true, type: "upload", data: files });
-  };
 
-  const performPortfolioUpload = async (files) => {
     const uploadedUrls = [];
-
     for (const file of files) {
       const ext = file.name.split(".").pop();
-      const filePath = `portfolio/${session.user.id}_${Date.now()}.${ext}`;
-
-      const { error } = await supabase.storage
-        .from("glossed-media")
-        .upload(filePath, file, { upsert: false });
-
-      if (!error) {
-        const { data } = supabase.storage
-          .from("glossed-media")
-          .getPublicUrl(filePath);
-        uploadedUrls.push(data.publicUrl);
+      const path = `portfolio/${user.id}_${Date.now()}.${ext}`;
+      try {
+        const url = await uploadFile(path, file);
+        uploadedUrls.push(url);
+      } catch {
+        console.error("❌ Upload error");
       }
     }
 
@@ -157,28 +123,20 @@ export default function VisualSettings() {
     await supabase
       .from("users")
       .update({ portfolio: newPortfolio })
-      .eq("id", session.user.id);
-
+      .eq("id", user.id);
     setPortfolio(newPortfolio);
     setToast({ message: "✅ Portfolio updated!", type: "success" });
   };
 
-  // --- SUPPRIMER IMAGE ---
-  const handleDeleteImage = (url) => {
-    setConfirmModal({ open: true, type: "delete", data: url });
-  };
-
-  const performDeleteImage = async (urlToDelete) => {
+  const handleDeleteImage = async (url) => {
     try {
-      const path = urlToDelete.split("/").slice(-2).join("/");
+      const path = url.split("/").slice(-2).join("/");
       await supabase.storage.from("glossed-media").remove([path]);
-
-      const newPortfolio = portfolio.filter((url) => url !== urlToDelete);
+      const newPortfolio = portfolio.filter((u) => u !== url);
       await supabase
         .from("users")
         .update({ portfolio: newPortfolio })
-        .eq("id", session.user.id);
-
+        .eq("id", user.id);
       setPortfolio(newPortfolio);
       setToast({ message: "🗑️ Image deleted.", type: "success" });
     } catch {
@@ -186,220 +144,179 @@ export default function VisualSettings() {
     }
   };
 
-  // --- UPLOAD ID / CERTIFICATE (avec modale) ---
-  const handleDocUpload = (e, type) => {
+  const handleDocUpload = async (e, type) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setConfirmModal({
-      open: true,
-      type: "docUpload",
-      data: { file, docType: type },
-    });
-  };
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `verification/${type}/${user.id}_${type}.${ext}`;
+      const publicUrl = await uploadFile(path, file);
 
-  const performDocUpload = async (file, type) => {
-    const ext = file.name.split(".").pop();
-    const filePath = `verification/${type}/${session.user.id}_${type}.${ext}`;
+      const updates = {
+        [type === "id" ? "id_document" : "certificate_document"]: publicUrl,
+        verification_status: "pending",
+        updated_at: new Date().toISOString(),
+      };
 
-    const { error } = await supabase.storage
-      .from("glossed-media")
-      .upload(filePath, file, { upsert: true, contentType: file.type });
+      await supabase.from("users").update(updates).eq("id", user.id);
+      if (type === "id") setIdDoc(publicUrl);
+      else setCertDoc(publicUrl);
 
-    if (error) {
-      setToast({ message: "❌ Upload failed.", type: "error" });
-      return;
+      setToast({ message: `✅ ${type} document uploaded.`, type: "success" });
+    } catch {
+      setToast({ message: "❌ Failed to upload document.", type: "error" });
     }
-
-    const updates = {
-      [type === "id" ? "id_document" : "certificate_document"]: filePath,
-      verification_status: "pending",
-      updated_at: new Date().toISOString(),
-    };
-
-    await supabase.from("users").update(updates).eq("id", session.user.id);
-    if (type === "id") setIdDoc(filePath);
-    else setCertDoc(filePath);
-
-    setToast({
-      message: `✅ ${type === "id" ? "ID" : "Certificate"} uploaded.`,
-      type: "success",
-    });
   };
 
-  // --- SAUVEGARDE DU STATUT ---
-  const handleSave = async () => {
-    if (!session?.user) return;
-    setSaving(true);
-
-    const { error } = await supabase
-      .from("users")
-      .update({ verification_status: verification })
-      .eq("id", session.user.id);
-
-    setSaving(false);
-    setToast({
-      message: error ? "❌ Error saving." : "✅ Status saved!",
-      type: error ? "error" : "success",
-    });
-  };
-
-  if (loading)
-    return <p className="text-gray-500 text-sm">Loading visual settings...</p>;
-
+  // --- UI ---
   return (
-    <div className="space-y-10">
-      <h3 className="text-lg font-semibold text-gray-800">
-        Visual & Verification
-      </h3>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-gray-800">
+          Visual & Verification
+        </h3>
+        <button
+          onClick={() => (editing ? handleSave() : setEditing(true))}
+          disabled={saving}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition
+            ${
+              editing
+                ? "bg-gradient-to-r from-rose-600 to-red-600 text-white"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+            }`}
+        >
+          {editing ? <Save size={16} /> : <Edit2 size={16} />}
+          {editing ? (saving ? "Saving..." : "Save") : "Modify"}
+        </button>
+      </div>
 
-      <ProfileSection
-        profileUrl={profileUrl}
-        onUpload={handleProfileUpload}
-        onDelete={handleDeleteProfilePhoto}
-      />
-
-      <PortfolioSection
-        portfolio={portfolio}
-        onUpload={handlePortfolioUpload}
-        onDelete={handleDeleteImage}
-      />
-
-      <VerificationSection
-        verification={verification}
-        setVerification={setVerification}
-        idDoc={idDoc}
-        certDoc={certDoc}
-        onUpload={handleDocUpload}
-        onSave={handleSave}
-        saving={saving}
-      />
-
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
+      {!editing ? (
+        // --- MODE LECTURE ---
+        <div className="space-y-6">
+          <ProfileView profileUrl={profileUrl} />
+          <PortfolioView portfolio={portfolio} />
+          <VerificationView
+            verification={verification}
+            idDoc={idDoc}
+            certDoc={certDoc}
+          />
+        </div>
+      ) : (
+        // --- MODE ÉDITION ---
+        <div className="space-y-6">
+          <ProfileEdit profileUrl={profileUrl} onUpload={handleProfileUpload} />
+          <PortfolioEdit
+            portfolio={portfolio}
+            onUpload={handlePortfolioUpload}
+            onDelete={handleDeleteImage}
+          />
+          <VerificationEdit
+            verification={verification}
+            setVerification={setVerification}
+            idDoc={idDoc}
+            certDoc={certDoc}
+            onUpload={handleDocUpload}
+          />
+        </div>
       )}
 
-      <ConfirmModal
-        open={confirmModal.open}
-        type={
-          confirmModal.type === "deleteProfile" ||
-          confirmModal.type === "delete"
-            ? "delete"
-            : confirmModal.type === "docUpload"
-            ? "verify"
-            : "upload"
-        }
-        title={
-          confirmModal.type === "upload"
-            ? "Confirm Upload"
-            : confirmModal.type === "deleteProfile"
-            ? "Delete Profile Photo?"
-            : confirmModal.type === "docUpload"
-            ? "Confirm Document Upload"
-            : "Delete Image?"
-        }
-        message={
-          confirmModal.type === "docUpload"
-            ? "Your document will be stored securely and reviewed confidentially by the Glossed team within 48 hours. You’ll receive a notification once it’s validated."
-            : confirmModal.type === "upload"
-            ? "Do you want to upload these photos to your portfolio?"
-            : confirmModal.type === "deleteProfile"
-            ? "Your profile picture will be permanently deleted."
-            : "This image will be permanently removed."
-        }
-        confirmLabel={
-          confirmModal.type === "upload"
-            ? "Upload"
-            : confirmModal.type === "docUpload"
-            ? "Send"
-            : "Delete"
-        }
-        onConfirm={
-          confirmModal.type === "deleteProfile"
-            ? confirmDeleteProfile
-            : handleConfirmAction
-        }
-        onCancel={() =>
-          setConfirmModal({ open: false, type: null, data: null })
-        }
-      />
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+      {confirmModal.open && (
+        <ConfirmModal
+          {...confirmModal}
+          onClose={() => setConfirmModal({ open: false })}
+        />
+      )}
     </div>
   );
 }
 
 /* --- Sous-sections --- */
 
-function ProfileSection({ profileUrl, onUpload, onDelete }) {
+function ProfileView({ profileUrl }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-      <div className="w-24 h-24 rounded-full overflow-hidden border shadow">
-        {profileUrl ? (
-          <img
-            src={profileUrl}
-            alt="Profile"
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
-            No photo
-          </div>
-        )}
-      </div>
-      <div>
-        <label className="text-sm font-medium text-gray-700 block mb-2">
-          Profile Picture
-        </label>
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-          <button
-            className="px-4 py-2 bg-gray-100 border rounded-lg hover:bg-gray-200 flex items-center gap-2 text-sm"
-            onClick={() => document.getElementById("profileUpload").click()}
-          >
-            <Upload size={16} /> Upload Profile Picture
-          </button>
-          <input
-            id="profileUpload"
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={onUpload}
-          />
-          {profileUrl && (
-            <button
-              onClick={onDelete}
-              className="text-xs text-red-500 underline hover:text-red-600 sm:ml-2"
-            >
-              Remove photo
-            </button>
-          )}
-        </div>
-      </div>
+    <div>
+      <h4 className="font-medium text-gray-700 mb-2">Profile Picture</h4>
+      {profileUrl ? (
+        <img
+          src={profileUrl}
+          alt="Profile"
+          className="w-24 h-24 rounded-full border shadow"
+        />
+      ) : (
+        <p className="text-gray-500 text-sm">No profile photo uploaded.</p>
+      )}
     </div>
   );
 }
 
-function PortfolioSection({ portfolio, onUpload, onDelete }) {
+function PortfolioView({ portfolio }) {
   return (
     <div>
-      <label className="text-sm font-medium text-gray-700">
-        Portfolio Pictures
-      </label>
-      <button
-        className="mt-2 px-4 py-2 bg-gray-100 border rounded-lg hover:bg-gray-200 flex items-center gap-2 text-sm"
-        onClick={() => document.getElementById("portfolioUpload").click()}
-      >
-        <Upload size={16} /> Upload Portfolio Photos
-      </button>
+      <h4 className="font-medium text-gray-700 mb-2">Portfolio</h4>
+      {portfolio.length ? (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+          {portfolio.map((url, i) => (
+            <img
+              key={i}
+              src={url}
+              alt="Portfolio"
+              className="rounded-lg shadow h-24 w-full object-cover"
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="text-gray-500 text-sm">No portfolio images yet.</p>
+      )}
+    </div>
+  );
+}
+
+function VerificationView({ verification, idDoc, certDoc }) {
+  return (
+    <div className="text-sm text-gray-700 space-y-1">
+      <p>
+        <strong>Status:</strong> {verification}
+      </p>
+      <p>{idDoc ? "📄 ID Document uploaded" : "No ID Document"}</p>
+      <p>{certDoc ? "🎓 Certificate uploaded" : "No Certificate"}</p>
+    </div>
+  );
+}
+
+function ProfileEdit({ profileUrl, onUpload }) {
+  return (
+    <div className="space-y-2">
+      <h4 className="font-medium text-gray-700">Profile Picture</h4>
+      {profileUrl && (
+        <img
+          src={profileUrl}
+          alt="Profile"
+          className="w-24 h-24 rounded-full border shadow"
+        />
+      )}
       <input
-        id="portfolioUpload"
+        type="file"
+        accept="image/*"
+        onChange={onUpload}
+        className="text-sm text-gray-600"
+      />
+    </div>
+  );
+}
+
+function PortfolioEdit({ portfolio, onUpload, onDelete }) {
+  return (
+    <div>
+      <h4 className="font-medium text-gray-700 mb-2">Portfolio</h4>
+      <input
         type="file"
         multiple
         accept="image/*"
-        className="hidden"
         onChange={onUpload}
+        className="text-sm text-gray-600"
       />
       {portfolio.length > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mt-4">
@@ -408,7 +325,7 @@ function PortfolioSection({ portfolio, onUpload, onDelete }) {
               <img
                 src={url}
                 alt="Portfolio"
-                className="w-full h-24 object-cover rounded-lg shadow"
+                className="rounded-lg shadow h-24 w-full object-cover"
               />
               <button
                 onClick={() => onDelete(url)}
@@ -424,34 +341,34 @@ function PortfolioSection({ portfolio, onUpload, onDelete }) {
   );
 }
 
-function VerificationSection({
+function VerificationEdit({
   verification,
   setVerification,
   idDoc,
   certDoc,
   onUpload,
-  onSave,
-  saving,
 }) {
   return (
     <div className="space-y-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Verification Status
-      </label>
-      <select
-        value={verification}
-        onChange={(e) => setVerification(e.target.value)}
-        className="w-full md:w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-      >
-        <option value="unverified">Unverified</option>
-        <option value="pending">Pending Review</option>
-        <option value="verified">Verified ✅</option>
-      </select>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Verification Status
+        </label>
+        <select
+          value={verification}
+          onChange={(e) => setVerification(e.target.value)}
+          className="w-full md:w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+        >
+          <option value="unverified">Unverified</option>
+          <option value="pending">Pending Review</option>
+          <option value="verified">Verified ✅</option>
+        </select>
+      </div>
 
-      <div className="flex flex-wrap gap-4 mt-4">
+      <div className="flex flex-wrap gap-4">
         <button
-          className="px-4 py-2 bg-gray-100 border rounded-lg hover:bg-gray-200 flex items-center gap-2 text-sm"
           onClick={() => document.getElementById("idUpload").click()}
+          className="px-4 py-2 bg-gray-100 border rounded-lg hover:bg-gray-200 flex items-center gap-2 text-sm"
         >
           <IdCard size={16} /> Upload ID Document
         </button>
@@ -464,8 +381,8 @@ function VerificationSection({
         />
 
         <button
-          className="px-4 py-2 bg-gray-100 border rounded-lg hover:bg-gray-200 flex items-center gap-2 text-sm"
           onClick={() => document.getElementById("certUpload").click()}
+          className="px-4 py-2 bg-gray-100 border rounded-lg hover:bg-gray-200 flex items-center gap-2 text-sm"
         >
           <FileText size={16} /> Upload Certificate / Diploma
         </button>
@@ -478,28 +395,9 @@ function VerificationSection({
         />
       </div>
 
-      <div className="mt-4 text-sm text-gray-600 space-y-1">
-        {idDoc ? (
-          <p>📄 ID Document uploaded</p>
-        ) : (
-          <p className="text-gray-400">ID Document missing</p>
-        )}
-        {certDoc ? (
-          <p>🎓 Certificate uploaded</p>
-        ) : (
-          <p className="text-gray-400">Certificate missing</p>
-        )}
-      </div>
-
-      <div className="text-right">
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.02] transition-transform flex items-center gap-2 ml-auto disabled:opacity-70"
-        >
-          <Save size={18} />
-          {saving ? "Saving..." : "Save Status"}
-        </button>
+      <div className="text-sm text-gray-600 space-y-1">
+        <p>{idDoc ? "📄 ID Document uploaded" : "No ID Document"}</p>
+        <p>{certDoc ? "🎓 Certificate uploaded" : "No Certificate"}</p>
       </div>
     </div>
   );
