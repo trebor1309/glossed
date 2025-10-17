@@ -10,6 +10,7 @@ export default function LegalSettings() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const [connecting, setConnecting] = useState(false);
 
   const [form, setForm] = useState({
     iban: "",
@@ -204,6 +205,8 @@ export default function LegalSettings() {
           <button
             onClick={async () => {
               try {
+                setConnecting(true); // 🟡 active le mode "loading"
+
                 const res = await fetch(
                   "https://cdcnylgokphyltkctymi.functions.supabase.co/create-stripe-account",
                   {
@@ -218,15 +221,17 @@ export default function LegalSettings() {
                     }),
                   }
                 );
+
                 const data = await res.json();
+
                 if (data.url) {
-                  // on sauvegarde le stripe_account_id dans Supabase
+                  // ✅ Enregistre l’account_id Stripe dans Supabase
                   await supabase
                     .from("users")
                     .update({ stripe_account_id: data.account_id })
                     .eq("id", user.id);
 
-                  // redirection vers Stripe
+                  // 🚀 Redirige le pro vers Stripe
                   window.location.href = data.url;
                 } else {
                   setToast({
@@ -236,12 +241,22 @@ export default function LegalSettings() {
                 }
               } catch (err) {
                 console.error(err);
-                setToast({ message: "❌ Connection error.", type: "error" });
+                setToast({
+                  message: "❌ Connection error.",
+                  type: "error",
+                });
+              } finally {
+                setConnecting(false); // 🟢 repasse en mode normal
               }
             }}
-            className="px-4 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.02] transition-transform"
+            disabled={connecting}
+            className={`px-4 py-2 rounded-full font-semibold transition-transform ${
+              connecting
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                : "bg-gradient-to-r from-rose-600 to-red-600 text-white hover:scale-[1.02]"
+            }`}
           >
-            Connect to Stripe
+            {connecting ? "Redirecting to Stripe…" : "Connect to Stripe"}
           </button>
         )}
       </div>
