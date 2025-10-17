@@ -14,36 +14,68 @@ export default function Services() {
       icon: <Sparkles className="text-rose-600" size={28} />,
       title: "Makeup & Beauty",
       desc: "From natural looks to full glam, our makeup artists bring out your unique radiance for every occasion.",
-      examples: ["Weddings", "Evening parties", "Photo shoots", "Job interviews"],
-      image: "/images/service-makeup.jpg",
+      examples: [
+        "Weddings",
+        "Evening parties",
+        "Photo shoots",
+        "Job interviews",
+      ],
+      image:
+        "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=900&q=80",
     },
     {
       icon: <Scissors className="text-rose-600" size={28} />,
       title: "Hair Styling",
       desc: "Cuts, blowouts, curls or braids — enjoy professional hairstyling without leaving home.",
       examples: ["Weddings & bridesmaids", "Corporate events", "Family photos"],
-      image: "/images/service-hair.jpg",
+      image:
+        "https://images.unsplash.com/photo-1580618672591-eb180b1a973f?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=900&q=80",
+    },
+    {
+      icon: <Scissors className="text-rose-600" size={28} />,
+      title: "Barber Services",
+      desc: "Classic cuts, modern fades, beard trimming and grooming — experience professional barber care right at home.",
+      examples: [
+        "Haircuts",
+        "Beard trimming",
+        "Groom styling",
+        "Special occasions",
+      ],
+      image:
+        "https://images.unsplash.com/photo-1654097803253-d481b6751f29?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=900&q=80",
     },
     {
       icon: <Heart className="text-rose-600" size={28} />,
       title: "Nails & Hand Care",
       desc: "Perfect manicures, creative nail art or quick touch-ups — Glossed brings the nail bar to you.",
       examples: ["Vacations", "Special dinners", "Weekend refresh"],
-      image: "/images/service-nails.jpg",
+      image:
+        "https://images.unsplash.com/photo-1632345031435-8727f6897d53?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=900&q=80",
     },
     {
       icon: <Wand2 className="text-rose-600" size={28} />,
       title: "Skincare & Facials",
       desc: "Relax with a custom skincare session designed to refresh and nourish your skin wherever you are.",
-      examples: ["At-home spa sessions", "Pre-event glow", "Skin prep for makeup"],
-      image: "/images/service-skincare.jpg",
+      examples: [
+        "At-home spa sessions",
+        "Pre-event glow",
+        "Skin prep for makeup",
+      ],
+      image:
+        "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=900&q=80",
     },
     {
       icon: <Smile className="text-rose-600" size={28} />,
       title: "Kids Makeup & Face Painting",
       desc: "Make birthdays and events extra magical with our creative makeup and safe, fun face painting services.",
-      examples: ["Birthdays", "Halloween parties", "School events", "Carnivals"],
-      image: "/images/service-kids.jpg",
+      examples: [
+        "Birthdays",
+        "Halloween parties",
+        "School events",
+        "Carnivals",
+      ],
+      image:
+        "https://images.unsplash.com/photo-1666005367697-b6fdb0901ece?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=900&q=80",
     },
   ];
 
@@ -51,18 +83,26 @@ export default function Services() {
     {
       title: "Wedding & Bridal Prep",
       desc: "Hair, makeup and nail services tailored for brides, bridesmaids and guests. Elegant, timeless, stress-free.",
+      image:
+        "https://images.unsplash.com/photo-1504993945773-3f38e1b6a626?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=900&q=80",
     },
     {
       title: "Professional Meetings",
       desc: "Look confident for job interviews, conferences or corporate photo shoots — beauty that means business.",
+      image:
+        "https://images.unsplash.com/photo-1531537571171-a707bf2683da?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=900&q=80",
     },
     {
       title: "Private Events & Parties",
       desc: "From birthdays to gala nights, our pros make sure you shine for every special moment.",
+      image:
+        "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=900&q=80",
     },
     {
       title: "Children’s Events",
       desc: "Fun, safe and colorful makeup for birthdays, Halloween or school fairs — memories that sparkle.",
+      image:
+        "https://images.unsplash.com/photo-1636717944794-858fe2fea698?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=900&q=80",
     },
   ];
 
@@ -129,19 +169,30 @@ export default function Services() {
           with your loved ones.
         </p>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 text-left">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {occasions.map((item, i) => (
-            <div
+            <motion.div
               key={i}
-              className="bg-white p-6 rounded-2xl shadow border border-rose-50 hover:shadow-lg transition"
+              whileHover={{ scale: 1.04, y: -6 }}
+              transition={{ type: "spring", stiffness: 300, damping: 18 }}
+              className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition"
             >
-              <h3 className="text-xl font-semibold text-rose-600 mb-2">
-                {item.title}
-              </h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                {item.desc}
-              </p>
-            </div>
+              <div className="overflow-hidden">
+                <img
+                  src={item.image}
+                  alt={item.title}
+                  className="w-full h-44 object-cover transform hover:scale-105 transition-transform duration-500 ease-out"
+                />
+              </div>
+              <div className="p-6 text-left">
+                <h3 className="text-lg font-semibold text-rose-600 mb-2">
+                  {item.title}
+                </h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {item.desc}
+                </p>
+              </div>
+            </motion.div>
           ))}
         </div>
       </section>

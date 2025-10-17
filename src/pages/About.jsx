@@ -95,7 +95,7 @@ export default function About() {
           </div>
           <div>
             <img
-              src="/images/about-howitworks.jpg"
+              src="https://images.unsplash.com/photo-1612883695890-f2ab22e65215?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop"
               alt="Glossed booking steps illustration"
               className="rounded-2xl shadow-md w-full object-cover h-[350px]"
             />
