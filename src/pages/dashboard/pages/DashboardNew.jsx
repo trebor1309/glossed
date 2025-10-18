@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { v4 as uuid } from "uuid";
 import { supabase } from "@/lib/supabaseClient";
 import { motion } from "framer-motion";
@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import Toast from "@/components/ui/Toast";
 import { useUser } from "@/context/UserContext";
-import { Autocomplete } from "@react-google-maps/api";
 
 /* ---------------------------------------------------------
    STEP 1 – Services
@@ -22,33 +21,33 @@ function StepServices({ bookingData, setBookingData, onNext }) {
   const serviceOptions = [
     {
       id: "Hair Stylist",
-      label: "💇 Hair Stylist",
-      img: "https://images.unsplash.com/photo-1519744792095-2f2205e87b6f?auto=format&fit=crop&w=800&q=60",
+      label: "Hair Stylist",
+      img: "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
     },
     {
       id: "Barber",
-      label: "💈 Barber",
-      img: "https://images.unsplash.com/photo-1502772066657-5c5d0a67c1c1?auto=format&fit=crop&w=800&q=60",
+      label: "Barber",
+      img: "https://images.unsplash.com/photo-1621605815971-fbc98d665033?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
     },
     {
       id: "Makeup Artist",
-      label: "💄 Makeup Artist",
-      img: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=800&q=60",
+      label: "Makeup Artist",
+      img: "https://images.unsplash.com/photo-1583784561105-a674080f391e?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
     },
     {
-      id: "Nail Technician",
-      label: "💅 Nail Technician",
-      img: "https://images.unsplash.com/photo-1601046008264-7ea3f8ae95b6?auto=format&fit=crop&w=800&q=60",
+      id: "Manicure",
+      label: "Manicure",
+      img: "https://images.unsplash.com/photo-1636019411401-82485711b6ba?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
     },
     {
-      id: "Wellness",
-      label: "🧘 Wellness",
-      img: "https://images.unsplash.com/photo-1599058917212-d750089bc07b?auto=format&fit=crop&w=800&q=60",
+      id: "Skincare",
+      label: "Skincare",
+      img: "https://images.unsplash.com/photo-1630398777649-cdfc7c5e8a24?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
     },
     {
-      id: "Aesthetician",
-      label: "🌸 Aesthetician",
-      img: "https://images.unsplash.com/photo-1595476108010-255204c7f0c9?auto=format&fit=crop&w=800&q=60",
+      id: "Kids Makeup",
+      label: "Kids Makeup",
+      img: "https://images.unsplash.com/photo-1676918324432-f23552e80484?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
     },
   ];
 
@@ -196,9 +195,51 @@ function StepWhen({ bookingData, setBookingData, onNext, onPrev }) {
 }
 
 /* ---------------------------------------------------------
-   STEP 3 – Address & Notes
+   STEP 3 – Address & Notes (corrected, one field only)
 --------------------------------------------------------- */
 function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
+  useEffect(() => {
+    if (!window.google?.maps?.places?.PlaceAutocompleteElement) return;
+
+    const container = document.getElementById("autocomplete-container");
+    if (!container) return;
+
+    // Crée un nouvel élément autocomplete
+    const placeAutocomplete = new google.maps.places.PlaceAutocompleteElement({
+      componentRestrictions: { country: "be" },
+    });
+
+    // Style Google natif
+    placeAutocomplete.classList.add(
+      "w-full",
+      "border",
+      "rounded-lg",
+      "px-4",
+      "py-2",
+      "focus:ring-2",
+      "focus:ring-rose-500",
+      "focus:outline-none"
+    );
+
+    container.appendChild(placeAutocomplete);
+
+    // Écoute l’événement de sélection
+    placeAutocomplete.addEventListener("gmp-placeselect", (e) => {
+      const place = e?.place;
+      if (!place?.location) return;
+      setBookingData((prev) => ({
+        ...prev,
+        address: place.formattedAddress,
+        latitude: place.location.lat(),
+        longitude: place.location.lng(),
+      }));
+    });
+
+    return () => {
+      container.innerHTML = "";
+    };
+  }, []);
+
   return (
     <motion.div
       key="step3"
@@ -212,18 +253,10 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         <MapPin size={20} /> Where should we come?
       </h2>
 
-      <Autocomplete>
-        <input
-          type="text"
-          placeholder="Enter your address..."
-          value={bookingData.address}
-          onChange={(e) =>
-            setBookingData({ ...bookingData, address: e.target.value })
-          }
-          className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
-        />
-      </Autocomplete>
+      {/* ✅ Single autocomplete field (only Google’s input now) */}
+      <div id="autocomplete-container" className="w-full"></div>
 
+      {/* Notes */}
       <textarea
         rows="3"
         placeholder="Additional notes..."
@@ -321,10 +354,13 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
     timeSlots: [],
     address: "",
     notes: "",
+    latitude: null,
+    longitude: null,
   });
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
+  /* 🧾 CONFIRM & SAVE BOOKING */
   const handleConfirm = async () => {
     setLoading(true);
     try {
@@ -332,9 +368,9 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
         {
           id: uuid(),
           client_id: session?.user?.id,
-          service: bookingData.services.join(", "), // texte unique concaténé
+          service: bookingData.services.join(", "),
           date: bookingData.date,
-          time_slot: bookingData.timeSlots.join(", "), // idem
+          time_slot: bookingData.timeSlots.join(", "),
           address: bookingData.address,
           notes: bookingData.notes,
           client_lat: bookingData.latitude || null,
@@ -342,14 +378,20 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
           status: "pending",
         },
       ]);
+
       if (error) throw error;
+
       setToast({
         message: "✅ Booking created successfully!",
         type: "success",
       });
+
       if (onSuccess) onSuccess();
     } catch (err) {
-      setToast({ message: `❌ ${err.message}`, type: "error" });
+      setToast({
+        message: `❌ ${err.message}`,
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }

@@ -10,24 +10,28 @@ import {
   Repeat,
   Plus,
 } from "lucide-react";
+import { useJsApiLoader } from "@react-google-maps/api";
 import BottomNav from "./BottomNav";
 import Sidebar from "./Sidebar";
+import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 
-// 🧠 Import du wrapper pour le formulaire de réservation
-import DashboardNewWrapper from "@/pages/dashboard/pages/DashboardNewWrapper";
+const libraries = ["places"];
 
 export default function DashboardLayout() {
-  const { logout, switchRole, isPro } = useUser();
+  const { switchRole, isPro } = useUser();
   const [active, setActive] = useState("Dashboard");
   const location = useLocation();
   const navigate = useNavigate();
 
-  // --- Nouveaux états pour le modal ---
   const [showNewBookingModal, setShowNewBookingModal] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [shouldCloseModal, setShouldCloseModal] = useState(false);
 
-  // --- Détection du viewport ---
+  // Charge Google Maps une seule fois pour tout le dashboard
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries,
+  });
+
   useEffect(() => {
     const checkViewport = () => setIsDesktop(window.innerWidth >= 768);
     checkViewport();
@@ -35,7 +39,6 @@ export default function DashboardLayout() {
     return () => window.removeEventListener("resize", checkViewport);
   }, []);
 
-  // --- Définir la page active ---
   useEffect(() => {
     if (location.pathname.includes("reservations"))
       setActive("My Reservations");
@@ -45,49 +48,43 @@ export default function DashboardLayout() {
     else setActive("Dashboard");
   }, [location.pathname]);
 
-  const menuItems = [
-    { name: "Dashboard", icon: Home, path: "/dashboard" },
-    {
-      name: "My Reservations",
-      icon: Calendar,
-      path: "/dashboard/reservations",
-    },
-    { name: "Payments", icon: CreditCard, path: "/dashboard/payments" },
-    { name: "Account", icon: User, path: "/dashboard/account" },
-    { name: "Settings", icon: Settings, path: "/dashboard/settings" },
-  ];
-
-  // --- Action du bouton "+ New Booking" ---
   const handleNewBookingClick = () => {
-    if (isDesktop) {
-      setShowNewBookingModal(true);
-      setShouldCloseModal(false);
-    } else {
-      navigate("/dashboard/new");
-    }
+    if (isDesktop) setShowNewBookingModal(true);
+    else navigate("/dashboard/new");
   };
 
-  // --- Fonction appelée par le formulaire quand succès ---
   const handleBookingSuccess = () => {
-    setShouldCloseModal(true);
-    setTimeout(() => setShowNewBookingModal(false), 400); // petit délai pour la transition
+    setShowNewBookingModal(false);
   };
+
+  if (loadError)
+    return (
+      <div className="flex items-center justify-center h-screen text-gray-600">
+        ❌ Google Maps failed to load.
+      </div>
+    );
+
+  if (!isLoaded)
+    return (
+      <div className="flex items-center justify-center h-screen text-gray-600">
+        Loading Google Maps...
+      </div>
+    );
 
   return (
     <>
       <div className="min-h-screen flex bg-gray-50 text-gray-900">
-        {/* Sidebar (desktop) */}
+        {/* Sidebar */}
         <aside className="hidden md:block w-64">
           <Sidebar />
         </aside>
 
-        {/* Contenu principal */}
+        {/* Main content */}
         <div className="flex-1 flex flex-col">
           <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-10 flex items-center justify-between">
             <h1 className="text-xl font-semibold text-gray-800">{active}</h1>
 
             <div className="flex items-center gap-3">
-              {/* 🔘 Nouveau bouton “+ New Booking” (visible si client) */}
               {!isPro && (
                 <button
                   onClick={handleNewBookingClick}
@@ -116,13 +113,12 @@ export default function DashboardLayout() {
         </div>
       </div>
 
-      {/* 🧭 Navigation mobile */}
       <BottomNav />
 
-      {/* 🪟 Modal desktop (s'affiche toujours au-dessus de tout) */}
+      {/* Modal for desktop */}
       {isDesktop && showNewBookingModal && (
-        <div className="fixed inset-0 z-[9999]">
-          <DashboardNewWrapper
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <DashboardNew
             isModal={true}
             onClose={() => setShowNewBookingModal(false)}
             onSuccess={handleBookingSuccess}
