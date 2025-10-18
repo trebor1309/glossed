@@ -119,14 +119,15 @@ export default function DashboardLayout() {
       {/* 🧭 Navigation mobile */}
       <BottomNav />
 
-      {/* 🪟 Modal desktop */}
-      {showNewBookingModal && (
-        <DashboardNewWrapper
-          isModal={true}
-          onClose={() => setShowNewBookingModal(false)}
-          onSuccess={handleBookingSuccess} // ✅ ferme automatiquement en cas de succès
-          shouldClose={shouldCloseModal}
-        />
+      {/* 🪟 Modal desktop (s'affiche toujours au-dessus de tout) */}
+      {isDesktop && showNewBookingModal && (
+        <div className="fixed inset-0 z-[9999]">
+          <DashboardNewWrapper
+            isModal={true}
+            onClose={() => setShowNewBookingModal(false)}
+            onSuccess={handleBookingSuccess}
+          />
+        </div>
       )}
     </>
   );
