@@ -195,7 +195,7 @@ function StepWhen({ bookingData, setBookingData, onNext, onPrev }) {
 }
 
 /* ---------------------------------------------------------
-   STEP 3 – Address & Notes (corrected, one field only)
+   STEP 3 – Address & Notes (final corrected version)
 --------------------------------------------------------- */
 function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
   useEffect(() => {
@@ -204,41 +204,63 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
     const container = document.getElementById("autocomplete-container");
     if (!container) return;
 
-    // Crée un nouvel élément autocomplete
+    // nettoie tout résidu pour éviter les doublons
+    container.innerHTML = "";
+
+    // crée le champ Google
     const placeAutocomplete = new google.maps.places.PlaceAutocompleteElement({
       componentRestrictions: { country: "be" },
     });
 
-    // Style Google natif
-    placeAutocomplete.classList.add(
-      "w-full",
-      "border",
-      "rounded-lg",
-      "px-4",
-      "py-2",
-      "focus:ring-2",
-      "focus:ring-rose-500",
-      "focus:outline-none"
-    );
+    // applique un style uniforme Tailwind
+    placeAutocomplete.style.border = "1px solid #d1d5db";
+    placeAutocomplete.style.borderRadius = "0.5rem";
+    placeAutocomplete.style.padding = "0.5rem 1rem";
+    placeAutocomplete.style.width = "100%";
+    placeAutocomplete.style.outline = "none";
+    placeAutocomplete.style.fontSize = "0.95rem";
+    placeAutocomplete.style.transition = "all 0.2s";
+    placeAutocomplete.addEventListener("focus", () => {
+      placeAutocomplete.style.borderColor = "#f43f5e"; // rose-600
+      placeAutocomplete.style.boxShadow = "0 0 0 3px rgba(244,63,94,0.2)";
+    });
+    placeAutocomplete.addEventListener("blur", () => {
+      placeAutocomplete.style.borderColor = "#d1d5db";
+      placeAutocomplete.style.boxShadow = "none";
+    });
 
     container.appendChild(placeAutocomplete);
 
-    // Écoute l’événement de sélection
-    placeAutocomplete.addEventListener("gmp-placeselect", (e) => {
+    // écoute la sélection d'une adresse
+    const handleSelect = (e) => {
       const place = e?.place;
       if (!place?.location) return;
+      const formatted = place.formattedAddress;
+      const lat = place.location.lat();
+      const lng = place.location.lng();
+
+      // met à jour immédiatement le state
       setBookingData((prev) => ({
         ...prev,
-        address: place.formattedAddress,
-        latitude: place.location.lat(),
-        longitude: place.location.lng(),
+        address: formatted,
+        latitude: lat,
+        longitude: lng,
       }));
-    });
+
+      // force un event React de re-rendu
+      requestAnimationFrame(() => {
+        const evt = new Event("input", { bubbles: true });
+        container.dispatchEvent(evt);
+      });
+    };
+
+    placeAutocomplete.addEventListener("gmp-placeselect", handleSelect);
 
     return () => {
+      placeAutocomplete.removeEventListener("gmp-placeselect", handleSelect);
       container.innerHTML = "";
     };
-  }, []);
+  }, [setBookingData]);
 
   return (
     <motion.div
@@ -253,7 +275,7 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         <MapPin size={20} /> Where should we come?
       </h2>
 
-      {/* ✅ Single autocomplete field (only Google’s input now) */}
+      {/* ✅ Champ unique Google */}
       <div id="autocomplete-container" className="w-full"></div>
 
       {/* Notes */}
@@ -267,6 +289,7 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
       />
 
+      {/* Navigation */}
       <div className="flex justify-between pt-6">
         <button
           onClick={onPrev}
@@ -276,7 +299,7 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         </button>
         <button
           onClick={onNext}
-          disabled={!bookingData.address}
+          disabled={!bookingData.address || bookingData.address.trim() === ""}
           className="px-6 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.02] transition disabled:opacity-60"
         >
           Next <ArrowRight size={18} className="inline ml-2" />
