@@ -1,16 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { v4 as uuid } from "uuid";
 import { supabase } from "@/lib/supabaseClient";
 import { motion } from "framer-motion";
-import {
-  X,
-  ArrowLeft,
-  ArrowRight,
-  Calendar,
-  Clock,
-  MapPin,
-  Search,
-} from "lucide-react";
+import { X, ArrowLeft, ArrowRight, Calendar, Clock, MapPin, Search } from "lucide-react";
 import Toast from "@/components/ui/Toast";
 import { useUser } from "@/context/UserContext";
 
@@ -153,9 +146,7 @@ function StepWhen({ bookingData, setBookingData, onNext, onPrev }) {
       <input
         type="date"
         value={bookingData.date}
-        onChange={(e) =>
-          setBookingData({ ...bookingData, date: e.target.value })
-        }
+        onChange={(e) => setBookingData({ ...bookingData, date: e.target.value })}
         className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
       />
 
@@ -195,72 +186,10 @@ function StepWhen({ bookingData, setBookingData, onNext, onPrev }) {
 }
 
 /* ---------------------------------------------------------
-   STEP 3 – Address & Notes (final corrected version)
+   STEP 3 – Address & Notes (version simplifiée et stable)
 --------------------------------------------------------- */
 function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
-  useEffect(() => {
-    if (!window.google?.maps?.places?.PlaceAutocompleteElement) return;
-
-    const container = document.getElementById("autocomplete-container");
-    if (!container) return;
-
-    // nettoie tout résidu pour éviter les doublons
-    container.innerHTML = "";
-
-    // crée le champ Google
-    const placeAutocomplete = new google.maps.places.PlaceAutocompleteElement({
-      componentRestrictions: { country: "be" },
-    });
-
-    // applique un style uniforme Tailwind
-    placeAutocomplete.style.border = "1px solid #d1d5db";
-    placeAutocomplete.style.borderRadius = "0.5rem";
-    placeAutocomplete.style.padding = "0.5rem 1rem";
-    placeAutocomplete.style.width = "100%";
-    placeAutocomplete.style.outline = "none";
-    placeAutocomplete.style.fontSize = "0.95rem";
-    placeAutocomplete.style.transition = "all 0.2s";
-    placeAutocomplete.addEventListener("focus", () => {
-      placeAutocomplete.style.borderColor = "#f43f5e"; // rose-600
-      placeAutocomplete.style.boxShadow = "0 0 0 3px rgba(244,63,94,0.2)";
-    });
-    placeAutocomplete.addEventListener("blur", () => {
-      placeAutocomplete.style.borderColor = "#d1d5db";
-      placeAutocomplete.style.boxShadow = "none";
-    });
-
-    container.appendChild(placeAutocomplete);
-
-    // écoute la sélection d'une adresse
-    const handleSelect = (e) => {
-      const place = e?.place;
-      if (!place?.location) return;
-      const formatted = place.formattedAddress;
-      const lat = place.location.lat();
-      const lng = place.location.lng();
-
-      // met à jour immédiatement le state
-      setBookingData((prev) => ({
-        ...prev,
-        address: formatted,
-        latitude: lat,
-        longitude: lng,
-      }));
-
-      // force un event React de re-rendu
-      requestAnimationFrame(() => {
-        const evt = new Event("input", { bubbles: true });
-        container.dispatchEvent(evt);
-      });
-    };
-
-    placeAutocomplete.addEventListener("gmp-placeselect", handleSelect);
-
-    return () => {
-      placeAutocomplete.removeEventListener("gmp-placeselect", handleSelect);
-      container.innerHTML = "";
-    };
-  }, [setBookingData]);
+  
 
   return (
     <motion.div
@@ -275,8 +204,14 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         <MapPin size={20} /> Where should we come?
       </h2>
 
-      {/* ✅ Champ unique Google */}
-      <div id="autocomplete-container" className="w-full"></div>
+      {/* ✅ Champ Google Autocomplete simple */}
+      <input
+        id="autocomplete-input"
+        type="text"
+        placeholder="Enter your address"
+        defaultValue={bookingData.address}
+        className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+      />
 
       {/* Notes */}
       <textarea
@@ -308,6 +243,7 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
     </motion.div>
   );
 }
+
 
 /* ---------------------------------------------------------
    STEP 4 – Recap
@@ -490,13 +426,7 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
 
       {steps[step]}
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </motion.div>
   );
 }
