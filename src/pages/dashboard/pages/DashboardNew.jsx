@@ -332,11 +332,13 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
         {
           id: uuid(),
           client_id: session?.user?.id,
-          services: bookingData.services,
+          service: bookingData.services.join(", "), // texte unique concaténé
           date: bookingData.date,
-          time_slots: bookingData.timeSlots,
+          time_slot: bookingData.timeSlots.join(", "), // idem
           address: bookingData.address,
           notes: bookingData.notes,
+          client_lat: bookingData.latitude || null,
+          client_lng: bookingData.longitude || null,
           status: "pending",
         },
       ]);
