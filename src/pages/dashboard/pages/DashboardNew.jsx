@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { v4 as uuid } from "uuid";
 import { supabase } from "@/lib/supabaseClient";
@@ -186,10 +185,55 @@ function StepWhen({ bookingData, setBookingData, onNext, onPrev }) {
 }
 
 /* ---------------------------------------------------------
-   STEP 3 – Address & Notes (version simplifiée et stable)
+   STEP 3 – Address & Notes (version Glossed stable)
 --------------------------------------------------------- */
 function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
-  
+  /* global google */
+  useEffect(() => {
+    if (!window.google?.maps?.places) return;
+
+    const input = document.getElementById("autocomplete-input");
+    if (!input) return;
+
+    // 🧹 Empêche le double montage (React 18 StrictMode)
+    if (input.dataset.autocompleteAttached) return;
+    input.dataset.autocompleteAttached = "true";
+
+    // 🗺️ Initialise Google Autocomplete
+    const autocomplete = new google.maps.places.Autocomplete(input, {
+      types: ["address"],
+      componentRestrictions: { country: "be" },
+      fields: ["formatted_address", "geometry"],
+    });
+
+    autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      if (!place.geometry) return;
+
+      const formatted = place.formatted_address;
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+
+      setBookingData((prev) => ({
+        ...prev,
+        address: formatted,
+        latitude: lat,
+        longitude: lng,
+      }));
+    });
+
+    // 🪄 S'assure que le menu de suggestions est visible dans le modal
+    const observer = new MutationObserver(() => {
+      const pac = document.querySelector(".pac-container");
+      if (pac) pac.style.zIndex = "999999";
+    });
+    observer.observe(document.body, { childList: true });
+
+    return () => {
+      google.maps.event.clearInstanceListeners(autocomplete);
+      observer.disconnect();
+    };
+  }, [setBookingData]);
 
   return (
     <motion.div
@@ -204,13 +248,15 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         <MapPin size={20} /> Where should we come?
       </h2>
 
-      {/* ✅ Champ Google Autocomplete simple */}
+      {/* ✅ Champ d’adresse avec autocomplete (look Glossed) */}
       <input
         id="autocomplete-input"
         type="text"
         placeholder="Enter your address"
         defaultValue={bookingData.address}
-        className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+        className="w-full border-2 border-rose-300 rounded-lg px-4 py-2 
+                   focus:border-rose-500 focus:ring-2 focus:ring-rose-500 
+                   outline-none transition"
       />
 
       {/* Notes */}
@@ -218,10 +264,9 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         rows="3"
         placeholder="Additional notes..."
         value={bookingData.notes}
-        onChange={(e) =>
-          setBookingData({ ...bookingData, notes: e.target.value })
-        }
-        className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+        onChange={(e) => setBookingData({ ...bookingData, notes: e.target.value })}
+        className="w-full border rounded-lg px-4 py-2 
+                   focus:ring-2 focus:ring-rose-500 focus:outline-none"
       />
 
       {/* Navigation */}
@@ -243,7 +288,6 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
     </motion.div>
   );
 }
-
 
 /* ---------------------------------------------------------
    STEP 4 – Recap

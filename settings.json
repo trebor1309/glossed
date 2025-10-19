@@ -1,0 +1,23 @@
+{
+  // Active ESLint pour ton projet
+  "eslint.enable": true,
+
+  // Utilise ton eslint.config.js (flat config)
+  "eslint.experimental.useFlatConfig": true,
+
+  // Auto-fix au moment de sauvegarder
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true,
+    "source.organizeImports": true
+  },
+
+  // Formate avec Prettier en priorité
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+
+  // Affiche les erreurs ESLint directement dans l’éditeur
+  "eslint.validate": ["javascript", "javascriptreact"],
+
+  // Optionnel : masque les warnings trop verbeux dans la console
+  "eslint.quiet": false
+}
