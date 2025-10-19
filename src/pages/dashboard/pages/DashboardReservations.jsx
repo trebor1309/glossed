@@ -4,8 +4,9 @@ import { useUser } from "@/context/UserContext";
 import { Clock, Bell, CheckCircle, Star, XCircle, Trash2, Edit3, Eye } from "lucide-react";
 import OffersModal from "@/components/modals/OffersModal";
 import { AnimatePresence } from "framer-motion";
-import EditBookingModal from "@/components/modals/EditBookingModal";
+import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 import CalendarView from "@/components/CalendarView";
+import Toast from "@/components/ui/Toast";
 
 export default function DashboardReservations() {
   const { session } = useUser();
@@ -16,6 +17,7 @@ export default function DashboardReservations() {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showOffersModal, setShowOffersModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [toast, setToast] = useState(null);
 
   const openOffersModal = (booking) => {
     setSelectedBooking(booking);
@@ -48,9 +50,24 @@ export default function DashboardReservations() {
 
   const handleDelete = async (id) => {
     if (!confirm("Are you sure you want to delete this reservation?")) return;
-    await supabase.from("bookings").delete().eq("id", id);
+
+    const { error } = await supabase.from("bookings").delete().eq("id", id);
+
+    if (error) {
+      setToast({
+        message: "Failed to delete booking. Please try again.",
+        type: "error",
+      });
+      return;
+    }
+
     setBookings((prev) => prev.filter((b) => b.id !== id));
+    setToast({
+      message: "Booking deleted successfully!",
+      type: "success",
+    });
   };
+
   const displayBookings = selectedDayBookings ? selectedDayBookings.dayBookings : bookings;
 
   const grouped = {
@@ -142,7 +159,7 @@ export default function DashboardReservations() {
         empty="No cancelled reservations."
       />
 
-      {/* ✅ Modal géré ici (pas dans ReservationSection) */}
+      {/* ✅ Modals gérés ici (pas dans ReservationSection) */}
       <AnimatePresence>
         {showOffersModal && selectedBooking && (
           <OffersModal
@@ -154,21 +171,43 @@ export default function DashboardReservations() {
                   b.id === id ? { ...b, status: "confirmed", accepted_offer: offer } : b
                 )
               );
+              setToast({
+                message: "Offer accepted successfully!",
+                type: "success",
+              });
             }}
           />
         )}
       </AnimatePresence>
+
       <AnimatePresence>
         {showEditModal && selectedBooking && (
-          <EditBookingModal
-            booking={selectedBooking}
+          <DashboardNew
+            isModal={true}
+            editBooking={selectedBooking}
             onClose={() => setShowEditModal(false)}
-            onSave={(id, updates) =>
-              setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...updates } : b)))
-            }
+            onSuccess={async () => {
+              // 🔄 Recharge les réservations à jour
+              const { data } = await supabase
+                .from("bookings")
+                .select("*")
+                .eq("client_id", session.user.id)
+                .order("date", { ascending: true });
+
+              setBookings(data || []);
+
+              // ✅ Affiche la notification Glossed
+              setToast({
+                message: "Booking updated successfully!",
+                type: "success",
+              });
+            }}
           />
         )}
       </AnimatePresence>
+
+      {/* ✅ Notification Glossed */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

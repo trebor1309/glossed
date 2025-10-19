@@ -14,32 +14,32 @@ function StepServices({ bookingData, setBookingData, onNext }) {
     {
       id: "Hair Stylist",
       label: "Hair Stylist",
-      img: "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
+      img: "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?auto=format&fit=crop&w=800&q=60",
     },
     {
       id: "Barber",
       label: "Barber",
-      img: "https://images.unsplash.com/photo-1621605815971-fbc98d665033?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
+      img: "https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=800&q=60",
     },
     {
       id: "Makeup Artist",
       label: "Makeup Artist",
-      img: "https://images.unsplash.com/photo-1583784561105-a674080f391e?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
+      img: "https://images.unsplash.com/photo-1583784561105-a674080f391e?auto=format&fit=crop&w=800&q=60",
     },
     {
       id: "Manicure",
       label: "Manicure",
-      img: "https://images.unsplash.com/photo-1636019411401-82485711b6ba?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
+      img: "https://images.unsplash.com/photo-1636019411401-82485711b6ba?auto=format&fit=crop&w=800&q=60",
     },
     {
       id: "Skincare",
       label: "Skincare",
-      img: "https://images.unsplash.com/photo-1630398777649-cdfc7c5e8a24?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
+      img: "https://images.unsplash.com/photo-1630398777649-cdfc7c5e8a24?auto=format&fit=crop&w=800&q=60",
     },
     {
       id: "Kids Makeup",
       label: "Kids Makeup",
-      img: "https://images.unsplash.com/photo-1676918324432-f23552e80484?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%253D%253D&auto=format&fit=crop&w=800&q=60",
+      img: "https://images.unsplash.com/photo-1676918324432-f23552e80484?auto=format&fit=crop&w=800&q=60",
     },
   ];
 
@@ -64,7 +64,6 @@ function StepServices({ bookingData, setBookingData, onNext }) {
       <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
         <Search size={20} /> Which service(s) would you like to book?
       </h2>
-
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {serviceOptions.map((opt) => {
           const selected = bookingData.services.includes(opt.id);
@@ -79,9 +78,7 @@ function StepServices({ bookingData, setBookingData, onNext }) {
               <img
                 src={opt.img}
                 alt={opt.label}
-                className={`object-cover w-full h-36 group-hover:opacity-90 transition ${
-                  selected ? "opacity-80" : "opacity-100"
-                }`}
+                className={`object-cover w-full h-36 group-hover:opacity-90 transition ${selected ? "opacity-80" : "opacity-100"}`}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent flex items-end justify-center pb-3 text-white font-semibold text-center text-sm sm:text-base">
                 {opt.label}
@@ -95,7 +92,6 @@ function StepServices({ bookingData, setBookingData, onNext }) {
           );
         })}
       </div>
-
       <div className="flex justify-between items-center pt-6">
         <button
           onClick={onNext}
@@ -185,21 +181,17 @@ function StepWhen({ bookingData, setBookingData, onNext, onPrev }) {
 }
 
 /* ---------------------------------------------------------
-   STEP 3 – Address & Notes (version Glossed stable)
+   STEP 3 – Address & Notes
 --------------------------------------------------------- */
 function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
   /* global google */
   useEffect(() => {
     if (!window.google?.maps?.places) return;
-
     const input = document.getElementById("autocomplete-input");
     if (!input) return;
-
-    // 🧹 Empêche le double montage (React 18 StrictMode)
     if (input.dataset.autocompleteAttached) return;
     input.dataset.autocompleteAttached = "true";
 
-    // 🗺️ Initialise Google Autocomplete
     const autocomplete = new google.maps.places.Autocomplete(input, {
       types: ["address"],
       componentRestrictions: { country: "be" },
@@ -209,30 +201,11 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
     autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
       if (!place.geometry) return;
-
       const formatted = place.formatted_address;
       const lat = place.geometry.location.lat();
       const lng = place.geometry.location.lng();
-
-      setBookingData((prev) => ({
-        ...prev,
-        address: formatted,
-        latitude: lat,
-        longitude: lng,
-      }));
+      setBookingData((prev) => ({ ...prev, address: formatted, latitude: lat, longitude: lng }));
     });
-
-    // 🪄 S'assure que le menu de suggestions est visible dans le modal
-    const observer = new MutationObserver(() => {
-      const pac = document.querySelector(".pac-container");
-      if (pac) pac.style.zIndex = "999999";
-    });
-    observer.observe(document.body, { childList: true });
-
-    return () => {
-      google.maps.event.clearInstanceListeners(autocomplete);
-      observer.disconnect();
-    };
   }, [setBookingData]);
 
   return (
@@ -248,27 +221,22 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         <MapPin size={20} /> Where should we come?
       </h2>
 
-      {/* ✅ Champ d’adresse avec autocomplete */}
       <input
         id="autocomplete-input"
         type="text"
         placeholder="Enter your address"
         defaultValue={bookingData.address}
-        className="w-full border rounded-lg px-4 py-2 
-                   focus:ring-2 focus:ring-rose-500 focus:outline-none"
+        className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
       />
 
-      {/* Notes */}
       <textarea
         rows="3"
         placeholder="Additional notes..."
         value={bookingData.notes}
         onChange={(e) => setBookingData({ ...bookingData, notes: e.target.value })}
-        className="w-full border rounded-lg px-4 py-2 
-                   focus:ring-2 focus:ring-rose-500 focus:outline-none"
+        className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
       />
 
-      {/* Navigation */}
       <div className="flex justify-between pt-6">
         <button
           onClick={onPrev}
@@ -291,7 +259,7 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
 /* ---------------------------------------------------------
    STEP 4 – Recap
 --------------------------------------------------------- */
-function StepRecap({ bookingData, onPrev, onConfirm, loading }) {
+function StepRecap({ bookingData, onPrev, onConfirm, loading, isEdit }) {
   return (
     <motion.div
       key="step4"
@@ -302,7 +270,7 @@ function StepRecap({ bookingData, onPrev, onConfirm, loading }) {
       className="space-y-6"
     >
       <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-        <Clock size={20} /> Confirm your booking
+        <Clock size={20} /> {isEdit ? "Confirm your updates" : "Confirm your booking"}
       </h2>
 
       <div className="bg-gray-50 p-4 rounded-xl border space-y-2">
@@ -337,7 +305,7 @@ function StepRecap({ bookingData, onPrev, onConfirm, loading }) {
           disabled={loading}
           className="px-6 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.02] transition disabled:opacity-60"
         >
-          {loading ? "Saving..." : "Confirm Booking"}
+          {loading ? "Saving..." : isEdit ? "Save changes" : "Confirm Booking"}
         </button>
       </div>
     </motion.div>
@@ -347,53 +315,78 @@ function StepRecap({ bookingData, onPrev, onConfirm, loading }) {
 /* ---------------------------------------------------------
    MAIN COMPONENT
 --------------------------------------------------------- */
-export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
+export default function DashboardNew({ isModal = false, onClose, onSuccess, editBooking = null }) {
   const { session } = useUser();
   const [step, setStep] = useState(1);
-  const [bookingData, setBookingData] = useState({
-    services: [],
-    date: "",
-    timeSlots: [],
-    address: "",
-    notes: "",
-    latitude: null,
-    longitude: null,
-  });
+  const [bookingData, setBookingData] = useState(
+    editBooking
+      ? {
+          services: editBooking.service?.split(", ") || [],
+          date: editBooking.date || "",
+          timeSlots: editBooking.time_slot?.split(", ") || [],
+          address: editBooking.address || "",
+          notes: editBooking.notes || "",
+          latitude: editBooking.client_lat || null,
+          longitude: editBooking.client_lng || null,
+        }
+      : {
+          services: [],
+          date: "",
+          timeSlots: [],
+          address: "",
+          notes: "",
+          latitude: null,
+          longitude: null,
+        }
+  );
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
-  /* 🧾 CONFIRM & SAVE BOOKING */
+  /* ✅ SAVE / UPDATE BOOKING */
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.from("bookings").insert([
-        {
-          id: uuid(),
-          client_id: session?.user?.id,
-          service: bookingData.services.join(", "),
-          date: bookingData.date,
-          time_slot: bookingData.timeSlots.join(", "),
-          address: bookingData.address,
-          notes: bookingData.notes,
-          client_lat: bookingData.latitude || null,
-          client_lng: bookingData.longitude || null,
-          status: "pending",
-        },
-      ]);
+      if (editBooking) {
+        const { error } = await supabase
+          .from("bookings")
+          .update({
+            service: bookingData.services.join(", "),
+            date: bookingData.date,
+            time_slot: bookingData.timeSlots.join(", "),
+            address: bookingData.address,
+            notes: bookingData.notes,
+            client_lat: bookingData.latitude,
+            client_lng: bookingData.longitude,
+          })
+          .eq("id", editBooking.id);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setToast({
-        message: "✅ Booking created successfully!",
-        type: "success",
-      });
+        setToast({ message: "✅ Booking updated successfully!", type: "success" });
+      } else {
+        const { error } = await supabase.from("bookings").insert([
+          {
+            id: uuid(),
+            client_id: session?.user?.id,
+            service: bookingData.services.join(", "),
+            date: bookingData.date,
+            time_slot: bookingData.timeSlots.join(", "),
+            address: bookingData.address,
+            notes: bookingData.notes,
+            client_lat: bookingData.latitude || null,
+            client_lng: bookingData.longitude || null,
+            status: "pending",
+          },
+        ]);
+
+        if (error) throw error;
+
+        setToast({ message: "✅ Booking created successfully!", type: "success" });
+      }
 
       if (onSuccess) onSuccess();
     } catch (err) {
-      setToast({
-        message: `❌ ${err.message}`,
-        type: "error",
-      });
+      setToast({ message: `❌ ${err.message}`, type: "error" });
     } finally {
       setLoading(false);
     }
@@ -429,6 +422,7 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
         onPrev={() => setStep(3)}
         onConfirm={handleConfirm}
         loading={loading}
+        isEdit={!!editBooking}
       />
     ),
   };
@@ -448,14 +442,14 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
         </button>
       )}
 
-      {/* Stepper progress indicator */}
+      {/* Stepper */}
       <div className="mb-6">
         <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
           <span>Step {step} of 4</span>
           {step === 1 && <span>Select services</span>}
           {step === 2 && <span>Choose time</span>}
           {step === 3 && <span>Address & notes</span>}
-          {step === 4 && <span>Review & confirm</span>}
+          {step === 4 && <span>{editBooking ? "Review changes" : "Review & confirm"}</span>}
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
           <motion.div
@@ -468,7 +462,6 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
       </div>
 
       {steps[step]}
-
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </motion.div>
   );
