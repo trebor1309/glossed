@@ -120,15 +120,32 @@ export default function DashboardLayout() {
             isModal={true}
             onClose={() => setShowNewBookingModal(false)}
             onSuccess={() => {
-              // ferme le modal
               setShowNewBookingModal(false);
-              // affiche le toast global
               setToast({
                 message: "✅ Booking created successfully!",
                 type: "success",
               });
             }}
           />
+        </div>
+      )}
+
+      {/* ✅ Toast responsive */}
+      {toast && (
+        <div
+          className="fixed z-[10000]
+               bottom-20 right-6
+               md:bottom-6 md:right-6
+               left-1/2 -translate-x-1/2
+               md:translate-x-0
+               w-[90%] md:w-auto
+               bg-white border border-gray-200 shadow-lg
+               rounded-xl px-4 py-3 text-gray-800"
+        >
+          {toast.message}
+          <button className="ml-3 text-rose-600 font-semibold" onClick={() => setToast(null)}>
+            ×
+          </button>
         </div>
       )}
     </>
