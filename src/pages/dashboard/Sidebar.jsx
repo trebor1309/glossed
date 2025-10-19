@@ -1,13 +1,5 @@
 // 📁 src/pages/dashboard/Sidebar.jsx
-import {
-  Home,
-  CalendarDays,
-  User,
-  Settings,
-  LogOut,
-  Repeat,
-  Plus,
-} from "lucide-react";
+import { Home, CalendarDays, User, Settings, LogOut, Repeat, Plus } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
 
@@ -41,10 +33,19 @@ export default function Sidebar() {
 
       {/* 🔴 New Booking – CTA principal */}
       <button
-        onClick={() => navigate("/dashboard/new")}
-        className="flex items-center justify-center gap-2 bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300 mb-6"
+        onClick={() => {
+          const isDesktop = window.innerWidth >= 768;
+          if (isDesktop) {
+            // envoie un signal global que le layout écoute
+            const event = new CustomEvent("open-new-booking-modal");
+            window.dispatchEvent(event);
+          } else {
+            navigate("/dashboard/new");
+          }
+        }}
+        className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition"
       >
-        <Plus size={18} />
+        <Plus size={18} className="text-rose-600" />
         <span>New Booking</span>
       </button>
 
@@ -56,9 +57,7 @@ export default function Sidebar() {
             to={to}
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${
-                isActive
-                  ? "bg-rose-50 text-rose-600 shadow-sm"
-                  : "text-gray-700 hover:bg-gray-100"
+                isActive ? "bg-rose-50 text-rose-600 shadow-sm" : "text-gray-700 hover:bg-gray-100"
               }`
             }
           >
