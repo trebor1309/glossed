@@ -1,25 +1,23 @@
- 
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { useUser } from "../context/UserContext";
 
-export default function Home({
-  onOpenLogin,
-  onOpenSignup,
-  onOpenProSignup,
-  onOpenDownload,
-}) {
+export default function Home({ onOpenLogin, onOpenSignup, onOpenProSignup, onOpenDownload }) {
   const { isAuthenticated, isClient, isPro, switchRole } = useUser();
   const navigate = useNavigate();
 
   const handleBookNow = () => {
+    const isDesktop = window.innerWidth >= 768;
+
     if (!isAuthenticated) {
-      onOpenLogin();
-    } else if (isClient) {
-      navigate("/dashboard/new");
-    } else if (isPro) {
-      // on peut soit prévenir, soit switcher direct
-      switchRole();
+      // ouvre le modal de login
+      onOpenLogin?.();
+    } else if (isDesktop) {
+      // envoie un signal global que le DashboardLayout écoutera
+      const event = new CustomEvent("open-new-booking-modal");
+      window.dispatchEvent(event);
+    } else {
+      // mobile : redirige vers la page complète
       navigate("/dashboard/new");
     }
   };
@@ -56,10 +54,9 @@ export default function Home({
             </h1>
 
             <p className="text-base sm:text-lg text-gray-600 mb-6 leading-relaxed max-w-md mx-auto md:mx-0">
-              Need salon-style hair, makeup or nails for an event—or just
-              because?{" "}
-              <span className="font-medium text-rose-600">Glossed</span> brings
-              certified beauty pros to you, anytime, anywhere.
+              Need salon-style hair, makeup or nails for an event—or just because?{" "}
+              <span className="font-medium text-rose-600">Glossed</span> brings certified beauty
+              pros to you, anytime, anywhere.
             </p>
 
             <motion.div
@@ -149,8 +146,8 @@ export default function Home({
             Why <span className="text-rose-600">Glossed?</span>
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            We bring professional care wherever you are — because confidence
-            should always be within reach.
+            We bring professional care wherever you are — because confidence should always be within
+            reach.
           </p>
         </div>
 
@@ -165,12 +162,9 @@ export default function Home({
                 className="w-24 h-24 object-cover rounded-full shadow-lg border-4 border-white relative z-10"
               />
             </div>
-            <h3 className="font-bold text-2xl mb-3 text-gray-900">
-              On-demand beauty
-            </h3>
+            <h3 className="font-bold text-2xl mb-3 text-gray-900">On-demand beauty</h3>
             <p className="text-gray-600 leading-relaxed text-lg max-w-xs">
-              Book certified pros anytime, anywhere — from your sofa to your
-              office.
+              Book certified pros anytime, anywhere — from your sofa to your office.
             </p>
           </div>
 
@@ -184,9 +178,7 @@ export default function Home({
                 className="w-24 h-24 object-cover rounded-full shadow-lg border-4 border-white relative z-10"
               />
             </div>
-            <h3 className="font-bold text-2xl mb-3 text-gray-900">
-              Premium experience
-            </h3>
+            <h3 className="font-bold text-2xl mb-3 text-gray-900">Premium experience</h3>
             <p className="text-gray-600 leading-relaxed text-lg max-w-xs">
               Enjoy salon-quality results without leaving home.
             </p>
@@ -202,12 +194,9 @@ export default function Home({
                 className="w-24 h-24 object-cover rounded-full shadow-lg border-4 border-white relative z-10"
               />
             </div>
-            <h3 className="font-bold text-2xl mb-3 text-gray-900">
-              For clients & pros
-            </h3>
+            <h3 className="font-bold text-2xl mb-3 text-gray-900">For clients & pros</h3>
             <p className="text-gray-600 leading-relaxed text-lg max-w-xs">
-              Join as a client or a beauty professional — Glossed empowers both
-              sides.
+              Join as a client or a beauty professional — Glossed empowers both sides.
             </p>
           </div>
         </div>
@@ -233,8 +222,8 @@ export default function Home({
           </h2>
 
           <p className="text-xl text-rose-100 mb-10 max-w-2xl mx-auto leading-relaxed">
-            Book top beauty professionals wherever you are — for any look, any
-            occasion. Discover the easiest way to feel your best, with Glossed.
+            Book top beauty professionals wherever you are — for any look, any occasion. Discover
+            the easiest way to feel your best, with Glossed.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
