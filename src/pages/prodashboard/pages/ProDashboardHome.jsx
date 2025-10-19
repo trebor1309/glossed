@@ -53,18 +53,8 @@ export default function ProDashboardHome() {
 
       {/* 📊 Statistiques */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Stat
-          icon={Clock}
-          color="text-amber-500"
-          value={pending.length}
-          label="Pending"
-        />
-        <Stat
-          icon={Calendar}
-          color="text-rose-600"
-          value={accepted.length}
-          label="Accepted"
-        />
+        <Stat icon={Clock} color="text-amber-500" value={pending.length} label="Pending" />
+        <Stat icon={Calendar} color="text-rose-600" value={accepted.length} label="Accepted" />
         <Stat
           icon={CheckCircle}
           color="text-green-500"
@@ -93,9 +83,7 @@ export default function ProDashboardHome() {
                 className="flex justify-between items-center border-b border-gray-100 pb-2"
               >
                 <div>
-                  <p className="font-medium text-gray-800">
-                    {m.client?.name || m.client?.email}
-                  </p>
+                  <p className="font-medium text-gray-800">{m.client?.name || m.client?.email}</p>
                   <p className="text-sm text-gray-500">
                     {m.service} —{" "}
                     {new Date(m.date).toLocaleDateString(undefined, {
@@ -116,19 +104,22 @@ export default function ProDashboardHome() {
 
       {/* 🗓️ Calendrier des missions */}
       <Card title="Calendar">
-        <CalendarView
-          value={new Date()}
-          tileContent={({ date }) => {
-            const hasMission = missions.some(
-              (m) =>
-                new Date(m.date).toDateString() === date.toDateString() &&
-                m.status !== "cancelled"
-            );
-            return hasMission ? (
-              <span className="text-rose-500 font-bold">•</span>
-            ) : null;
-          }}
-        />
+        <div className="w-full overflow-x-hidden max-w-full">
+          <div className="calendar-container mx-auto w-full">
+            <CalendarView
+              className="w-full"
+              value={new Date()}
+              tileContent={({ date }) => {
+                const hasMission = missions.some(
+                  (m) =>
+                    new Date(m.date).toDateString() === date.toDateString() &&
+                    m.status !== "cancelled"
+                );
+                return hasMission ? <span className="text-rose-500 font-bold">•</span> : null;
+              }}
+            />
+          </div>
+        </div>
       </Card>
     </section>
   );

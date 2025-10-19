@@ -14,7 +14,7 @@ export default function ProBottomNav() {
   const { proBadge = 0 } = useUser(); // 🆕 dynamique
 
   const nav = (
-    <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-lg flex justify-around items-center py-2 md:hidden z-[9999]">
+    <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-lg flex justify-around items-center py-2 md:hidden z-[40]">
       {/* 🔘 Bouton central flottant */}
       <div className="absolute -top-5 left-1/2 -translate-x-1/2">
         <button

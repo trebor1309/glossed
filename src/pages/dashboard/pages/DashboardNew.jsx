@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { X, ArrowLeft, ArrowRight, Calendar, Clock, MapPin, Search } from "lucide-react";
 import Toast from "@/components/ui/Toast";
 import { useUser } from "@/context/UserContext";
+import { useNavigate } from "react-router-dom";
 
 /* ---------------------------------------------------------
    STEP 1 – Services
@@ -317,6 +318,7 @@ function StepRecap({ bookingData, onPrev, onConfirm, loading, isEdit }) {
 --------------------------------------------------------- */
 export default function DashboardNew({ isModal = false, onClose, onSuccess, editBooking = null }) {
   const { session } = useUser();
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [bookingData, setBookingData] = useState(
     editBooking
@@ -339,12 +341,17 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           longitude: null,
         }
   );
-  const [loading, setLoading] = useState(false);
+
+  // 🔄 État pour bloquer le spam de clic
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
 
   /* ✅ SAVE / UPDATE BOOKING */
   const handleConfirm = async () => {
-    setLoading(true);
+    if (isSubmitting) return; // sécurité anti-double clic
+    setIsSubmitting(true);
+    setToast(null);
+
     try {
       if (editBooking) {
         const { error } = await supabase
@@ -361,7 +368,6 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           .eq("id", editBooking.id);
 
         if (error) throw error;
-
         setToast({ message: "✅ Booking updated successfully!", type: "success" });
       } else {
         const { error } = await supabase.from("bookings").insert([
@@ -380,15 +386,18 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
         ]);
 
         if (error) throw error;
-
         setToast({ message: "✅ Booking created successfully!", type: "success" });
       }
 
-      if (onSuccess) onSuccess();
+      // Attendre 1.5 s pour affichage du toast puis fermer/redirect
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+        if (isModal && onClose) onClose();
+        if (navigate) navigate("/dashboard/reservations");
+      }, 1500);
     } catch (err) {
       setToast({ message: `❌ ${err.message}`, type: "error" });
-    } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -421,7 +430,7 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
         bookingData={bookingData}
         onPrev={() => setStep(3)}
         onConfirm={handleConfirm}
-        loading={loading}
+        loading={isSubmitting}
         isEdit={!!editBooking}
       />
     ),
@@ -429,14 +438,17 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
 
   return (
     <motion.div
-      className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg space-y-8 relative"
+      className={`max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg space-y-8 relative ${
+        isModal ? "fixed inset-0 z-50 overflow-y-auto" : ""
+      }`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
       {isModal && (
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
+          disabled={isSubmitting}
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 disabled:opacity-50"
         >
           <X size={22} />
         </button>
@@ -462,6 +474,8 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
       </div>
 
       {steps[step]}
+
+      {/* Toast */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </motion.div>
   );

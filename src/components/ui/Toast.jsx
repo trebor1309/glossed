@@ -18,11 +18,13 @@ export default function Toast({ message, type = "success", onClose }) {
 
   return (
     <div
-      className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl text-white text-sm font-semibold transition-all duration-300 ${
-        isSuccess
-          ? "bg-gradient-to-r from-rose-600 to-red-600"
-          : "bg-gray-800"
-      }`}
+      onClick={() => setVisible(false)}
+      className={`fixed z-[10000]
+      bottom-20 left-1/2 -translate-x-1/2 w-[92%]
+      sm:bottom-6 sm:left-auto sm:right-6 sm:translate-x-0 sm:w-auto
+      flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl text-white text-sm font-semibold
+      transition-all duration-300
+      ${isSuccess ? "bg-gradient-to-r from-rose-600 to-red-600" : "bg-gray-800"}`}
     >
       {isSuccess ? (
         <CheckCircle2 size={20} className="text-white" />

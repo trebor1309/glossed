@@ -7,6 +7,7 @@ import { AnimatePresence } from "framer-motion";
 import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 import CalendarView from "@/components/CalendarView";
 import Toast from "@/components/ui/Toast";
+import { openConfirmModal } from "@/components/ui/openConfirmModal";
 
 export default function DashboardReservations() {
   const { session } = useUser();
@@ -48,22 +49,31 @@ export default function DashboardReservations() {
     fetchBookings();
   }, [session]);
 
+  // 🧹 Suppression avec modal stylé
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this reservation?")) return;
+    const confirmed = await openConfirmModal(
+      "Delete this booking?",
+      "This action cannot be undone.",
+      { type: "delete", confirmLabel: "Delete" }
+    );
+
+    if (!confirmed) return;
 
     const { error } = await supabase.from("bookings").delete().eq("id", id);
 
     if (error) {
       setToast({
-        message: "Failed to delete booking. Please try again.",
+        message: "❌ Failed to delete booking. Please try again.",
         type: "error",
       });
       return;
     }
 
+    // ✅ MAJ locale de la liste sans recharger toute la page
     setBookings((prev) => prev.filter((b) => b.id !== id));
+
     setToast({
-      message: "Booking deleted successfully!",
+      message: "✅ Booking deleted successfully!",
       type: "success",
     });
   };
