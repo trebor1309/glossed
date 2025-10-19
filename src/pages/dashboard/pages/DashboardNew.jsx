@@ -248,15 +248,14 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         <MapPin size={20} /> Where should we come?
       </h2>
 
-      {/* ✅ Champ d’adresse avec autocomplete (look Glossed) */}
+      {/* ✅ Champ d’adresse avec autocomplete */}
       <input
         id="autocomplete-input"
         type="text"
         placeholder="Enter your address"
         defaultValue={bookingData.address}
-        className="w-full border-2 border-rose-300 rounded-lg px-4 py-2 
-                   focus:border-rose-500 focus:ring-2 focus:ring-rose-500 
-                   outline-none transition"
+        className="w-full border rounded-lg px-4 py-2 
+                   focus:ring-2 focus:ring-rose-500 focus:outline-none"
       />
 
       {/* Notes */}
