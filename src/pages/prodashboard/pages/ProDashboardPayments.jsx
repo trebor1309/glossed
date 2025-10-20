@@ -4,7 +4,7 @@ import { useUser } from "@/context/UserContext";
 import { Download, FileText, CheckCircle, XCircle, Clock } from "lucide-react";
 import dayjs from "dayjs";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 
 export default function ProDashboardPayments() {
   const { session } = useUser();
@@ -62,58 +62,71 @@ export default function ProDashboardPayments() {
   const glossedFooter = (doc) => {
     doc.setFontSize(9);
     doc.setTextColor(120);
-    doc.text(
-      "This document was generated automatically by Glossed – www.glossed.app",
-      14,
-      285
-    );
+    doc.text("This document was generated automatically by Glossed – www.glossed.app", 14, 285);
   };
 
+  /* ----------------------------- 🧾 Rapport PDF Global ----------------------------- */
   /* ----------------------------- 🧾 Rapport PDF Global ----------------------------- */
   const handleDownloadReport = () => {
     const doc = new jsPDF();
 
+    // --- En-tête stylé Glossed ---
     glossedHeader(doc, "Payments Report");
 
     doc.setFontSize(12);
     doc.text(
-      `Period: ${filter.toUpperCase()} | Generated: ${dayjs().format(
-        "DD/MM/YYYY HH:mm"
-      )}`,
+      `Period: ${filter.toUpperCase()} | Generated: ${dayjs().format("DD/MM/YYYY HH:mm")}`,
       14,
       42
     );
 
-    const tableData = payments.map((p) => [
-      p.id.slice(0, 8),
-      `${p.amount.toFixed(2)} €`,
-      p.status,
-      p.mission_id || "—",
-      dayjs(p.created_at).format("DD/MM/YYYY"),
-    ]);
+    // --- Cas 1 : paiements trouvés ---
+    if (payments.length > 0) {
+      const tableData = payments.map((p) => [
+        p.id.slice(0, 8),
+        `${p.amount.toFixed(2)} €`,
+        p.status,
+        p.mission_id || "—",
+        dayjs(p.created_at).format("DD/MM/YYYY"),
+      ]);
 
-    doc.autoTable({
-      startY: 50,
-      head: [["Payment ID", "Amount", "Status", "Mission", "Date"]],
-      body: tableData,
-      styles: { fontSize: 10 },
-      headStyles: {
-        fillColor: [225, 29, 72],
-        textColor: [255, 255, 255],
-      },
-      alternateRowStyles: { fillColor: [255, 240, 245] },
-    });
+      autoTable(doc, {
+        startY: 50,
+        head: [["Payment ID", "Amount", "Status", "Mission", "Date"]],
+        body: tableData,
+        styles: { fontSize: 10 },
+        headStyles: {
+          fillColor: [225, 29, 72],
+          textColor: [255, 255, 255],
+        },
+        alternateRowStyles: { fillColor: [255, 240, 245] },
+      });
 
-    // Total
-    doc.setFontSize(14);
-    doc.setTextColor(30, 30, 30);
-    doc.text(
-      `Total: ${total.toFixed(2)} €`,
-      14,
-      doc.lastAutoTable.finalY + 12
-    );
+      // --- Total ---
+      doc.setFontSize(14);
+      doc.setTextColor(30, 30, 30);
+      doc.text(`Total: ${total.toFixed(2)} €`, 14, doc.lastAutoTable.finalY + 12);
+    }
 
+    // --- Cas 2 : aucun paiement ---
+    else {
+      doc.setFontSize(13);
+      doc.setTextColor(120);
+      doc.text("No payments found for this period.", 14, 60);
+
+      doc.setFontSize(11);
+      doc.setTextColor(150);
+      doc.text(
+        "Try adjusting your filter (week, month, year) or verify your account activity.",
+        14,
+        70
+      );
+    }
+
+    // --- Pied de page ---
     glossedFooter(doc);
+
+    // --- Téléchargement ---
     doc.save(`Glossed_Payments_${filter}_${dayjs().format("YYYYMMDD")}.pdf`);
   };
 
@@ -159,10 +172,8 @@ export default function ProDashboardPayments() {
 
   /* ----------------------------- Rendu ----------------------------- */
   return (
-    <section className="mt-10 max-w-6xl mx-auto px-4 sm:px-6 md:px-8 space-y-10">
-      <h1 className="text-2xl font-bold text-gray-800 text-center mb-2">
-        Payments Overview
-      </h1>
+    <section className="mt-10 max-w-4xl mx-auto px-4 sm:px-6 md:px-8 space-y-10">
+      <h1 className="text-2xl font-bold text-gray-800 text-center mb-2">Payments Overview</h1>
 
       {/* Filtres */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white shadow-sm rounded-xl p-4 border border-gray-100">
@@ -183,17 +194,13 @@ export default function ProDashboardPayments() {
         </div>
         <div className="text-right">
           <p className="text-gray-500 text-sm">Total</p>
-          <p className="text-2xl font-bold text-gray-800">
-            {total.toFixed(2)} €
-          </p>
+          <p className="text-2xl font-bold text-gray-800">{total.toFixed(2)} €</p>
         </div>
       </div>
 
       {/* Liste */}
       <div className="bg-white shadow-sm rounded-xl p-6 border border-gray-100">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          Recent Payments
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Payments</h2>
 
         {payments.length ? (
           <ul className="divide-y divide-gray-100">
@@ -203,9 +210,7 @@ export default function ProDashboardPayments() {
                 className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
                 <div>
-                  <p className="font-medium text-gray-800">
-                    {p.amount.toFixed(2)} €
-                  </p>
+                  <p className="font-medium text-gray-800">{p.amount.toFixed(2)} €</p>
                   <p className="text-sm text-gray-500">
                     {dayjs(p.created_at).format("DD MMM YYYY")}
                   </p>
