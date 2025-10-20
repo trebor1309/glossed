@@ -6,15 +6,19 @@ import { useNavigate } from "react-router-dom";
 
 export default function DashboardHome() {
   const { user } = useUser();
+  const navigate = useNavigate();
+
   const [counts, setCounts] = useState({
     pending: 0,
     offers: 0,
     confirmed: 0,
   });
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
-  // 🧠 Charger les réservations client
+  // 🔹 Photo de profil (avec cache local)
+  const [profilePhoto, setProfilePhoto] = useState(null);
+
+  // 🧠 Charger les réservations du client
   useEffect(() => {
     const fetchBookings = async () => {
       if (!user?.id) return;
@@ -43,41 +47,63 @@ export default function DashboardHome() {
     fetchBookings();
   }, [user?.id]);
 
-  const name = user?.first_name ? user.first_name : "there";
-  const photo = user?.profile_photo;
+  // 📸 Charger la photo depuis Supabase ou le cache local
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const KEY = "glossed_client_photo";
+    const cached = localStorage.getItem(KEY);
+
+    if (cached) {
+      setProfilePhoto(cached);
+      return;
+    }
+
+    const fetchProfilePhoto = async () => {
+      const { data, error } = await supabase
+        .from("users")
+        .select("profile_photo")
+        .eq("id", user.id)
+        .single();
+
+      if (!error && data?.profile_photo) {
+        setProfilePhoto(data.profile_photo);
+        localStorage.setItem(KEY, data.profile_photo);
+      }
+    };
+
+    fetchProfilePhoto();
+  }, [user?.id]);
+
+  const firstName = user?.first_name || "there";
 
   return (
-    <div className="mt-8 max-w-5xl mx-auto px-4 space-y-10">
-      {/* --- Header --- */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">
-            Welcome back, <span className="text-rose-600">{name}</span> 👋
-          </h1>
-          <p className="text-gray-500 mt-1">
-            Manage your bookings and discover new services in a few clicks.
-          </p>
-        </div>
+    <div className="mt-8 max-w-4xl mx-auto px-4 text-center space-y-10">
+      {/* --- Header + photo --- */}
+      <div className="flex flex-col items-center space-y-4">
+        {profilePhoto ? (
+          <img
+            src={profilePhoto}
+            alt="Profile"
+            className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
+            onError={(e) => (e.target.style.display = "none")}
+          />
+        ) : (
+          <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-3xl font-semibold shadow-lg">
+            {firstName?.[0]?.toUpperCase() || "?"}
+          </div>
+        )}
 
-        {/* --- Profile photo --- */}
-        <div className="flex justify-center sm:justify-end">
-          {photo ? (
-            <img
-              src={photo}
-              alt="Profile"
-              className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
-            />
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-2xl font-semibold shadow-lg">
-              {name?.[0]?.toUpperCase() || "?"}
-            </div>
-          )}
-        </div>
+        <h1 className="text-3xl font-bold text-gray-800">
+          Welcome back, <span className="text-rose-600">{firstName}</span> 👋
+        </h1>
+        <p className="text-gray-500 max-w-md">
+          Manage your bookings and discover new services in a few clicks.
+        </p>
       </div>
 
       {/* --- Summary cards --- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Pending */}
         <DashboardCard
           title="Pending Requests"
           value={loading ? "…" : counts.pending}
@@ -86,7 +112,6 @@ export default function DashboardHome() {
           onClick={() => navigate("/dashboard/reservations#pending")}
         />
 
-        {/* Offers */}
         <DashboardCard
           title="Offers Received"
           value={loading ? "…" : counts.offers}
@@ -95,7 +120,6 @@ export default function DashboardHome() {
           onClick={() => navigate("/dashboard/reservations#offers")}
         />
 
-        {/* Confirmed */}
         <DashboardCard
           title="Confirmed Appointments"
           value={loading ? "…" : counts.confirmed}
@@ -104,10 +128,8 @@ export default function DashboardHome() {
           onClick={() => navigate("/dashboard/reservations#confirmed")}
         />
 
-        {/* Book a Service */}
         <DashboardCard
           title="Book a Service"
-          value=""
           icon={<Calendar className="text-green-500" size={24} />}
           color="from-green-400 to-green-600"
           onClick={() => navigate("/dashboard/new")}
@@ -115,24 +137,24 @@ export default function DashboardHome() {
         />
       </div>
 
-      {/* --- My Reservations section --- */}
+      {/* --- CTA vers Account --- */}
       <section className="bg-white rounded-2xl shadow p-6 border border-gray-100">
-        <h2 className="text-xl font-semibold text-gray-800 mb-2">My Reservations</h2>
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">Your Account</h2>
         <p className="text-gray-500 text-sm mb-4">
-          View and manage all your current and past bookings.
+          Update your personal information, payment details, and preferences.
         </p>
         <button
-          onClick={() => navigate("/dashboard/reservations")}
+          onClick={() => navigate("/dashboard/account")}
           className="px-5 py-2 rounded-full font-medium bg-gradient-to-r from-rose-600 to-red-600 text-white hover:scale-[1.02] transition-transform"
         >
-          Go to My Reservations
+          Go to Account
         </button>
       </section>
     </div>
   );
 }
 
-// --- Subcomponent: Card ---
+// --- Card ---
 function DashboardCard({ title, value, icon, color, onClick, cta = false }) {
   return (
     <div

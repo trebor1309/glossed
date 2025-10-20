@@ -8,8 +8,11 @@ export default function ProDashboardHome() {
   const navigate = useNavigate();
   const { session } = useUser();
   const proId = session?.user?.id;
-  const proName = session?.user?.user_metadata?.name || "Professional";
-
+  const firstName =
+    session?.user?.user_metadata?.first_name ||
+    session?.user?.user_metadata?.business_name ||
+    session?.user?.user_metadata?.name?.split(" ")[0] ||
+    "there";
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [stats, setStats] = useState({
     pending: 0,
@@ -66,10 +69,7 @@ export default function ProDashboardHome() {
           .select("*", { count: "exact", head: true })
           .eq("pro_id", proId)
           .eq("status", "completed"),
-        supabase
-          .from("payments")
-          .select("*", { count: "exact", head: true })
-          .eq("pro_id", proId),
+        supabase.from("payments").select("*", { count: "exact", head: true }).eq("pro_id", proId),
       ]);
 
       setStats({
@@ -122,10 +122,7 @@ export default function ProDashboardHome() {
           .select("*", { count: "exact", head: true })
           .eq("pro_id", proId)
           .eq("status", "completed"),
-        supabase
-          .from("payments")
-          .select("*", { count: "exact", head: true })
-          .eq("pro_id", proId),
+        supabase.from("payments").select("*", { count: "exact", head: true }).eq("pro_id", proId),
       ]);
 
       setStats({
@@ -177,7 +174,7 @@ export default function ProDashboardHome() {
 
   /* ----------------------------- 🎨 Rendu ----------------------------- */
   return (
-    <section className="mt-10 max-w-6xl mx-auto px-4 sm:px-6 md:px-8 space-y-10">
+    <section className="mt-10 max-w-4xl mx-auto px-4 sm:px-6 md:px-8 space-y-10">
       {/* 🔹 Welcome section */}
       <div className="text-center mb-6 flex flex-col items-center">
         <div className="relative mb-4">
@@ -185,12 +182,12 @@ export default function ProDashboardHome() {
             {profilePhoto ? (
               <img
                 src={profilePhoto}
-                alt={proName}
+                alt={firstName}
                 className="w-full h-full rounded-full object-cover bg-white"
               />
             ) : (
               <div className="w-full h-full rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold text-xl">
-                {proName.charAt(0).toUpperCase()}
+                {firstName.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
@@ -198,9 +195,9 @@ export default function ProDashboardHome() {
         </div>
 
         <h1 className="text-2xl font-bold text-gray-800">
-          Welcome back,{" "}
-          <span className="text-rose-600">{proName.split(" ")[0]}</span> 
+          Welcome back, <span className="text-rose-600">{firstName}</span> 👋
         </h1>
+
         <p className="text-gray-500 text-sm mt-1">
           Here’s a quick overview of your current activity.
         </p>
@@ -215,9 +212,7 @@ export default function ProDashboardHome() {
             className={`group bg-gradient-to-r ${color} text-white rounded-2xl shadow-md hover:shadow-lg p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.03]`}
           >
             <Icon size={32} className="mb-3 opacity-90" />
-            <h3 className="text-lg font-semibold text-white text-center">
-              {title}
-            </h3>
+            <h3 className="text-lg font-semibold text-white text-center">{title}</h3>
             <p className="text-2xl font-bold mt-2">{count}</p>
           </button>
         ))}
@@ -225,9 +220,7 @@ export default function ProDashboardHome() {
 
       {/* 🔹 Profile summary */}
       <div className="bg-white rounded-2xl shadow p-6 border border-gray-100 mt-8 text-center">
-        <h2 className="text-lg font-semibold text-gray-800 mb-2">
-          Your Profile at a Glance
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-800 mb-2">Your Profile at a Glance</h2>
         <p className="text-sm text-gray-500 max-w-md mx-auto">
           Keep your profile up to date to attract more clients and appear higher in search results.
         </p>
