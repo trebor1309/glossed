@@ -18,7 +18,7 @@ export default function ProDashboardSettings() {
   ];
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="mt-10 max-w-4xl mx-auto p-4 space-y-8">
       {/* Tabs */}
       <div className="flex flex-wrap gap-3 border-b pb-2">
         {tabs.map((tab) => (

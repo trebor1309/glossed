@@ -70,7 +70,18 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
   const location = useLocation();
   const isMobile = useIsMobile(768);
 
-  // Redirection rôle → bonne zone après chargement du profil
+    // 🔸 Modales globales
+  const [showLogin, setShowLogin] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
+  const [showProSignup, setShowProSignup] = useState(false);
+  const [showDownload, setShowDownload] = useState(false);
+
+
+  // 🧭 Détection des routes dashboard
+  const isDashboardRoute =
+    location.pathname.startsWith("/dashboard") || location.pathname.startsWith("/prodashboard");
+
+  // 🔄 Redirection du rôle vers la bonne zone
   useEffect(() => {
     if (!loading && isAuthenticated) {
       if (isPro && location.pathname === "/dashboard") {
@@ -82,17 +93,13 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
     }
   }, [isAuthenticated, isPro, loading, location.pathname, navigate]);
 
-  // Modales
-  const [showLogin, setShowLogin] = useState(false);
-  const [showSignup, setShowSignup] = useState(false);
-  const [showProSignup, setShowProSignup] = useState(false);
-  const [showDownload, setShowDownload] = useState(false);
+  // 🔐 Garde : empêche un client d'accéder au prodashboard
+  if (!loading && isAuthenticated && !isPro && location.pathname.startsWith("/prodashboard")) {
+    navigate("/dashboard", { replace: true });
+    return null;
+  }
 
-  const isDashboard =
-    location.pathname.startsWith("/dashboard") ||
-    location.pathname.startsWith("/prodashboard");
-
-  // Écran de chargement (inclut tout l'app pour éviter les sauts)
+  // 💫 Écran de chargement
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-rose-50 via-white to-amber-50 text-gray-700 overflow-hidden">
@@ -107,34 +114,24 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
     );
   }
 
-  // Garde : un client ne doit pas accéder au prodashboard
-  if (
-    !loading &&
-    isAuthenticated &&
-    !isPro &&
-    location.pathname.startsWith("/prodashboard")
-  ) {
-    navigate("/dashboard", { replace: true });
-    return null;
-  }
-
+  // 🧭 Application principale
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-50 to-white text-gray-900 font-sans">
-      {/* Navbar (cachée seulement sur mobile connecté en dashboard) */}
-      <Navbar
-        isAuthenticated={isAuthenticated}
-        isPro={isPro}
-        user={user}
-        logout={logout}
-        onOpenLogin={() => setShowLogin(true)}
-        onOpenProSignup={() => setShowProSignup(true)}
-        isDashboard={isDashboard}
-        isMobile={isMobile}
-      />
+      {/* 🌸 Navbar visible sur toutes les pages hors dashboard */}
+      {!isDashboardRoute && (
+        <Navbar
+          isAuthenticated={isAuthenticated}
+          isPro={isPro}
+          user={user}
+          logout={logout}
+          onOpenLogin={() => setShowLogin(true)}
+          onOpenProSignup={() => setShowProSignup(true)}
+          isMobile={isMobile}
+        />
+      )}
 
       <ScrollToTop />
 
-      {/* Routes */}
       <main className="flex-grow">
         <Routes>
           {/* Pages publiques */}
@@ -163,11 +160,8 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
           <Route path="/contact" element={<Contact />} />
           <Route path="/safety" element={<Safety />} />
 
-          {/* Client dashboard */}
-          <Route
-            path="/dashboard"
-            element={isAuthenticated ? <DashboardLayout /> : <Home />}
-          >
+          {/* Dashboard Client */}
+          <Route path="/dashboard" element={isAuthenticated ? <DashboardLayout /> : <Home />}>
             <Route index element={<DashboardHome />} />
             <Route path="new" element={<DashboardNew />} />
             <Route path="reservations" element={<DashboardReservations />} />
@@ -176,7 +170,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
             <Route path="more" element={<DashboardMore />} />
           </Route>
 
-          {/* Pro dashboard */}
+          {/* Dashboard Pro */}
           <Route
             path="/prodashboard"
             element={
@@ -196,10 +190,10 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
         </Routes>
       </main>
 
-      {/* Footer : visible en desktop tout le temps, masqué sur mobile connecté */}
-      {(!isDashboard || !isMobile) && <Footer />}
+      {/* 🌸 Footer visible sur toutes les pages hors dashboard */}
+      {!isDashboardRoute && <Footer />}
 
-      {/* Modales */}
+      {/* 🪄 Modales */}
       {showLogin && (
         <LoginModal
           onClose={() => setShowLogin(false)}

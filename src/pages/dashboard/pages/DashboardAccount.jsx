@@ -12,7 +12,7 @@ export default function DashboardAccount() {
   };
 
   return (
-    <section className="space-y-6">
+    <section className="mt-10 max-w-4xl mx-auto p-4 text-center space-y-6">
       {/* Profil utilisateur */}
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100">
         <div className="flex items-center gap-4">

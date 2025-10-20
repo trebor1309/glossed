@@ -7,7 +7,6 @@ import { AnimatePresence } from "framer-motion";
 import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 import CalendarView from "@/components/CalendarView";
 import Toast from "@/components/ui/Toast";
-import { openConfirmModal } from "@/components/ui/openConfirmModal";
 
 export default function DashboardReservations() {
   const { session } = useUser();
@@ -49,31 +48,22 @@ export default function DashboardReservations() {
     fetchBookings();
   }, [session]);
 
-  // 🧹 Suppression avec modal stylé
   const handleDelete = async (id) => {
-    const confirmed = await openConfirmModal(
-      "Delete this booking?",
-      "This action cannot be undone.",
-      { type: "delete", confirmLabel: "Delete" }
-    );
-
-    if (!confirmed) return;
+    if (!confirm("Are you sure you want to delete this reservation?")) return;
 
     const { error } = await supabase.from("bookings").delete().eq("id", id);
 
     if (error) {
       setToast({
-        message: "❌ Failed to delete booking. Please try again.",
+        message: "Failed to delete booking. Please try again.",
         type: "error",
       });
       return;
     }
 
-    // ✅ MAJ locale de la liste sans recharger toute la page
     setBookings((prev) => prev.filter((b) => b.id !== id));
-
     setToast({
-      message: "✅ Booking deleted successfully!",
+      message: "Booking deleted successfully!",
       type: "success",
     });
   };
@@ -96,7 +86,8 @@ export default function DashboardReservations() {
     );
 
   return (
-    <div className="mt-10 max-w-3xl mx-auto p-4 space-y-10 overflow-x-hidden">
+    // ✅ même structure que DashboardAccount / DashboardSettings
+    <section className="mt-10 max-w-4xl mx-auto p-4 space-y-6">
       <h1 className="text-2xl font-bold text-gray-800 text-center mb-4">My Reservations</h1>
 
       <CalendarView
@@ -140,7 +131,7 @@ export default function DashboardReservations() {
         data={grouped.offers}
         actions={{ view: true }}
         empty="No offers to review yet."
-        onView={openOffersModal} // ✅ on passe la fonction ici
+        onView={openOffersModal}
       />
 
       <ReservationSection
@@ -169,7 +160,7 @@ export default function DashboardReservations() {
         empty="No cancelled reservations."
       />
 
-      {/* ✅ Modals gérés ici (pas dans ReservationSection) */}
+      {/* ✅ Modals gérés ici */}
       <AnimatePresence>
         {showOffersModal && selectedBooking && (
           <OffersModal
@@ -197,7 +188,6 @@ export default function DashboardReservations() {
             editBooking={selectedBooking}
             onClose={() => setShowEditModal(false)}
             onSuccess={async () => {
-              // 🔄 Recharge les réservations à jour
               const { data } = await supabase
                 .from("bookings")
                 .select("*")
@@ -205,8 +195,6 @@ export default function DashboardReservations() {
                 .order("date", { ascending: true });
 
               setBookings(data || []);
-
-              // ✅ Affiche la notification Glossed
               setToast({
                 message: "Booking updated successfully!",
                 type: "success",
@@ -218,7 +206,7 @@ export default function DashboardReservations() {
 
       {/* ✅ Notification Glossed */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
+    </section>
   );
 }
 
@@ -264,7 +252,7 @@ function ReservationSection({
                 <div className="flex gap-2">
                   {actions.view && (
                     <button
-                      onClick={() => onView?.(b)} // ✅ appel de la prop
+                      onClick={() => onView?.(b)}
                       className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
                       title="View offers"
                     >
@@ -273,7 +261,7 @@ function ReservationSection({
                   )}
                   {actions.edit && (
                     <button
-                      onClick={() => onEdit?.(b)} // ✅ ouvre bien le modal d’édition
+                      onClick={() => onEdit?.(b)}
                       className="p-2 rounded-full hover:bg-gray-100"
                       title="Edit"
                     >

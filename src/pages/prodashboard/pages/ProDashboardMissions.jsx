@@ -1,126 +1,191 @@
-import { CheckCircle, XCircle, Clock, Calendar } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
-import {
-  getAllBookings,
-  upsertMission,
-  updateBookingStatus, // 🆕 pour modifier le statut côté client
-} from "@/lib/storage";
+import { CheckCircle, Clock, XCircle, Star, Eye, Bell } from "lucide-react";
+import CalendarView from "@/components/CalendarView";
+import Toast from "@/components/ui/Toast";
 
 export default function ProDashboardMissions() {
-  const { setProBadge } = useUser();
-
+  const { session, setProBadge } = useUser();
   const [missions, setMissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDayMissions, setSelectedDayMissions] = useState(null);
+  const [toast, setToast] = useState(null);
 
-  // 🔁 Charger les missions en attente (bookings "pending")
+  // 🔹 Charger les missions du pro
   useEffect(() => {
-    const all = getAllBookings().filter((b) => b.status === "pending");
-    setMissions(all);
-    setProBadge(all.length);
+    if (!session?.user) return;
 
-    // Écouter les nouveaux bookings créés côté client
-    const handleNewBooking = () => {
-      const updated = getAllBookings().filter((b) => b.status === "pending");
-      setMissions(updated);
-      setProBadge(updated.length);
+    const fetchMissions = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("*")
+        .eq("pro_id", session.user.id)
+        .order("date", { ascending: true });
+
+      if (!error && data) setMissions(data);
+      setLoading(false);
     };
-    window.addEventListener("glossed:new-booking", handleNewBooking);
-    return () =>
-      window.removeEventListener("glossed:new-booking", handleNewBooking);
-  }, [setProBadge]);
 
-  // ✅ Accept → passe en "upcoming" pour le pro + "confirmed" pour le client
-  const handleAccept = (id) => {
-    setMissions((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, status: "upcoming" } : m))
+    fetchMissions();
+  }, [session]);
+
+  // 🔔 Écouter les nouvelles réservations en temps réel
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const channel = supabase
+      .channel("bookings-changes-pro")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "bookings",
+          filter: `pro_id=eq.${session.user.id}`,
+        },
+        (payload) => {
+          const newBooking = payload.new;
+          setMissions((prev) => [newBooking, ...prev]);
+          setProBadge((n) => (n || 0) + 1);
+          setToast({
+            message: "New booking request received!",
+            type: "success",
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id, setProBadge]);
+
+  const displayMissions = selectedDayMissions ? selectedDayMissions.dayMissions : missions;
+
+  const grouped = {
+    pending: displayMissions.filter((m) => m.status === "pending"),
+    confirmed: displayMissions.filter((m) => m.status === "confirmed"),
+    completed: displayMissions.filter((m) => m.status === "completed"),
+    cancelled: displayMissions.filter((m) => m.status === "cancelled"),
+  };
+
+  if (loading)
+    return (
+      <div className="flex justify-center items-center h-48 text-gray-600">
+        Loading your missions...
+      </div>
     );
-    updateBookingStatus(id, "confirmed"); // 🆕 met à jour côté client
-    setProBadge((n) => Math.max(0, n - 1));
-  };
-
-  // ❌ Decline → supprime côté pro + passe "cancelled" côté client
-  const handleDecline = (id) => {
-    setMissions((prev) => prev.filter((m) => m.id !== id));
-    updateBookingStatus(id, "cancelled"); // 🆕 met à jour côté client
-    setProBadge((n) => Math.max(0, n - 1));
-  };
-
-  const pending = missions.filter((m) => m.status === "pending");
-  const upcoming = missions.filter((m) => m.status === "upcoming");
 
   return (
-    <section className="space-y-8">
-      {/* Pending */}
-      <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
-          <Clock size={20} className="text-amber-500" /> Pending Requests
-        </h2>
-        {pending.length ? (
-          <ul className="space-y-4">
-            {pending.map((m) => (
-              <li
-                key={m.id}
-                className="flex justify-between items-center border-b border-gray-100 pb-3"
-              >
-                <div>
-                  <p className="font-medium text-gray-800">{m.service}</p>
-                  <p className="text-sm text-gray-500">
-                    {m.date} — {m.timeSlot}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {m.address?.street}, {m.address?.city}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleAccept(m.id)}
-                    className="px-3 py-1.5 rounded-lg bg-green-50 text-green-600 text-sm font-medium hover:bg-green-100 transition"
-                  >
-                    Accept
-                  </button>
-                  <button
-                    onClick={() => handleDecline(m.id)}
-                    className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 text-sm font-medium hover:bg-rose-100 transition"
-                  >
-                    Decline
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-gray-500 text-sm italic">No pending requests</p>
-        )}
-      </div>
+    <section className="mt-10 max-w-4xl mx-auto p-4 space-y-10 overflow-x-hidden">
+      <h1 className="text-2xl font-bold text-gray-800 text-center mb-4">My Missions</h1>
 
-      {/* Upcoming */}
-      <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
-          <Calendar size={20} className="text-rose-600" /> Upcoming Missions
-        </h2>
-        {upcoming.length ? (
-          <ul className="space-y-4">
-            {upcoming.map((m) => (
-              <li
-                key={m.id}
-                className="flex justify-between items-center border-b border-gray-100 pb-3"
-              >
-                <div>
-                  <p className="font-medium text-gray-800">{m.service}</p>
-                  <p className="text-sm text-gray-500">
-                    {m.date} — {m.timeSlot}
-                  </p>
-                </div>
-                <span className="text-rose-600 font-semibold text-sm">
-                  Confirmed
+      {/* ✅ Vue calendrier (même que client) */}
+      <CalendarView
+        bookings={missions}
+        onSelectDay={(date, dayMissions) => {
+          setSelectedDayMissions({ date, dayMissions });
+        }}
+      />
+
+      {selectedDayMissions && (
+        <div className="text-center text-gray-600 mb-4">
+          <p className="text-sm">
+            Showing missions for{" "}
+            <span className="font-semibold text-gray-800">{selectedDayMissions.date}</span> (
+            {selectedDayMissions.dayMissions.length} items)
+          </p>
+          <button
+            onClick={() => setSelectedDayMissions(null)}
+            className="mt-2 px-4 py-1.5 text-sm font-medium text-rose-600 border border-rose-200 rounded-full hover:bg-rose-50 transition"
+          >
+            Show all missions
+          </button>
+        </div>
+      )}
+
+      {/* ✅ Section par statut */}
+      <MissionSection
+        title="Pending Requests"
+        icon={<Clock size={20} className="text-amber-500" />}
+        color="text-amber-600"
+        data={grouped.pending}
+        empty="No pending requests."
+      />
+
+      <MissionSection
+        title="Confirmed Appointments"
+        icon={<CheckCircle size={20} className="text-blue-600" />}
+        color="text-blue-600"
+        data={grouped.confirmed}
+        empty="No confirmed missions yet."
+      />
+
+      <MissionSection
+        title="Completed Services"
+        icon={<Star size={20} className="text-green-500" />}
+        color="text-green-600"
+        data={grouped.completed}
+        empty="No completed missions yet."
+      />
+
+      <MissionSection
+        title="Cancelled"
+        icon={<XCircle size={20} className="text-gray-400" />}
+        color="text-gray-400"
+        data={grouped.cancelled}
+        empty="No cancelled missions."
+      />
+
+      {/* ✅ Notification Toast */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+    </section>
+  );
+}
+
+/* 🔸 Sous-composant section mission */
+function MissionSection({ title, icon, data, color, empty }) {
+  return (
+    <section className="bg-white rounded-2xl shadow p-6 border border-gray-100">
+      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+        {icon} {title}
+      </h2>
+
+      {data.length ? (
+        <ul className="divide-y divide-gray-100">
+          {data.map((m) => (
+            <li
+              key={m.id}
+              className="py-3 flex justify-between items-start hover:bg-gray-50 px-2 rounded-lg transition"
+            >
+              <div className="flex-1">
+                <p className="font-medium text-gray-800">{m.service}</p>
+                <p className="text-sm text-gray-500">
+                  {m.date} — {m.time_slot}
+                </p>
+                <p className="text-sm text-gray-500">{m.address}</p>
+                {m.notes && <p className="text-xs text-gray-400 italic mt-1">“{m.notes}”</p>}
+              </div>
+
+              <div className="flex flex-col items-end gap-2">
+                <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>
+                  {m.status}
                 </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-gray-500 text-sm italic">No upcoming missions</p>
-        )}
-      </div>
+                <button
+                  className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
+                  title="View details"
+                >
+                  <Eye size={16} />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-gray-500 text-sm italic">{empty}</p>
+      )}
     </section>
   );
 }

@@ -1,15 +1,6 @@
 // 📄 src/pages/dashboard/pages/DashboardSettings.jsx
 import { useState } from "react";
-import {
-  Bell,
-  Moon,
-  Globe,
-  Eye,
-  Trash2,
-  User,
-  Mail,
-  Smartphone,
-} from "lucide-react";
+import { Bell, Moon, Globe, Eye, Trash2, User, Mail, Smartphone } from "lucide-react";
 
 export default function DashboardSettings() {
   const [darkMode, setDarkMode] = useState(false);
@@ -26,7 +17,7 @@ export default function DashboardSettings() {
   };
 
   return (
-    <section className="space-y-6">
+    <section className="mt-10 max-w-4xl mx-auto p-4 text-center space-y-6">
       {/* 👤 Profil */}
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100">
         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">

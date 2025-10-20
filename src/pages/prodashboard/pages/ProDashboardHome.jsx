@@ -1,145 +1,243 @@
-// 📄 src/pages/prodashboard/pages/ProDashboardHome.jsx
 import { useEffect, useState } from "react";
-import { Calendar, CheckCircle, Clock, DollarSign } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
-import CalendarView from "react-calendar";
-import "react-calendar/dist/Calendar.css";
+import { Clock, CheckCircle, DollarSign, Star } from "lucide-react";
 
 export default function ProDashboardHome() {
-  const { user } = useUser();
-  const [missions, setMissions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { session } = useUser();
+  const proId = session?.user?.id;
+  const proName = session?.user?.user_metadata?.name || "Professional";
 
+  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [stats, setStats] = useState({
+    pending: 0,
+    confirmed: 0,
+    completed: 0,
+    payments: 0,
+  });
+
+  /* ----------------------------- 🧩 Photo de profil ----------------------------- */
   useEffect(() => {
-    if (!user) return;
-    fetchMissions();
-  }, [user]);
+    if (!proId) return;
 
-  async function fetchMissions() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("missions")
-      .select(
-        `
-        id,
-        service,
-        description,
-        date,
-        price,
-        status,
-        client:client_id (name, email)
-      `
+    // Vérifie d’abord le cache local
+    const cached = localStorage.getItem("glossed_pro_photo");
+    if (cached) {
+      setProfilePhoto(cached);
+      return;
+    }
+
+    const fetchProfilePhoto = async () => {
+      const { data, error } = await supabase
+        .from("users")
+        .select("profile_photo")
+        .eq("id", proId)
+        .single();
+
+      if (!error && data?.profile_photo) {
+        setProfilePhoto(data.profile_photo);
+        localStorage.setItem("glossed_pro_photo", data.profile_photo);
+      }
+    };
+
+    fetchProfilePhoto();
+  }, [proId]);
+
+  /* ----------------------------- 📊 Charger les stats ----------------------------- */
+  useEffect(() => {
+    if (!proId) return;
+
+    const fetchStats = async () => {
+      const [pending, confirmed, completed, payments] = await Promise.all([
+        supabase
+          .from("bookings")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", proId)
+          .eq("status", "pending"),
+        supabase
+          .from("bookings")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", proId)
+          .eq("status", "confirmed"),
+        supabase
+          .from("bookings")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", proId)
+          .eq("status", "completed"),
+        supabase
+          .from("payments")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", proId),
+      ]);
+
+      setStats({
+        pending: pending.count || 0,
+        confirmed: confirmed.count || 0,
+        completed: completed.count || 0,
+        payments: payments.count || 0,
+      });
+    };
+
+    fetchStats();
+  }, [proId]);
+
+  /* ----------------------------- 🔄 Realtime updates ----------------------------- */
+  useEffect(() => {
+    if (!proId) return;
+
+    const bookingsChannel = supabase
+      .channel("bookings-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bookings", filter: `pro_id=eq.${proId}` },
+        () => refreshStats()
       )
-      .eq("pro_id", user.id)
-      .order("date", { ascending: true });
+      .subscribe();
 
-    if (error) console.error("Erreur chargement missions:", error);
-    else setMissions(data || []);
-    setLoading(false);
-  }
+    const paymentsChannel = supabase
+      .channel("payments-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments", filter: `pro_id=eq.${proId}` },
+        () => refreshStats()
+      )
+      .subscribe();
 
-  // 🧮 Statistiques
-  const pending = missions.filter((m) => m.status === "pending");
-  const accepted = missions.filter((m) => m.status === "accepted");
-  const completed = missions.filter((m) => m.status === "completed");
-  const totalEarnings = completed.reduce((sum, m) => sum + (m.price || 0), 0);
+    const refreshStats = async () => {
+      const [pending, confirmed, completed, payments] = await Promise.all([
+        supabase
+          .from("bookings")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", proId)
+          .eq("status", "pending"),
+        supabase
+          .from("bookings")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", proId)
+          .eq("status", "confirmed"),
+        supabase
+          .from("bookings")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", proId)
+          .eq("status", "completed"),
+        supabase
+          .from("payments")
+          .select("*", { count: "exact", head: true })
+          .eq("pro_id", proId),
+      ]);
 
+      setStats({
+        pending: pending.count || 0,
+        confirmed: confirmed.count || 0,
+        completed: completed.count || 0,
+        payments: payments.count || 0,
+      });
+    };
+
+    // Nettoyage à la fermeture
+    return () => {
+      supabase.removeChannel(bookingsChannel);
+      supabase.removeChannel(paymentsChannel);
+    };
+  }, [proId]);
+
+  /* ----------------------------- 🧱 Cartes ----------------------------- */
+  const cards = [
+    {
+      title: "Pending Requests",
+      count: stats.pending,
+      color: "from-amber-400 to-amber-500",
+      icon: Clock,
+      link: "/prodashboard/missions#pending",
+    },
+    {
+      title: "Accepted Appointments",
+      count: stats.confirmed,
+      color: "from-blue-400 to-blue-500",
+      icon: CheckCircle,
+      link: "/prodashboard/missions#confirmed",
+    },
+    {
+      title: "Completed Jobs",
+      count: stats.completed,
+      color: "from-green-400 to-green-500",
+      icon: Star,
+      link: "/prodashboard/missions#completed",
+    },
+    {
+      title: "Recent Payments",
+      count: stats.payments,
+      color: "from-rose-400 to-red-500",
+      icon: DollarSign,
+      link: "/prodashboard/payments",
+    },
+  ];
+
+  /* ----------------------------- 🎨 Rendu ----------------------------- */
   return (
-    <section className="space-y-8">
-      <h1 className="text-2xl font-semibold text-gray-800 mb-4">
-        Welcome back, {user?.email?.split("@")[0]} 👋
-      </h1>
+    <section className="mt-10 max-w-6xl mx-auto px-4 sm:px-6 md:px-8 space-y-10">
+      {/* 🔹 Welcome section */}
+      <div className="text-center mb-6 flex flex-col items-center">
+        <div className="relative mb-4">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-r from-rose-500 to-red-500 p-[2px]">
+            {profilePhoto ? (
+              <img
+                src={profilePhoto}
+                alt={proName}
+                className="w-full h-full rounded-full object-cover bg-white"
+              />
+            ) : (
+              <div className="w-full h-full rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold text-xl">
+                {proName.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div className="absolute inset-0 -z-10 blur-xl bg-rose-200/40 rounded-full"></div>
+        </div>
 
-      {/* 📊 Statistiques */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Stat icon={Clock} color="text-amber-500" value={pending.length} label="Pending" />
-        <Stat icon={Calendar} color="text-rose-600" value={accepted.length} label="Accepted" />
-        <Stat
-          icon={CheckCircle}
-          color="text-green-500"
-          value={completed.length}
-          label="Completed"
-        />
-        <Stat
-          icon={DollarSign}
-          color="text-rose-600"
-          value={`€${totalEarnings}`}
-          label="Total Earned"
-        />
+        <h1 className="text-2xl font-bold text-gray-800">
+          Welcome back,{" "}
+          <span className="text-rose-600">{proName.split(" ")[0]}</span> 
+        </h1>
+        <p className="text-gray-500 text-sm mt-1">
+          Here’s a quick overview of your current activity.
+        </p>
       </div>
 
-      {/* ⏳ Missions à venir */}
-      <Card title="Upcoming Missions">
-        {loading ? (
-          <p className="text-gray-500">Loading missions...</p>
-        ) : accepted.length === 0 ? (
-          <p className="text-gray-500">No upcoming missions.</p>
-        ) : (
-          <ul className="space-y-3">
-            {accepted.map((m) => (
-              <li
-                key={m.id}
-                className="flex justify-between items-center border-b border-gray-100 pb-2"
-              >
-                <div>
-                  <p className="font-medium text-gray-800">{m.client?.name || m.client?.email}</p>
-                  <p className="text-sm text-gray-500">
-                    {m.service} —{" "}
-                    {new Date(m.date).toLocaleDateString(undefined, {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </p>
-                </div>
-                <span className="text-rose-600 font-semibold cursor-pointer hover:underline">
-                  View
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      {/* 🔹 Cards grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {cards.map(({ title, count, color, icon: Icon, link }) => (
+          <button
+            key={title}
+            onClick={() => navigate(link)}
+            className={`group bg-gradient-to-r ${color} text-white rounded-2xl shadow-md hover:shadow-lg p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.03]`}
+          >
+            <Icon size={32} className="mb-3 opacity-90" />
+            <h3 className="text-lg font-semibold text-white text-center">
+              {title}
+            </h3>
+            <p className="text-2xl font-bold mt-2">{count}</p>
+          </button>
+        ))}
+      </div>
 
-      {/* 🗓️ Calendrier des missions */}
-      <Card title="Calendar">
-        <div className="w-full overflow-x-hidden max-w-full">
-          <div className="calendar-container mx-auto w-full">
-            <CalendarView
-              className="w-full"
-              value={new Date()}
-              tileContent={({ date }) => {
-                const hasMission = missions.some(
-                  (m) =>
-                    new Date(m.date).toDateString() === date.toDateString() &&
-                    m.status !== "cancelled"
-                );
-                return hasMission ? <span className="text-rose-500 font-bold">•</span> : null;
-              }}
-            />
-          </div>
-        </div>
-      </Card>
+      {/* 🔹 Profile summary */}
+      <div className="bg-white rounded-2xl shadow p-6 border border-gray-100 mt-8 text-center">
+        <h2 className="text-lg font-semibold text-gray-800 mb-2">
+          Your Profile at a Glance
+        </h2>
+        <p className="text-sm text-gray-500 max-w-md mx-auto">
+          Keep your profile up to date to attract more clients and appear higher in search results.
+        </p>
+        <button
+          onClick={() => navigate("/prodashboard/settings")}
+          className="mt-4 px-6 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-medium shadow hover:shadow-md hover:scale-[1.02] transition-transform"
+        >
+          Go to Profile
+        </button>
+      </div>
     </section>
-  );
-}
-
-function Stat({ icon: Icon, color, value, label }) {
-  return (
-    <div className="bg-white p-5 rounded-2xl shadow border border-gray-100 flex flex-col items-center">
-      <Icon className={`${color} mb-2`} size={24} />
-      <span className="text-2xl font-bold">{value}</span>
-      <p className="text-gray-500 text-sm">{label}</p>
-    </div>
-  );
-}
-
-function Card({ title, children }) {
-  return (
-    <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
-      <h2 className="text-lg font-semibold mb-4 text-gray-800">{title}</h2>
-      {children}
-    </div>
   );
 }
