@@ -1,66 +1,153 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
-import { Clock, CheckCircle, Bell } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { Calendar, Clock, CheckCircle, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function DashboardHome() {
-  const { session } = useUser();
-  const [stats, setStats] = useState({ pending: 0, offers: 0, confirmed: 0 });
+  const { user } = useUser();
+  const [counts, setCounts] = useState({
+    pending: 0,
+    offers: 0,
+    confirmed: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
+  // 🧠 Charger les réservations client
   useEffect(() => {
-    if (!session?.user) return;
+    const fetchBookings = async () => {
+      if (!user?.id) return;
+      setLoading(true);
 
-    const fetchStats = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("bookings")
         .select("status")
-        .eq("client_id", session.user.id);
-      if (!data) return;
+        .eq("client_id", user.id);
 
-      const grouped = data.reduce(
-        (acc, b) => ({ ...acc, [b.status]: (acc[b.status] || 0) + 1 }),
-        {}
-      );
-      setStats(grouped);
+      if (error) {
+        console.error("❌ Supabase error:", error.message);
+        setLoading(false);
+        return;
+      }
+
+      const grouped = {
+        pending: data.filter((b) => b.status === "pending").length,
+        offers: data.filter((b) => b.status === "offers").length,
+        confirmed: data.filter((b) => b.status === "confirmed").length,
+      };
+      setCounts(grouped);
+      setLoading(false);
     };
 
-    fetchStats();
-  }, [session]);
+    fetchBookings();
+  }, [user?.id]);
+
+  const name = user?.first_name ? user.first_name : "there";
+  const photo = user?.profile_photo;
 
   return (
-    <div className="mt-10 max-w-4xl mx-auto p-4 text-center">
-      <h1 className="text-3xl font-bold text-gray-800 mb-3">Welcome back 👋</h1>
-      <p className="text-gray-600 mb-8">Here’s a quick overview of your bookings and offers.</p>
+    <div className="mt-8 max-w-5xl mx-auto px-4 space-y-10">
+      {/* --- Header --- */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">
+            Welcome back, <span className="text-rose-600">{name}</span> 👋
+          </h1>
+          <p className="text-gray-500 mt-1">
+            Manage your bookings and discover new services in a few clicks.
+          </p>
+        </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <StatCard
-          icon={<Clock size={22} className="text-amber-500" />}
-          label="Pending"
-          value={stats.pending || 0}
+        {/* --- Profile photo --- */}
+        <div className="flex justify-center sm:justify-end">
+          {photo ? (
+            <img
+              src={photo}
+              alt="Profile"
+              className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-2xl font-semibold shadow-lg">
+              {name?.[0]?.toUpperCase() || "?"}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* --- Summary cards --- */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Pending */}
+        <DashboardCard
+          title="Pending Requests"
+          value={loading ? "…" : counts.pending}
+          icon={<Clock className="text-amber-500" size={24} />}
+          color="from-amber-400 to-amber-600"
+          onClick={() => navigate("/dashboard/reservations#pending")}
         />
-        <StatCard
-          icon={<Bell size={22} className="text-red-500" />}
-          label="Offers to review"
-          value={stats.offers || 0}
+
+        {/* Offers */}
+        <DashboardCard
+          title="Offers Received"
+          value={loading ? "…" : counts.offers}
+          icon={<Sparkles className="text-rose-500" size={24} />}
+          color="from-rose-400 to-rose-600"
+          onClick={() => navigate("/dashboard/reservations#offers")}
         />
-        <StatCard
-          icon={<CheckCircle size={22} className="text-green-500" />}
-          label="Confirmed"
-          value={stats.confirmed || 0}
+
+        {/* Confirmed */}
+        <DashboardCard
+          title="Confirmed Appointments"
+          value={loading ? "…" : counts.confirmed}
+          icon={<CheckCircle className="text-blue-500" size={24} />}
+          color="from-blue-400 to-blue-600"
+          onClick={() => navigate("/dashboard/reservations#confirmed")}
+        />
+
+        {/* Book a Service */}
+        <DashboardCard
+          title="Book a Service"
+          value=""
+          icon={<Calendar className="text-green-500" size={24} />}
+          color="from-green-400 to-green-600"
+          onClick={() => navigate("/dashboard/new")}
+          cta
         />
       </div>
+
+      {/* --- My Reservations section --- */}
+      <section className="bg-white rounded-2xl shadow p-6 border border-gray-100">
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">My Reservations</h2>
+        <p className="text-gray-500 text-sm mb-4">
+          View and manage all your current and past bookings.
+        </p>
+        <button
+          onClick={() => navigate("/dashboard/reservations")}
+          className="px-5 py-2 rounded-full font-medium bg-gradient-to-r from-rose-600 to-red-600 text-white hover:scale-[1.02] transition-transform"
+        >
+          Go to My Reservations
+        </button>
+      </section>
     </div>
   );
 }
 
-function StatCard({ icon, label, value }) {
+// --- Subcomponent: Card ---
+function DashboardCard({ title, value, icon, color, onClick, cta = false }) {
   return (
-    <div className="p-6 bg-white rounded-2xl shadow hover:shadow-md transition">
-      <div className="flex flex-col items-center justify-center">
-        <div className="mb-2">{icon}</div>
-        <h3 className="text-lg font-semibold text-gray-800">{label}</h3>
-        <p className="text-2xl font-bold text-rose-600 mt-2">{value}</p>
+    <div
+      onClick={onClick}
+      className={`cursor-pointer bg-gradient-to-r ${color} text-white rounded-2xl shadow-md hover:shadow-lg p-5 flex flex-col items-center justify-center transition-transform hover:scale-[1.03]`}
+    >
+      <div className="flex items-center gap-3 mb-2">
+        {icon}
+        <h3 className="font-semibold text-lg">{title}</h3>
       </div>
+      {cta ? (
+        <span className="text-sm opacity-90 mt-1">Click to book now</span>
+      ) : (
+        <p className="text-3xl font-bold">{value}</p>
+      )}
     </div>
   );
 }
