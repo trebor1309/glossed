@@ -138,14 +138,12 @@ function StepWhen({ bookingData, setBookingData, onNext, onPrev }) {
       <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
         <Calendar size={20} /> When would you like the service?
       </h2>
-
       <input
         type="date"
         value={bookingData.date}
         onChange={(e) => setBookingData({ ...bookingData, date: e.target.value })}
         className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
       />
-
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {timeSlotOptions.map((slot) => (
           <button
@@ -161,7 +159,6 @@ function StepWhen({ bookingData, setBookingData, onNext, onPrev }) {
           </button>
         ))}
       </div>
-
       <div className="flex justify-between pt-6">
         <button
           onClick={onPrev}
@@ -221,7 +218,6 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
       <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
         <MapPin size={20} /> Where should we come?
       </h2>
-
       <input
         id="autocomplete-input"
         type="text"
@@ -229,7 +225,6 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         defaultValue={bookingData.address}
         className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
       />
-
       <textarea
         rows="3"
         placeholder="Additional notes..."
@@ -237,7 +232,6 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         onChange={(e) => setBookingData({ ...bookingData, notes: e.target.value })}
         className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
       />
-
       <div className="flex justify-between pt-6">
         <button
           onClick={onPrev}
@@ -273,7 +267,6 @@ function StepRecap({ bookingData, onPrev, onConfirm, loading, isEdit }) {
       <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
         <Clock size={20} /> {isEdit ? "Confirm your updates" : "Confirm your booking"}
       </h2>
-
       <div className="bg-gray-50 p-4 rounded-xl border space-y-2">
         <p>
           <strong>Services:</strong> {bookingData.services.join(", ")}
@@ -293,7 +286,6 @@ function StepRecap({ bookingData, onPrev, onConfirm, loading, isEdit }) {
           </p>
         )}
       </div>
-
       <div className="flex justify-between pt-6">
         <button
           onClick={onPrev}
@@ -341,22 +333,23 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           longitude: null,
         }
   );
-
-  // 🔄 État pour bloquer le spam de clic
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
 
-  /* ✅ SAVE / UPDATE BOOKING */
+  /* ✅ SAVE / UPDATE BOOKING + NOTIFY PROS */
   const handleConfirm = async () => {
-    if (isSubmitting) return; // sécurité anti-double clic
+    if (isSubmitting) return;
     setIsSubmitting(true);
     setToast(null);
 
     try {
-      if (editBooking) {
-        const { error } = await supabase
-          .from("bookings")
-          .update({
+      const bookingId = uuid();
+      const { data: bookingInsert, error: bookingError } = await supabase
+        .from("bookings")
+        .insert([
+          {
+            id: bookingId,
+            client_id: session.user.id,
             service: bookingData.services.join(", "),
             date: bookingData.date,
             time_slot: bookingData.timeSlots.join(", "),
@@ -364,36 +357,58 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
             notes: bookingData.notes,
             client_lat: bookingData.latitude,
             client_lng: bookingData.longitude,
-          })
-          .eq("id", editBooking.id);
-
-        if (error) throw error;
-        setToast({ message: "✅ Booking updated successfully!", type: "success" });
-      } else {
-        const { error } = await supabase.from("bookings").insert([
-          {
-            id: uuid(),
-            client_id: session?.user?.id,
-            service: bookingData.services.join(", "),
-            date: bookingData.date,
-            time_slot: bookingData.timeSlots.join(", "),
-            address: bookingData.address,
-            notes: bookingData.notes,
-            client_lat: bookingData.latitude || null,
-            client_lng: bookingData.longitude || null,
             status: "pending",
           },
-        ]);
+        ])
+        .select()
+        .single();
 
-        if (error) throw error;
-        setToast({ message: "✅ Booking created successfully!", type: "success" });
+      if (bookingError) throw bookingError;
+
+      // Recherche pros compatibles
+      const { data: pros } = await supabase
+        .from("users")
+        .select("id, latitude, longitude, services, working_radius");
+
+      const distanceKm = (lat1, lon1, lat2, lon2) => {
+        const R = 6371;
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLon = ((lon2 - lon1) * Math.PI) / 180;
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos((lat1 * Math.PI) / 180) *
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      };
+
+      const matchingPros = pros.filter((p) => {
+        if (!p.latitude || !p.longitude) return false;
+        const dist = distanceKm(
+          bookingData.latitude,
+          bookingData.longitude,
+          p.latitude,
+          p.longitude
+        );
+        const offersService = Array.isArray(p.services)
+          ? p.services.some((s) => bookingData.services.includes(s))
+          : p.services?.includes(bookingData.services[0]);
+        return dist <= (p.working_radius || 20) && offersService;
+      });
+
+      if (matchingPros.length > 0) {
+        const notifRows = matchingPros.map((p) => ({
+          booking_id: bookingId,
+          pro_id: p.id,
+        }));
+        await supabase.from("booking_notifications").insert(notifRows);
       }
 
-      // Attendre 1.5 s pour affichage du toast puis fermer/redirect
+      setToast({ message: "✅ Booking created & sent to nearby pros!", type: "success" });
       setTimeout(() => {
         if (onSuccess) onSuccess();
         if (isModal && onClose) onClose();
-        if (navigate) navigate("/dashboard/reservations");
+        navigate("/dashboard/reservations");
       }, 1500);
     } catch (err) {
       setToast({ message: `❌ ${err.message}`, type: "error" });
@@ -438,9 +453,7 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
 
   return (
     <motion.div
-      className={`max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg space-y-8 relative ${
-        isModal ? "fixed inset-0 z-50 overflow-y-auto" : ""
-      }`}
+      className={`max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg space-y-8 relative ${isModal ? "fixed inset-0 z-50 overflow-y-auto" : ""}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
@@ -453,7 +466,6 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           <X size={22} />
         </button>
       )}
-
       {/* Stepper */}
       <div className="mb-6">
         <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
@@ -472,10 +484,7 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           />
         </div>
       </div>
-
       {steps[step]}
-
-      {/* Toast */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </motion.div>
   );

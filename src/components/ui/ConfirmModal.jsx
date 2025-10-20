@@ -13,11 +13,7 @@ export default function ConfirmModal({
   previews = [], // 👈 support multiple
   type = "default", // "default" | "delete" | "upload" | "verify"
 }) {
-  const allPreviews = previews.length
-    ? previews
-    : imagePreview
-    ? [imagePreview]
-    : [];
+  const allPreviews = previews.length ? previews : imagePreview ? [imagePreview] : [];
 
   return (
     <AnimatePresence>
@@ -38,15 +34,9 @@ export default function ConfirmModal({
             {/* Icône dynamique */}
             <div className="flex justify-center">
               {type === "delete" ? (
-                <AlertTriangle
-                  size={42}
-                  className="text-red-500 bg-red-100 p-2 rounded-full"
-                />
+                <AlertTriangle size={42} className="text-red-500 bg-red-100 p-2 rounded-full" />
               ) : (
-                <ShieldCheck
-                  size={42}
-                  className="text-rose-600 bg-rose-100 p-2 rounded-full"
-                />
+                <ShieldCheck size={42} className="text-rose-600 bg-rose-100 p-2 rounded-full" />
               )}
             </div>
 
@@ -58,9 +48,7 @@ export default function ConfirmModal({
             {allPreviews.length > 0 && (
               <div
                 className={`${
-                  allPreviews.length > 1
-                    ? "grid grid-cols-3 gap-2"
-                    : "flex justify-center"
+                  allPreviews.length > 1 ? "grid grid-cols-3 gap-2" : "flex justify-center"
                 } mt-3 mb-1`}
               >
                 {allPreviews.map((src, i) => (
@@ -97,8 +85,8 @@ export default function ConfirmModal({
             {/* Message de vérification spécifique */}
             {type === "verify" && (
               <p className="text-xs text-gray-400 mt-3">
-                Your document will be stored securely and reviewed
-                confidentially by the Glossed team within 48 hours.
+                Your document will be stored securely and reviewed confidentially by the Glossed
+                team within 48 hours.
               </p>
             )}
           </motion.div>

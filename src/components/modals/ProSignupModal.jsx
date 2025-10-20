@@ -46,15 +46,11 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
             ✕
           </button>
 
-          <h2 className="text-3xl font-bold text-center mb-6">
-            Join Glossed as a Pro
-          </h2>
+          <h2 className="text-3xl font-bold text-center mb-6">Join Glossed as a Pro</h2>
 
           <form className="space-y-4" onSubmit={handleProSignup}>
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Business name
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Business name</label>
               <input
                 type="text"
                 name="businessName"
@@ -65,9 +61,7 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
                 type="email"
                 name="email"
@@ -78,9 +72,7 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Password</label>
               <input
                 type="password"
                 name="password"
@@ -100,10 +92,7 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
 
           <p className="text-center text-sm text-gray-500 mt-6">
             Want to sign up as a client instead?{" "}
-            <button
-              onClick={onClientSignup}
-              className="text-rose-600 font-medium hover:underline"
-            >
+            <button onClick={onClientSignup} className="text-rose-600 font-medium hover:underline">
               Create client account
             </button>
           </p>

@@ -51,10 +51,7 @@ export default function DashboardMore() {
   const handleSwitchToPro = async () => {
     if (user?.roles?.includes("pro")) {
       try {
-        await supabase
-          .from("users")
-          .update({ active_role: "pro" })
-          .eq("id", user.id);
+        await supabase.from("users").update({ active_role: "pro" }).eq("id", user.id);
       } catch (e) {
         console.warn("⚠️ Erreur lors de la mise à jour du rôle actif :", e);
       }
@@ -72,9 +69,7 @@ export default function DashboardMore() {
           key={section.title}
           className="bg-white rounded-2xl shadow-md p-6 border border-gray-100"
         >
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            {section.title}
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">{section.title}</h3>
           <ul className="space-y-3">
             {section.items.map(({ label, icon: Icon, to }) => (
               <li key={label}>
@@ -98,8 +93,7 @@ export default function DashboardMore() {
           Become a Pro
         </h3>
         <p className="text-gray-600 text-sm mb-4 max-w-sm mx-auto">
-          Join Glossed as a beauty professional and start receiving client
-          bookings.
+          Join Glossed as a beauty professional and start receiving client bookings.
         </p>
         <button
           onClick={handleSwitchToPro}
@@ -134,9 +128,7 @@ export default function DashboardMore() {
           <LogOut className="w-5 h-5 text-rose-600" />
           Logout
         </h3>
-        <p className="text-gray-600 text-sm mb-4">
-          You can log out of your account anytime.
-        </p>
+        <p className="text-gray-600 text-sm mb-4">You can log out of your account anytime.</p>
         <button
           onClick={logout}
           className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full text-sm font-medium shadow hover:shadow-md hover:scale-105 transition-transform"

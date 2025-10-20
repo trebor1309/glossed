@@ -10,17 +10,11 @@ export default function TestMapClean() {
 
   if (loadError)
     return (
-      <div style={{ color: "red", padding: "20px" }}>
-        ❌ Google Maps error: {loadError.message}
-      </div>
+      <div style={{ color: "red", padding: "20px" }}>❌ Google Maps error: {loadError.message}</div>
     );
 
   if (!isLoaded)
-    return (
-      <div style={{ padding: "20px", fontSize: "18px" }}>
-        ⏳ Loading Google Maps...
-      </div>
-    );
+    return <div style={{ padding: "20px", fontSize: "18px" }}>⏳ Loading Google Maps...</div>;
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>

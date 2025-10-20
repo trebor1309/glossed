@@ -30,13 +30,7 @@ export default function Navbar({
         {/* Desktop Links */}
         <div className="hidden md:flex items-center gap-10 text-sm font-medium">
           <a
-            href={
-              isAuthenticated
-                ? isPro
-                  ? "/prodashboard"
-                  : "/dashboard"
-                : "/"
-            }
+            href={isAuthenticated ? (isPro ? "/prodashboard" : "/dashboard") : "/"}
             className="hover:text-rose-600 transition-all duration-300 hover:scale-105"
           >
             {isAuthenticated ? "Dashboard" : "Home"}

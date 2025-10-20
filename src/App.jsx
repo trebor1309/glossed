@@ -70,12 +70,11 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
   const location = useLocation();
   const isMobile = useIsMobile(768);
 
-    // 🔸 Modales globales
+  // 🔸 Modales globales
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
   const [showProSignup, setShowProSignup] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
-
 
   // 🧭 Détection des routes dashboard
   const isDashboardRoute =

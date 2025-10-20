@@ -16,9 +16,8 @@ export default function Press() {
         </div>
         <h1 className="text-4xl font-bold mb-4">Press & Media</h1>
         <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          Welcome to the official Glossed press page. Here you&apos;ll find all
-          essential resources for journalists, media partners, and anyone
-          interested in sharing our story.
+          Welcome to the official Glossed press page. Here you&apos;ll find all essential resources
+          for journalists, media partners, and anyone interested in sharing our story.
         </p>
       </div>
 
@@ -33,12 +32,10 @@ export default function Press() {
 
       {/* Section: Press Kit */}
       <section className="mb-24 text-center">
-        <h2 className="text-2xl font-semibold mb-4 text-gray-800">
-          Press Kit & Resources
-        </h2>
+        <h2 className="text-2xl font-semibold mb-4 text-gray-800">Press Kit & Resources</h2>
         <p className="text-gray-600 max-w-2xl mx-auto mb-8">
-          Need logos, screenshots or company information? Download our official
-          media kit to use verified Glossed assets for articles or publications.
+          Need logos, screenshots or company information? Download our official media kit to use
+          verified Glossed assets for articles or publications.
         </p>
 
         <a
@@ -63,8 +60,8 @@ export default function Press() {
               “The Future of Beauty at Home”
             </h3>
             <p className="text-gray-600 text-sm mb-4">
-              A deep dive into how Glossed is transforming the way we access
-              professional beauty services — fast, flexible, and modern.
+              A deep dive into how Glossed is transforming the way we access professional beauty
+              services — fast, flexible, and modern.
             </p>
             <p className="text-sm text-gray-400">— Beauty Tech Review</p>
           </div>
@@ -75,8 +72,8 @@ export default function Press() {
               “A Startup Bringing Elegance to Convenience”
             </h3>
             <p className="text-gray-600 text-sm mb-4">
-              Glossed bridges the gap between luxury and accessibility for the
-              new generation of on-demand beauty lovers.
+              Glossed bridges the gap between luxury and accessibility for the new generation of
+              on-demand beauty lovers.
             </p>
             <p className="text-sm text-gray-400">— Startup Europe Weekly</p>
           </div>
@@ -87,8 +84,8 @@ export default function Press() {
               “Empowering Independent Stylists”
             </h3>
             <p className="text-gray-600 text-sm mb-4">
-              Glossed helps freelancers thrive by giving them digital tools,
-              visibility, and clients who value quality.
+              Glossed helps freelancers thrive by giving them digital tools, visibility, and clients
+              who value quality.
             </p>
             <p className="text-sm text-gray-400">— Tech & Lifestyle Journal</p>
           </div>
@@ -97,12 +94,10 @@ export default function Press() {
 
       {/* Section: Press Contact */}
       <section className="text-center mb-12">
-        <h2 className="text-2xl font-semibold mb-4 text-gray-800">
-          Press Contact
-        </h2>
+        <h2 className="text-2xl font-semibold mb-4 text-gray-800">Press Contact</h2>
         <p className="text-gray-600 mb-6">
-          For interviews, media inquiries or partnership requests, please
-          contact our communications team.
+          For interviews, media inquiries or partnership requests, please contact our communications
+          team.
         </p>
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
           <a

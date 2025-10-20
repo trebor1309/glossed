@@ -9,8 +9,8 @@ export default function Footer() {
           <div className="col-span-2">
             <Logo size="text-3xl" variant="light" />
             <p className="text-gray-400 mb-6 max-w-md leading-relaxed mt-4">
-              Experience beauty services like never before — professional,
-              convenient, and always on-demand.
+              Experience beauty services like never before — professional, convenient, and always
+              on-demand.
             </p>
             <div className="flex gap-4 mt-4">
               <a
@@ -31,10 +31,16 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-white">Company</h4>
             <div className="space-y-3 text-gray-400">
-              <a href="/about-us" className="block hover:text-rose-400 transition-colors duration-300">
+              <a
+                href="/about-us"
+                className="block hover:text-rose-400 transition-colors duration-300"
+              >
                 About Us
               </a>
-              <a href="/careers" className="block hover:text-rose-400 transition-colors duration-300">
+              <a
+                href="/careers"
+                className="block hover:text-rose-400 transition-colors duration-300"
+              >
                 Careers
               </a>
               <a href="/press" className="block hover:text-rose-400 transition-colors duration-300">
@@ -49,16 +55,25 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-white">Support</h4>
             <div className="space-y-3 text-gray-400">
-              <a href="/help-center" className="block hover:text-rose-400 transition-colors duration-300">
+              <a
+                href="/help-center"
+                className="block hover:text-rose-400 transition-colors duration-300"
+              >
                 Help Center
               </a>
-              <a href="/contact" className="block hover:text-rose-400 transition-colors duration-300">
+              <a
+                href="/contact"
+                className="block hover:text-rose-400 transition-colors duration-300"
+              >
                 Contact
               </a>
               <a href="/faq" className="block hover:text-rose-400 transition-colors duration-300">
                 FAQ
               </a>
-              <a href="/safety" className="block hover:text-rose-400 transition-colors duration-300">
+              <a
+                href="/safety"
+                className="block hover:text-rose-400 transition-colors duration-300"
+              >
                 Safety
               </a>
             </div>

@@ -26,12 +26,8 @@ export default function DownloadModal({ onClose }) {
         </button>
 
         <Smartphone className="mx-auto mb-4 text-rose-500 w-12 h-12" />
-        <h2 className="text-2xl font-semibold mb-2">
-          Download the Glossed App
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Choose your platform — app coming soon!
-        </p>
+        <h2 className="text-2xl font-semibold mb-2">Download the Glossed App</h2>
+        <p className="text-gray-600 mb-6">Choose your platform — app coming soon!</p>
 
         {/* Badges officiels */}
         <div className="flex justify-center gap-4 mt-6">
@@ -62,9 +58,7 @@ export default function DownloadModal({ onClose }) {
           </a>
         </div>
 
-        <p className="text-xs text-gray-400 mt-6">
-          Available soon on App Store & Google Play
-        </p>
+        <p className="text-xs text-gray-400 mt-6">Available soon on App Store & Google Play</p>
       </motion.div>
     </motion.div>
   );

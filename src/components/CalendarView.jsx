@@ -89,27 +89,14 @@ export default function CalendarView({ bookings, onSelectDay }) {
               onClick={() => onSelectDay?.(key, dayBookings)}
               ref={isToday ? todayRef : null}
               className={`h-10 sm:h-12 md:h-14 rounded-lg flex flex-col items-center justify-center relative border transition
-                ${
-                  isToday
-                    ? "border-rose-400 bg-rose-50 text-rose-700"
-                    : "border-transparent"
-                }
-                ${
-                  isCurrentMonth
-                    ? "text-gray-800 hover:bg-gray-50"
-                    : "text-gray-300"
-                }`}
+                ${isToday ? "border-rose-400 bg-rose-50 text-rose-700" : "border-transparent"}
+                ${isCurrentMonth ? "text-gray-800 hover:bg-gray-50" : "text-gray-300"}`}
             >
-              <span className="text-xs sm:text-sm font-medium">
-                {day.format("D")}
-              </span>
+              <span className="text-xs sm:text-sm font-medium">{day.format("D")}</span>
               <div className="flex gap-[3px] mt-1">
                 {Object.entries(statusColors).map(([status, color]) =>
                   dayBookings.some((b) => b.status === status) ? (
-                    <span
-                      key={status}
-                      className={`w-1.5 h-1.5 rounded-full ${color}`}
-                    ></span>
+                    <span key={status} className={`w-1.5 h-1.5 rounded-full ${color}`}></span>
                   ) : null
                 )}
               </div>

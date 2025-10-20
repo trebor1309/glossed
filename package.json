@@ -12,6 +12,7 @@
     "pretty": "prettier --write .",
     "clean-all": "npm run lint && npm run check-unused && npm run pretty",
     "check": "npm run lint && npm run build",
+    "format": "prettier --write .",
     "prepare": "husky install"
   },
   "dependencies": {

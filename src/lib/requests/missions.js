@@ -33,10 +33,7 @@ export async function getClientMissions(clientId) {
  * ✏️ Met à jour le statut d’une mission
  */
 export async function updateMissionStatus(missionId, status) {
-  const { error } = await supabase
-    .from("missions")
-    .update({ status })
-    .eq("id", missionId);
+  const { error } = await supabase.from("missions").update({ status }).eq("id", missionId);
 
   if (error) throw error;
 }

@@ -1,11 +1,5 @@
 import { motion } from "framer-motion";
-import {
-  ShieldCheck,
-  HeartHandshake,
-  CreditCard,
-  Sparkles,
-  Users,
-} from "lucide-react";
+import { ShieldCheck, HeartHandshake, CreditCard, Sparkles, Users } from "lucide-react";
 
 export default function Safety() {
   return (
@@ -22,9 +16,8 @@ export default function Safety() {
         </div>
         <h1 className="text-4xl font-bold mb-4">Safety & Trust</h1>
         <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          At Glossed, your safety and peace of mind are our top priorities.  
-          Every professional and every booking is handled with care, transparency,  
-          and respect — for both clients and pros.
+          At Glossed, your safety and peace of mind are our top priorities. Every professional and
+          every booking is handled with care, transparency, and respect — for both clients and pros.
         </p>
       </div>
 
@@ -35,14 +28,14 @@ export default function Safety() {
             <Users className="text-rose-500" size={22} /> Verified & Trained Professionals
           </h2>
           <p className="text-gray-600 leading-relaxed">
-            Every professional on Glossed is carefully verified through identity
-            checks, qualification reviews and profile validation.  
-            Our onboarding includes guidance on customer service and hygiene best practices.
+            Every professional on Glossed is carefully verified through identity checks,
+            qualification reviews and profile validation. Our onboarding includes guidance on
+            customer service and hygiene best practices.
           </p>
           <p className="text-gray-600 leading-relaxed">
-            We only collaborate with certified or experienced experts — makeup artists,
-            hair stylists, nail technicians and skincare specialists — who meet our standards
-            of professionalism and safety.
+            We only collaborate with certified or experienced experts — makeup artists, hair
+            stylists, nail technicians and skincare specialists — who meet our standards of
+            professionalism and safety.
           </p>
         </div>
         <div>
@@ -69,12 +62,12 @@ export default function Safety() {
           </h2>
           <p className="text-gray-600 leading-relaxed">
             Our professionals strictly follow hygiene and sanitization protocols for every
-            appointment — including tool disinfection, single-use materials, and regular
-            equipment checks.
+            appointment — including tool disinfection, single-use materials, and regular equipment
+            checks.
           </p>
           <p className="text-gray-600 leading-relaxed">
-            Clients can also request extra precautions for sensitive skin or medical
-            conditions. Your comfort and health always come first.
+            Clients can also request extra precautions for sensitive skin or medical conditions.
+            Your comfort and health always come first.
           </p>
         </div>
       </section>
@@ -86,12 +79,12 @@ export default function Safety() {
             <CreditCard className="text-rose-500" size={22} /> Secure & Transparent Payments
           </h2>
           <p className="text-gray-600 leading-relaxed">
-            All payments on Glossed are processed through encrypted, PSD2-compliant gateways.
-            Your financial information is never stored or shared with third parties.
+            All payments on Glossed are processed through encrypted, PSD2-compliant gateways. Your
+            financial information is never stored or shared with third parties.
           </p>
           <p className="text-gray-600 leading-relaxed">
-            Professionals are paid automatically after each completed service, ensuring
-            transparency and fairness for both sides. No cash exchange, no uncertainty.
+            Professionals are paid automatically after each completed service, ensuring transparency
+            and fairness for both sides. No cash exchange, no uncertainty.
           </p>
         </div>
         <div>
@@ -108,13 +101,11 @@ export default function Safety() {
         <div className="inline-flex items-center justify-center bg-rose-100 text-rose-600 w-16 h-16 rounded-2xl mb-4">
           <HeartHandshake size={28} />
         </div>
-        <h2 className="text-2xl font-semibold mb-3 text-gray-800">
-          Mutual Respect, Always
-        </h2>
+        <h2 className="text-2xl font-semibold mb-3 text-gray-800">Mutual Respect, Always</h2>
         <p className="text-gray-600 max-w-3xl mx-auto mb-4">
-          Glossed was built on empathy and respect. Clients and professionals alike are
-          expected to maintain a kind, respectful attitude — because true beauty
-          thrives in trust and cooperation.
+          Glossed was built on empathy and respect. Clients and professionals alike are expected to
+          maintain a kind, respectful attitude — because true beauty thrives in trust and
+          cooperation.
         </p>
         <p className="text-gray-600 max-w-3xl mx-auto mb-6">
           Our support team is always available to help resolve any concern or misunderstanding
@@ -131,8 +122,8 @@ export default function Safety() {
       {/* Outro */}
       <div className="text-center max-w-2xl mx-auto">
         <p className="text-gray-500 text-sm">
-          Your safety is not an option — it’s a promise.  
-          Together, we make beauty professional, accessible, and trustworthy.
+          Your safety is not an option — it’s a promise. Together, we make beauty professional,
+          accessible, and trustworthy.
         </p>
       </div>
     </motion.div>

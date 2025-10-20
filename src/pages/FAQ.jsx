@@ -86,8 +86,8 @@ export default function FAQ() {
         </div>
         <h1 className="text-4xl font-bold mb-4">Frequently Asked Questions</h1>
         <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          Find answers to the most common questions about using Glossed — from
-          booking and payments to becoming a verified professional.
+          Find answers to the most common questions about using Glossed — from booking and payments
+          to becoming a verified professional.
         </p>
       </div>
 
@@ -106,9 +106,7 @@ export default function FAQ() {
                 <p className="text-sm uppercase tracking-wide text-rose-500 font-semibold">
                   {item.category}
                 </p>
-                <h3 className="text-lg font-medium text-gray-800">
-                  {item.q}
-                </h3>
+                <h3 className="text-lg font-medium text-gray-800">{item.q}</h3>
               </div>
               <ChevronDown
                 size={20}
@@ -137,9 +135,7 @@ export default function FAQ() {
 
       {/* CTA */}
       <div className="text-center mt-16">
-        <p className="text-gray-600 mb-3">
-          Didn’t find what you were looking for?
-        </p>
+        <p className="text-gray-600 mb-3">Didn’t find what you were looking for?</p>
         <a
           href="/contact"
           className="inline-block bg-gradient-to-r from-rose-600 to-red-600 text-white font-semibold px-6 py-2.5 rounded-full hover:scale-105 transition"

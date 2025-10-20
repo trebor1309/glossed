@@ -16,9 +16,8 @@ export default function AboutUs() {
         </div>
         <h1 className="text-4xl font-bold mb-4">The Story Behind Glossed</h1>
         <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          Created in 2025, <strong>Glossed</strong> was born from a simple idea:
-          making professional beauty services as accessible and effortless as
-          ordering your favorite coffee.
+          Created in 2025, <strong>Glossed</strong> was born from a simple idea: making professional
+          beauty services as accessible and effortless as ordering your favorite coffee.
         </p>
       </div>
 
@@ -38,16 +37,14 @@ export default function AboutUs() {
             <Sparkles className="text-rose-500" size={22} /> Our Mission
           </h2>
           <p className="text-gray-600 leading-relaxed">
-            We believe that beauty shouldn’t depend on time, traffic or
-            geography. <strong>Glossed</strong> connects clients with verified
-            professionals who bring their skills directly to your home — for a
-            makeup session before a wedding, a quick hairstyle before an event,
-            or a moment of self-care after a long week.
+            We believe that beauty shouldn’t depend on time, traffic or geography.{" "}
+            <strong>Glossed</strong> connects clients with verified professionals who bring their
+            skills directly to your home — for a makeup session before a wedding, a quick hairstyle
+            before an event, or a moment of self-care after a long week.
           </p>
           <p className="text-gray-600 leading-relaxed">
-            Our goal is to make every appointment seamless, elegant and
-            personalized. We want beauty to fit <em>your life</em>, not the
-            other way around.
+            Our goal is to make every appointment seamless, elegant and personalized. We want beauty
+            to fit <em>your life</em>, not the other way around.
           </p>
         </div>
 
@@ -74,53 +71,44 @@ export default function AboutUs() {
             <Scissors className="text-rose-500" size={22} /> How It All Started
           </h2>
           <p className="text-gray-600 leading-relaxed">
-            The project began when our founders — a designer, a developer and a
-            makeup artist — noticed how hard it could be to find skilled beauty
-            professionals who were both available and flexible.
+            The project began when our founders — a designer, a developer and a makeup artist —
+            noticed how hard it could be to find skilled beauty professionals who were both
+            available and flexible.
           </p>
           <p className="text-gray-600 leading-relaxed">
-            Between busy schedules, last-minute events and a growing demand for
-            convenience, it became clear: <em>beauty needed to come to you.</em>{" "}
-            What started as a small idea quickly turned into a mission to bring
-            together the best independent professionals under one elegant,
-            digital roof.
+            Between busy schedules, last-minute events and a growing demand for convenience, it
+            became clear: <em>beauty needed to come to you.</em> What started as a small idea
+            quickly turned into a mission to bring together the best independent professionals under
+            one elegant, digital roof.
           </p>
         </div>
       </section>
 
       {/* Section: Values */}
       <section className="text-center mb-24">
-        <h2 className="text-3xl font-semibold mb-6 text-gray-800">
-          What We Stand For
-        </h2>
+        <h2 className="text-3xl font-semibold mb-6 text-gray-800">What We Stand For</h2>
         <div className="grid md:grid-cols-3 gap-10 text-left">
           <div className="p-6 bg-white rounded-2xl shadow border border-rose-50 hover:shadow-lg transition">
-            <h3 className="text-xl font-semibold text-rose-600 mb-3">
-              Accessibility
-            </h3>
+            <h3 className="text-xl font-semibold text-rose-600 mb-3">Accessibility</h3>
             <p className="text-gray-600 leading-relaxed">
-              Everyone deserves to feel confident and cared for, no matter where
-              they live or how busy they are.
+              Everyone deserves to feel confident and cared for, no matter where they live or how
+              busy they are.
             </p>
           </div>
 
           <div className="p-6 bg-white rounded-2xl shadow border border-rose-50 hover:shadow-lg transition">
-            <h3 className="text-xl font-semibold text-rose-600 mb-3">
-              Empowerment
-            </h3>
+            <h3 className="text-xl font-semibold text-rose-600 mb-3">Empowerment</h3>
             <p className="text-gray-600 leading-relaxed">
-              We help independent professionals grow their business, manage
-              their clients and showcase their talent.
+              We help independent professionals grow their business, manage their clients and
+              showcase their talent.
             </p>
           </div>
 
           <div className="p-6 bg-white rounded-2xl shadow border border-rose-50 hover:shadow-lg transition">
-            <h3 className="text-xl font-semibold text-rose-600 mb-3">
-              Trust & Quality
-            </h3>
+            <h3 className="text-xl font-semibold text-rose-600 mb-3">Trust & Quality</h3>
             <p className="text-gray-600 leading-relaxed">
-              Every pro is handpicked and verified to ensure clients enjoy a
-              high-end, safe and comfortable experience.
+              Every pro is handpicked and verified to ensure clients enjoy a high-end, safe and
+              comfortable experience.
             </p>
           </div>
         </div>
@@ -132,8 +120,8 @@ export default function AboutUs() {
           Beauty, whenever and wherever you are.
         </h3>
         <p className="text-gray-600 mb-6">
-          Join the Glossed experience — where professionals meet simplicity,
-          elegance and confidence.
+          Join the Glossed experience — where professionals meet simplicity, elegance and
+          confidence.
         </p>
         <a
           href="/dashboard/new"

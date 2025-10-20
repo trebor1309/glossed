@@ -41,9 +41,7 @@ export default function OffersModal({ booking, onClose, onAccept }) {
           <X size={20} />
         </button>
 
-        <h2 className="text-xl font-semibold text-gray-800 mb-2">
-          Offers for {booking.service}
-        </h2>
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">Offers for {booking.service}</h2>
         <p className="text-sm text-gray-500 mb-5">
           {booking.date} — {booking.time_slot}
         </p>
@@ -61,9 +59,7 @@ export default function OffersModal({ booking, onClose, onAccept }) {
                 </div>
                 <p className="text-sm text-gray-600 mb-2">{offer.message}</p>
                 <div className="flex justify-between items-center">
-                  <p className="font-semibold text-rose-600">
-                    {offer.price} €
-                  </p>
+                  <p className="font-semibold text-rose-600">{offer.price} €</p>
                   <button
                     onClick={() => handleAccept(offer)}
                     className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-semibold rounded-full bg-gradient-to-r from-rose-600 to-red-600 text-white hover:scale-105 transition"
@@ -75,9 +71,7 @@ export default function OffersModal({ booking, onClose, onAccept }) {
             ))}
           </ul>
         ) : (
-          <p className="text-gray-500 text-sm italic">
-            No offers have been received yet.
-          </p>
+          <p className="text-gray-500 text-sm italic">No offers have been received yet.</p>
         )}
       </motion.div>
     </motion.div>

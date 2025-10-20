@@ -35,10 +35,10 @@ serve(async (req) => {
       type: "account_onboarding",
     });
 
-    return new Response(
-      JSON.stringify({ url: accountLink.url, account_id: account.id }),
-      { headers, status: 200 }
-    );
+    return new Response(JSON.stringify({ url: accountLink.url, account_id: account.id }), {
+      headers,
+      status: 200,
+    });
   } catch (error) {
     console.error("Stripe Error:", error);
     return new Response(JSON.stringify({ error: error.message }), {

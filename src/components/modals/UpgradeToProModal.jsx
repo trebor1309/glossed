@@ -72,9 +72,7 @@ export default function UpgradeToProModal({ onClose }) {
             ✕
           </button>
 
-          <h2 className="text-2xl font-bold text-center mb-6">
-            Upgrade to Pro
-          </h2>
+          <h2 className="text-2xl font-bold text-center mb-6">Upgrade to Pro</h2>
 
           {!success ? (
             <>
@@ -84,9 +82,7 @@ export default function UpgradeToProModal({ onClose }) {
 
               <form onSubmit={handleUpgrade} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Business name
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Business name</label>
                   <input
                     type="text"
                     name="businessName"
@@ -97,9 +93,7 @@ export default function UpgradeToProModal({ onClose }) {
                   />
                 </div>
 
-                {error && (
-                  <p className="text-sm text-red-600 text-center">{error}</p>
-                )}
+                {error && <p className="text-sm text-red-600 text-center">{error}</p>}
 
                 <button
                   type="submit"

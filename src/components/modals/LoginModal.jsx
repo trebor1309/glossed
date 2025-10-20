@@ -52,9 +52,7 @@ export default function LoginModal({ onClose, onSignup }) {
           {/* Formulaire */}
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
                 type="email"
                 name="email"
@@ -65,9 +63,7 @@ export default function LoginModal({ onClose, onSignup }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Password</label>
               <input
                 type="password"
                 name="password"
@@ -87,10 +83,7 @@ export default function LoginModal({ onClose, onSignup }) {
 
           <p className="text-center text-sm text-gray-500 mt-6">
             Don’t have an account?{" "}
-            <button
-              onClick={onSignup}
-              className="text-rose-600 font-medium hover:underline"
-            >
+            <button onClick={onSignup} className="text-rose-600 font-medium hover:underline">
               Sign up
             </button>
           </p>

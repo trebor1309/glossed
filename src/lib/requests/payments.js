@@ -28,9 +28,6 @@ export async function addPayment(payment) {
  * ⚙️ Met à jour le statut d’un paiement
  */
 export async function updatePaymentStatus(paymentId, status) {
-  const { error } = await supabase
-    .from("payments")
-    .update({ status })
-    .eq("id", paymentId);
+  const { error } = await supabase.from("payments").update({ status }).eq("id", paymentId);
   if (error) throw error;
 }

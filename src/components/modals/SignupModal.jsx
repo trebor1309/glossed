@@ -8,19 +8,18 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
   const navigate = useNavigate();
 
   const handleSignup = async (e) => {
-  e.preventDefault();
-  const email = e.target.email.value.trim();
-  const password = e.target.password.value.trim();
+    e.preventDefault();
+    const email = e.target.email.value.trim();
+    const password = e.target.password.value.trim();
 
-  try {
-    await signup(email, password, "client"); // fonction Supabase du UserContext
-    onClose();
-    navigate("/dashboard");
-  } catch (error) {
-    alert(" Signup failed: " + error.message);
-  }
-};
-
+    try {
+      await signup(email, password, "client"); // fonction Supabase du UserContext
+      onClose();
+      navigate("/dashboard");
+    } catch (error) {
+      alert(" Signup failed: " + error.message);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -47,16 +46,12 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
             ✕
           </button>
 
-          <h2 className="text-3xl font-bold text-center mb-6">
-            Create your account
-          </h2>
+          <h2 className="text-3xl font-bold text-center mb-6">Create your account</h2>
 
           {/* Formulaire */}
           <form className="space-y-4" onSubmit={handleSignup}>
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Full name
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Full name</label>
               <input
                 type="text"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
@@ -65,9 +60,7 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
                 type="email"
                 name="email"
@@ -77,9 +70,7 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Password</label>
               <input
                 type="password"
                 name="password"
@@ -99,20 +90,14 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
           {/* Liens complémentaires */}
           <p className="text-center text-sm text-gray-500 mt-6">
             Are you a beauty professional?{" "}
-            <button
-              onClick={onProSignup}
-              className="text-rose-600 font-medium hover:underline"
-            >
+            <button onClick={onProSignup} className="text-rose-600 font-medium hover:underline">
               Join as a Pro
             </button>
           </p>
 
           <p className="text-center text-sm text-gray-500 mt-3">
             Already have an account?{" "}
-            <button
-              onClick={onLogin}
-              className="text-rose-600 font-medium hover:underline"
-            >
+            <button onClick={onLogin} className="text-rose-600 font-medium hover:underline">
               Sign in
             </button>
           </p>

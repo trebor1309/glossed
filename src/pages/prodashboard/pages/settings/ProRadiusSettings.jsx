@@ -1,13 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
-import {
-  GoogleMap,
-  Marker,
-  Circle,
-  useLoadScript,
-  Autocomplete,
-} from "@react-google-maps/api";
+import { GoogleMap, Marker, Circle, useLoadScript, Autocomplete } from "@react-google-maps/api";
 import { MapPin } from "lucide-react";
 import Toast from "@/components/ui/Toast";
 
@@ -66,8 +60,7 @@ export default function ProRadiusSettings() {
 
     setTimeout(() => setSaving(false), 1200); // effet visuel d’environ 1 s
 
-    if (error)
-      setToast({ message: "❌ Error saving working area.", type: "error" });
+    if (error) setToast({ message: "❌ Error saving working area.", type: "error" });
     else
       setToast({
         message: "✅ Working area saved automatically!",
@@ -131,10 +124,7 @@ export default function ProRadiusSettings() {
     }
   };
 
-  if (loadError)
-    return (
-      <p className="text-red-500">❌ Google Maps error: {loadError.message}</p>
-    );
+  if (loadError) return <p className="text-red-500">❌ Google Maps error: {loadError.message}</p>;
   if (!isLoaded) return <p className="text-gray-500">⏳ Loading map...</p>;
 
   return (
@@ -143,9 +133,7 @@ export default function ProRadiusSettings() {
       {saving && (
         <div className="fixed inset-0 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center z-[9999] transition-opacity animate-fadeIn">
           <div className="w-12 h-12 border-4 border-rose-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-rose-600 font-semibold text-lg tracking-wide">
-            Saving…
-          </p>
+          <p className="text-rose-600 font-semibold text-lg tracking-wide">Saving…</p>
         </div>
       )}
 
@@ -168,9 +156,7 @@ export default function ProRadiusSettings() {
 
       {/* Radius slider */}
       <div className="flex items-center gap-4 relative">
-        <label className="text-sm text-gray-600 font-medium min-w-[120px]">
-          Working radius:
-        </label>
+        <label className="text-sm text-gray-600 font-medium min-w-[120px]">Working radius:</label>
         <input
           type="range"
           min={1}
@@ -179,9 +165,7 @@ export default function ProRadiusSettings() {
           onChange={handleRadiusChange}
           className="w-full accent-rose-600 cursor-pointer"
         />
-        <span className="text-sm font-semibold text-gray-700 w-12 text-right">
-          {radius} km
-        </span>
+        <span className="text-sm font-semibold text-gray-700 w-12 text-right">{radius} km</span>
       </div>
 
       {/* Map */}

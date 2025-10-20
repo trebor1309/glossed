@@ -36,8 +36,6 @@ export function updateBookingStatus(id, newStatus) {
   if (idx !== -1) {
     all[idx].status = newStatus;
     localStorage.setItem(LS_KEYS.BOOKINGS, JSON.stringify(all));
-    window.dispatchEvent(
-      new CustomEvent("glossed:booking-updated", { detail: all[idx] })
-    );
+    window.dispatchEvent(new CustomEvent("glossed:booking-updated", { detail: all[idx] }));
   }
 }

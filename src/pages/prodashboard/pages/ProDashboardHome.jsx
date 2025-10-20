@@ -6,14 +6,11 @@ import { Clock, CheckCircle, DollarSign, Star } from "lucide-react";
 
 export default function ProDashboardHome() {
   const navigate = useNavigate();
-  const { session } = useUser();
-  const proId = session?.user?.id;
-  const firstName =
-    session?.user?.user_metadata?.first_name ||
-    session?.user?.user_metadata?.business_name ||
-    session?.user?.user_metadata?.name?.split(" ")[0] ||
-    "there";
-  const [profilePhoto, setProfilePhoto] = useState(null);
+  const { user } = useUser(); // ✅ On récupère directement les données du contexte
+  const proId = user?.id;
+  const firstName = user?.first_name || user?.business_name || "there";
+  const [profilePhoto, setProfilePhoto] = useState(user?.profile_photo || null);
+
   const [stats, setStats] = useState({
     pending: 0,
     confirmed: 0,
@@ -87,24 +84,6 @@ export default function ProDashboardHome() {
   useEffect(() => {
     if (!proId) return;
 
-    const bookingsChannel = supabase
-      .channel("bookings-updates")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bookings", filter: `pro_id=eq.${proId}` },
-        () => refreshStats()
-      )
-      .subscribe();
-
-    const paymentsChannel = supabase
-      .channel("payments-updates")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "payments", filter: `pro_id=eq.${proId}` },
-        () => refreshStats()
-      )
-      .subscribe();
-
     const refreshStats = async () => {
       const [pending, confirmed, completed, payments] = await Promise.all([
         supabase
@@ -133,7 +112,24 @@ export default function ProDashboardHome() {
       });
     };
 
-    // Nettoyage à la fermeture
+    const bookingsChannel = supabase
+      .channel("bookings-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bookings", filter: `pro_id=eq.${proId}` },
+        () => refreshStats()
+      )
+      .subscribe();
+
+    const paymentsChannel = supabase
+      .channel("payments-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments", filter: `pro_id=eq.${proId}` },
+        () => refreshStats()
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(bookingsChannel);
       supabase.removeChannel(paymentsChannel);

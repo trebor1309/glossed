@@ -26,9 +26,7 @@ export default function ProDashboardMore() {
     <section className="space-y-6">
       {/* 🌸 Quick access */}
       <div className="bg-white p-6 rounded-2xl shadow border border-gray-100">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          Quick Access
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">Quick Access</h2>
         <div className="grid grid-cols-2 gap-4">
           <button
             onClick={() => navigate("/prodashboard/payments")}

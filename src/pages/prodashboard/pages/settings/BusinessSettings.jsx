@@ -34,8 +34,8 @@ export default function BusinessSettings() {
           business_type: Array.isArray(data.business_type)
             ? data.business_type
             : data.business_type
-            ? [data.business_type]
-            : [],
+              ? [data.business_type]
+              : [],
           description: data.description || "",
         });
       }
@@ -55,11 +55,7 @@ export default function BusinessSettings() {
       updated_at: new Date().toISOString(),
     };
 
-    const { error, data } = await supabase
-      .from("users")
-      .update(updates)
-      .eq("id", user.id)
-      .select();
+    const { error, data } = await supabase.from("users").update(updates).eq("id", user.id).select();
     console.log("🔍 UPDATE RESULT:", { error, data });
     setSaving(false);
 
@@ -94,9 +90,7 @@ export default function BusinessSettings() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-800">
-          Business Information
-        </h3>
+        <h3 className="text-lg font-semibold text-gray-800">Business Information</h3>
         <button
           onClick={() => (editing ? handleSave() : setEditing(true))}
           disabled={saving}
@@ -133,15 +127,11 @@ export default function BusinessSettings() {
             label="Business Name"
             name="business_name"
             value={form.business_name}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, business_name: e.target.value }))
-            }
+            onChange={(e) => setForm((prev) => ({ ...prev, business_name: e.target.value }))}
           />
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Business Type
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Business Type</label>
             <div className="flex flex-wrap gap-3">
               {types.map((t) => (
                 <label
@@ -169,9 +159,7 @@ export default function BusinessSettings() {
             label="Description"
             name="description"
             value={form.description}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, description: e.target.value }))
-            }
+            onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
             rows={3}
             placeholder="Describe your services..."
           />

@@ -16,10 +16,7 @@ function Root() {
 
   return (
     <UserProvider openUpgradeModal={openUpgradeModal}>
-      <App
-        showUpgradeModal={showUpgradeModal}
-        closeUpgradeModal={closeUpgradeModal}
-      />
+      <App showUpgradeModal={showUpgradeModal} closeUpgradeModal={closeUpgradeModal} />
     </UserProvider>
   );
 }

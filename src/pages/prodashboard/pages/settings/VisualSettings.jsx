@@ -27,9 +27,7 @@ export default function VisualSettings() {
 
       const { data, error } = await supabase
         .from("users")
-        .select(
-          "profile_photo, portfolio, verification_status, id_document, certificate_document"
-        )
+        .select("profile_photo, portfolio, verification_status, id_document, certificate_document")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -80,10 +78,7 @@ export default function VisualSettings() {
 
       const path = `profiles/${user.id}_profile.${ext}`;
       const publicUrl = await uploadFile(path, file);
-      await supabase
-        .from("users")
-        .update({ profile_photo: publicUrl })
-        .eq("id", user.id);
+      await supabase.from("users").update({ profile_photo: publicUrl }).eq("id", user.id);
       setProfileUrl(publicUrl);
       setToast({ message: "✅ Profile photo updated!", type: "success" });
       URL.revokeObjectURL(file);
@@ -135,10 +130,7 @@ export default function VisualSettings() {
       setPortfolio(newPortfolio);
 
       // 🔹 Màj Supabase
-      await supabase
-        .from("users")
-        .update({ portfolio: newPortfolio })
-        .eq("id", user.id);
+      await supabase.from("users").update({ portfolio: newPortfolio }).eq("id", user.id);
 
       // 🔹 Nettoyage des URLs temporaires
       files.forEach((f) => URL.revokeObjectURL(f));
@@ -155,10 +147,7 @@ export default function VisualSettings() {
       const path = url.split("/").slice(-2).join("/");
       await supabase.storage.from("glossed-media").remove([path]);
       const newPortfolio = portfolio.filter((u) => u !== url);
-      await supabase
-        .from("users")
-        .update({ portfolio: newPortfolio })
-        .eq("id", user.id);
+      await supabase.from("users").update({ portfolio: newPortfolio }).eq("id", user.id);
       setPortfolio(newPortfolio);
       setToast({ message: "🗑️ Image deleted.", type: "success" });
     } catch {
@@ -211,9 +200,7 @@ export default function VisualSettings() {
   // --- UI ---
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold text-gray-800">
-        Visual & Verification
-      </h3>
+      <h3 className="text-lg font-semibold text-gray-800">Visual & Verification</h3>
 
       <ProfileSection profileUrl={profileUrl} onUpload={handleProfileUpload} />
 
@@ -239,32 +226,26 @@ export default function VisualSettings() {
             confirmModal.type === "profileUpload"
               ? "Confirm Profile Picture"
               : confirmModal.type === "portfolioUpload"
-              ? "Upload Portfolio Images"
-              : "Confirm Document Upload"
+                ? "Upload Portfolio Images"
+                : "Confirm Document Upload"
           }
           message={
             confirmModal.type === "profileUpload"
               ? `Do you want to use ${confirmModal.data?.file?.name} as your new profile picture?`
               : confirmModal.type === "portfolioUpload"
-              ? `Do you want to upload ${confirmModal.data?.files?.length} new images to your portfolio?`
-              : "Uploading this document will replace the previous one and will be reviewed within 72 hours."
+                ? `Do you want to upload ${confirmModal.data?.files?.length} new images to your portfolio?`
+                : "Uploading this document will replace the previous one and will be reviewed within 72 hours."
           }
-          imagePreview={
-            confirmModal.data?.previewUrl || confirmModal.data?.previews?.[0]
-          }
+          imagePreview={confirmModal.data?.previewUrl || confirmModal.data?.previews?.[0]}
           confirmLabel="Upload"
           onConfirm={async () => {
             const { type, data } = confirmModal;
             if (type === "profileUpload") await performProfileUpload(data.file);
-            if (type === "portfolioUpload")
-              await performPortfolioUpload(data.files);
-            if (type === "docUpload")
-              await performDocUpload(data.file, data.docType);
+            if (type === "portfolioUpload") await performPortfolioUpload(data.files);
+            if (type === "docUpload") await performDocUpload(data.file, data.docType);
             setConfirmModal({ open: false, type: null, data: null });
           }}
-          onCancel={() =>
-            setConfirmModal({ open: false, type: null, data: null })
-          }
+          onCancel={() => setConfirmModal({ open: false, type: null, data: null })}
         />
       )}
     </div>
@@ -278,18 +259,9 @@ function ProfileSection({ profileUrl, onUpload }) {
     <div className="space-y-2">
       <h4 className="font-medium text-gray-700">Profile Picture</h4>
       {profileUrl && (
-        <img
-          src={profileUrl}
-          alt="Profile"
-          className="w-24 h-24 rounded-full border shadow"
-        />
+        <img src={profileUrl} alt="Profile" className="w-24 h-24 rounded-full border shadow" />
       )}
-      <input
-        type="file"
-        accept="image/*"
-        onChange={onUpload}
-        className="text-sm text-gray-600"
-      />
+      <input type="file" accept="image/*" onChange={onUpload} className="text-sm text-gray-600" />
     </div>
   );
 }
@@ -332,8 +304,7 @@ function VerificationSection({ verification, idDoc, certDoc, onUpload }) {
   return (
     <div className="space-y-4">
       <label className="block text-sm font-medium text-gray-700 mb-1">
-        Verification Status:{" "}
-        <span className="font-semibold">{verification}</span>
+        Verification Status: <span className="font-semibold">{verification}</span>
       </label>
 
       <div className="flex flex-wrap gap-4">

@@ -16,8 +16,8 @@ export default function Contact() {
         </div>
         <h1 className="text-4xl font-bold mb-4">Contact Us</h1>
         <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          Whether you’re a client, a professional, or a partner, we’d love to
-          hear from you. Our team will get back to you as soon as possible.
+          Whether you’re a client, a professional, or a partner, we’d love to hear from you. Our
+          team will get back to you as soon as possible.
         </p>
       </div>
 
@@ -68,9 +68,7 @@ export default function Contact() {
 
       {/* Contact Form */}
       <section className="max-w-3xl mx-auto bg-white p-10 rounded-3xl shadow border border-gray-100">
-        <h2 className="text-2xl font-semibold mb-8 text-center text-gray-800">
-          Send us a Message
-        </h2>
+        <h2 className="text-2xl font-semibold mb-8 text-center text-gray-800">Send us a Message</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -80,9 +78,7 @@ export default function Contact() {
         >
           <div className="grid md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Your Name
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
               <input
                 type="text"
                 required
@@ -91,9 +87,7 @@ export default function Contact() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input
                 type="email"
                 required
@@ -104,9 +98,7 @@ export default function Contact() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Subject
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
             <input
               type="text"
               placeholder="Booking issue, account help..."
@@ -115,9 +107,7 @@ export default function Contact() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Message
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
             <textarea
               rows="5"
               required
