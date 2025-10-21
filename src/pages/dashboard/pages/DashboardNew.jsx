@@ -384,15 +384,19 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
 
       const matchingPros = pros.filter((p) => {
         if (!p.latitude || !p.longitude) return false;
+
         const dist = distanceKm(
           bookingData.latitude,
           bookingData.longitude,
           p.latitude,
           p.longitude
         );
-        const offersService = Array.isArray(p.business_type)
-          ? p.business_type.some((s) => bookingData.services.includes(s))
-          : p.business_type?.includes(bookingData.services[0]);
+
+        // ✅ Comparaison insensible à la casse
+        const clientServices = bookingData.services.map((s) => s.toLowerCase());
+        const proType = p.business_type?.toLowerCase() || "";
+
+        const offersService = clientServices.some((s) => proType.includes(s));
 
         return dist <= (p.radius_km || 20) && offersService;
       });
