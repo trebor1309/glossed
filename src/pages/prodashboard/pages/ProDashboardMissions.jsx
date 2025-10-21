@@ -41,6 +41,7 @@ export default function ProDashboardMissions() {
   --------------------------------------------------------- */
   useEffect(() => {
     if (!session?.user?.id) return;
+    console.log("🛰️ Connecting Realtime channel for pro:", session?.user?.id);
 
     const channel = supabase
       .channel("booking-notifications")
@@ -70,6 +71,10 @@ export default function ProDashboardMissions() {
         }
       )
       .subscribe();
+    console.log("✅ Subscribed to Realtime successfully!");
+    channel.on("status", (status) => {
+      console.log("📡 Channel status:", status);
+    });
 
     return () => {
       supabase.removeChannel(channel);
