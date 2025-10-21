@@ -392,14 +392,24 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           p.longitude
         );
 
-        // ✅ Comparaison insensible à la casse
-        const clientServices = bookingData.services.map((s) => s.toLowerCase());
-        const proType = p.business_type?.toLowerCase() || "";
+        // 🔸 Normalise les chaînes pour comparer sans casse ni espaces parasites
+        const clientServices = bookingData.services.map((s) => s.trim().toLowerCase());
+        const proTypes = Array.isArray(p.business_type)
+          ? p.business_type.map((s) => s.trim().toLowerCase())
+          : p.business_type
+            ? p.business_type.split(",").map((s) => s.trim().toLowerCase())
+            : [];
 
-        const offersService = clientServices.some((s) => proType.includes(s));
+        const offersService = proTypes.some((t) => clientServices.some((s) => t.includes(s)));
 
-        return dist <= (p.radius_km || 20) && offersService;
+        // 🔸 élargis légèrement le rayon pour test (20 km par défaut)
+        const isInRange = !p.latitude || !p.longitude || dist <= (p.radius_km || 20);
+
+        return isInRange && offersService;
       });
+
+      console.log("📋 Pros trouvés:", pros);
+      console.log("✅ Pros correspondants:", matchingPros);
 
       if (matchingPros.length > 0) {
         const notifRows = matchingPros.map((p) => ({
