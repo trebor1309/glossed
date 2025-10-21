@@ -368,7 +368,7 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
       // Recherche pros compatibles
       const { data: pros } = await supabase
         .from("users")
-        .select("id, latitude, longitude, services, radius_km");
+        .select("id, latitude, longitude, business_type, radius_km");
 
       const distanceKm = (lat1, lon1, lat2, lon2) => {
         const R = 6371;
@@ -390,9 +390,10 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           p.latitude,
           p.longitude
         );
-        const offersService = Array.isArray(p.services)
-          ? p.services.some((s) => bookingData.services.includes(s))
-          : p.services?.includes(bookingData.services[0]);
+        const offersService = Array.isArray(p.business_type)
+          ? p.business_type.some((s) => bookingData.services.includes(s))
+          : p.business_type?.includes(bookingData.services[0]);
+
         return dist <= (p.radius_km || 20) && offersService;
       });
 
