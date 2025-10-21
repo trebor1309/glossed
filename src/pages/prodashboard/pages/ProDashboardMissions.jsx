@@ -40,8 +40,9 @@ export default function ProDashboardMissions() {
      2️⃣ Écoute temps réel des nouvelles notifications
   --------------------------------------------------------- */
   useEffect(() => {
-    if (!session?.user?.id) return;
-    console.log("🛰️ Connecting Realtime channel for pro:", session?.user?.id);
+    if (!session?.user?.id) return; // ⬅️ évite de créer le canal si pas encore de user
+
+    console.log("🛰️ Connecting Realtime channel for pro:", session.user.id);
 
     const channel = supabase
       .channel("booking-notifications")
@@ -54,9 +55,9 @@ export default function ProDashboardMissions() {
           filter: `pro_id=eq.${session.user.id}`,
         },
         async (payload) => {
+          console.log("📨 Realtime event received:", payload);
           const { booking_id } = payload.new;
 
-          // récupérer la réservation associée
           const { data: booking } = await supabase
             .from("bookings")
             .select("*")
@@ -70,16 +71,14 @@ export default function ProDashboardMissions() {
           }
         }
       )
-      .subscribe();
-    console.log("✅ Subscribed to Realtime successfully!");
-    channel.on("status", (status) => {
-      console.log("📡 Channel status:", status);
-    });
+      .subscribe((status) => {
+        console.log("📡 Channel status:", status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [session?.user?.id, setProBadge]);
+  }, [session?.user?.id]);
 
   /* ---------------------------------------------------------
      3️⃣ Refuser une demande (supprime la notif de ce pro)
