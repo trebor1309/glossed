@@ -5,7 +5,33 @@ import { CheckCircle, Clock, XCircle, Star, Eye } from "lucide-react";
 import CalendarView from "@/components/CalendarView";
 import Toast from "@/components/ui/Toast";
 import ProProposalModal from "@/components/modals/ProProposalModal";
+import ProMissionDetailsModal from "@/components/modals/ProMissionDetailsModal";
+import ProEvaluationModal from "@/components/modals/ProEvaluationModal";
 
+/* ---------------------------------------------------------
+   🧠 Helper – Parser un champ PostgreSQL text[]
+--------------------------------------------------------- */
+const parseBusinessType = (businessType) => {
+  if (!businessType) return [];
+  try {
+    if (typeof businessType === "string" && businessType.startsWith("{")) {
+      return businessType
+        .replace(/^{|}$/g, "")
+        .split(",")
+        .map((s) => s.replace(/"/g, "").trim());
+    }
+    if (Array.isArray(businessType)) return businessType.map((s) => s.trim());
+    if (typeof businessType === "string") return businessType.split(",").map((s) => s.trim());
+    return [];
+  } catch (e) {
+    console.warn("⚠️ parseBusinessType failed:", e);
+    return [];
+  }
+};
+
+/* ---------------------------------------------------------
+   🌸 Composant principal
+--------------------------------------------------------- */
 export default function ProDashboardMissions() {
   const { session, setProBadge } = useUser();
   const [missions, setMissions] = useState([]);
@@ -13,16 +39,17 @@ export default function ProDashboardMissions() {
   const [selectedDayMissions, setSelectedDayMissions] = useState(null);
   const [toast, setToast] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [selectedMission, setSelectedMission] = useState(null);
+  const [selectedEvaluation, setSelectedEvaluation] = useState(null);
 
   /* ---------------------------------------------------------
-     1️⃣ Charger les missions / demandes liées à ce pro
+     1️⃣ Charger les missions liées à ce pro
   --------------------------------------------------------- */
   useEffect(() => {
     if (!session?.user) return;
 
     const fetchMissions = async () => {
       setLoading(true);
-      // On charge toutes les réservations liées à ce pro
       const { data, error } = await supabase
         .from("bookings")
         .select("*")
@@ -56,7 +83,6 @@ export default function ProDashboardMissions() {
         async (payload) => {
           const { booking_id } = payload.new;
 
-          // récupérer la réservation associée
           const { data: booking } = await supabase
             .from("bookings")
             .select("*")
@@ -64,6 +90,8 @@ export default function ProDashboardMissions() {
             .single();
 
           if (booking) {
+            console.log("📩 New booking received via Realtime:", booking);
+
             setMissions((prev) => [booking, ...prev]);
             setProBadge((n) => (n || 0) + 1);
             setToast({ message: "📩 New booking request in your area!", type: "success" });
@@ -71,10 +99,9 @@ export default function ProDashboardMissions() {
         }
       )
       .subscribe();
+
     console.log("✅ Subscribed to Realtime successfully!");
-    channel.on("status", (status) => {
-      console.log("📡 Channel status:", status);
-    });
+    channel.on("status", (status) => console.log("📡 Channel status:", status));
 
     return () => {
       supabase.removeChannel(channel);
@@ -86,16 +113,13 @@ export default function ProDashboardMissions() {
   --------------------------------------------------------- */
   const handleRefuse = async (booking) => {
     try {
-      // Supprimer la notification pour ce pro uniquement
       await supabase
         .from("booking_notifications")
         .delete()
         .eq("booking_id", booking.id)
         .eq("pro_id", session.user.id);
 
-      // Retirer du state local
       setMissions((prev) => prev.filter((m) => m.id !== booking.id));
-
       setToast({ message: "❌ Request removed from your list", type: "info" });
     } catch (err) {
       setToast({ message: `❌ ${err.message}`, type: "error" });
@@ -181,6 +205,7 @@ export default function ProDashboardMissions() {
         color="text-rose-600"
         data={grouped.proposed}
         empty="No proposals sent yet."
+        setSelectedMission={setSelectedMission}
       />
 
       <MissionSection
@@ -189,6 +214,7 @@ export default function ProDashboardMissions() {
         color="text-blue-600"
         data={grouped.confirmed}
         empty="No confirmed missions yet."
+        setSelectedMission={setSelectedMission}
       />
 
       <MissionSection
@@ -197,6 +223,7 @@ export default function ProDashboardMissions() {
         color="text-green-600"
         data={grouped.completed}
         empty="No completed missions yet."
+        setSelectedMission={setSelectedMission}
       />
 
       <MissionSection
@@ -205,7 +232,32 @@ export default function ProDashboardMissions() {
         color="text-gray-400"
         data={grouped.cancelled}
         empty="No cancelled missions."
+        setSelectedMission={setSelectedMission}
       />
+
+      {/* ✅ Modal Détails */}
+      {selectedMission && (
+        <ProMissionDetailsModal
+          booking={selectedMission}
+          onClose={() => setSelectedMission(null)}
+          onChat={(b) => console.log("💬 Open chat with client:", b.client_id)}
+          onEvaluate={(b) => setSelectedEvaluation(b)} // ✅ ouvre le modal d’évaluation
+        />
+      )}
+
+      {selectedEvaluation && (
+        <ProEvaluationModal
+          booking={selectedEvaluation}
+          onClose={() => setSelectedEvaluation(null)}
+          onSuccess={() => {
+            setSelectedEvaluation(null);
+            setToast({
+              message: "⭐ Review submitted successfully!",
+              type: "success",
+            });
+          }}
+        />
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </section>
@@ -215,7 +267,16 @@ export default function ProDashboardMissions() {
 /* ---------------------------------------------------------
    🔸 Sous-composant : MissionSection
 --------------------------------------------------------- */
-function MissionSection({ title, icon, data, color, empty, onOpenProposal, onRefuse }) {
+function MissionSection({
+  title,
+  icon,
+  data,
+  color,
+  empty,
+  onOpenProposal,
+  onRefuse,
+  setSelectedMission,
+}) {
   return (
     <section className="bg-white rounded-2xl shadow p-6 border border-gray-100">
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
@@ -260,6 +321,7 @@ function MissionSection({ title, icon, data, color, empty, onOpenProposal, onRef
                   </div>
                 ) : (
                   <button
+                    onClick={() => setSelectedMission && setSelectedMission(m)}
                     className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
                     title="View details"
                   >
