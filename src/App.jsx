@@ -134,7 +134,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
 
       <main className="flex-grow">
         <Routes>
-          {/* Pages publiques */}
+          {/* 🌍 Pages publiques */}
           <Route
             path="/"
             element={
@@ -160,7 +160,10 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
           <Route path="/contact" element={<Contact />} />
           <Route path="/safety" element={<Safety />} />
 
-          {/* Dashboard Client */}
+          {/* 💬 Chat accessible à tous les utilisateurs connectés */}
+          <Route path="/chat/:mission_id" element={isAuthenticated ? <ChatPage /> : <Home />} />
+
+          {/* 👤 Dashboard Client */}
           <Route path="/dashboard" element={isAuthenticated ? <DashboardLayout /> : <Home />}>
             <Route index element={<DashboardHome />} />
             <Route path="new" element={<DashboardNew />} />
@@ -170,7 +173,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
             <Route path="more" element={<DashboardMore />} />
           </Route>
 
-          {/* Dashboard Pro */}
+          {/* 💼 Dashboard Pro */}
           <Route
             path="/prodashboard"
             element={
@@ -187,7 +190,6 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
             <Route path="settings" element={<ProDashboardSettings />} />
             <Route path="more" element={<ProDashboardMore />} />
           </Route>
-          <Route path="/dashboard/chat/:mission_id" element={<ChatPage />} />
         </Routes>
       </main>
 

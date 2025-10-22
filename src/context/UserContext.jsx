@@ -134,6 +134,21 @@ export function UserProvider({ children, openUpgradeModal }) {
   const isAuthenticated = !!user;
   const isPro = user?.activeRole === "pro";
   const isClient = user?.activeRole === "client";
+  // -----------------------------------------------------------
+  // 🔐 Connexion utilisateur
+  // -----------------------------------------------------------
+  const login = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+
+    if (data.session?.user) {
+      await fetchUserProfile(data.session.user);
+      setSession(data.session);
+    }
+  };
 
   const value = {
     session,
@@ -141,6 +156,7 @@ export function UserProvider({ children, openUpgradeModal }) {
     isAuthenticated,
     isPro,
     isClient,
+    login,
     logout,
     switchRole,
     loading,
