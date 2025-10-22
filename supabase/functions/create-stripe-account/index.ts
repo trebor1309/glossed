@@ -1,49 +1,50 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.22.0";
+import Stripe from "stripe";
+import { createClient } from "https://esm.sh/@supabase/supabase-js";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY"), {
-  apiVersion: "2024-06-20",
+  apiVersion: "2023-10-16",
 });
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")! // ⚠️ important: clé SERVICE
+);
 
-serve(async (req) => {
-  // ✅ Gestion CORS
-  const headers = {
-    "Access-Control-Allow-Origin": "*", // ← autorise toutes les origines (ou restreins à ton domaine)
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  };
-
-  // ✅ Réponse immédiate aux requêtes OPTIONS (pré-vol CORS)
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers });
-  }
-
+Deno.serve(async (req) => {
   try {
     const { user_id, email } = await req.json();
+    if (!user_id || !email) return new Response("Missing parameters", { status: 400 });
 
+    // 🔹 1. Créer un compte Express Stripe
     const account = await stripe.accounts.create({
       type: "express",
-      country: "BE",
       email,
-      capabilities: { transfers: { requested: true } },
+      capabilities: {
+        transfers: { requested: true },
+      },
+      business_type: "individual",
     });
 
+    // 🔹 2. Générer le lien d’onboarding
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: "https://glossed.vercel.app/dashboard/settings/legal",
-      return_url: "https://glossed.vercel.app/dashboard/settings/legal",
+      refresh_url: "https://glossed.be/dashboard/stripe/refresh",
+      return_url: "https://glossed.be/dashboard/stripe/success",
       type: "account_onboarding",
     });
 
-    return new Response(JSON.stringify({ url: accountLink.url, account_id: account.id }), {
-      headers,
-      status: 200,
-    });
-  } catch (error) {
-    console.error("Stripe Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers,
-      status: 400,
-    });
+    // 🔹 3. Sauvegarder le Stripe ID dans Supabase
+    await supabase.from("users").update({ stripe_account_id: account.id }).eq("id", user_id);
+
+    // 🔹 4. Retourner l’URL d’onboarding
+    return new Response(
+      JSON.stringify({
+        url: accountLink.url,
+        account_id: account.id,
+      }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    console.error("Stripe error:", err);
+    return new Response(JSON.stringify({ error: err.message }), { status: 400 });
   }
 });

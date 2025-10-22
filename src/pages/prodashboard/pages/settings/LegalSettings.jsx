@@ -101,6 +101,41 @@ export default function LegalSettings() {
       });
     }
   };
+  // 🔍 Vérifier l’état du compte Stripe (connecté / non connecté)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const checkStripe = async () => {
+      try {
+        const res = await fetch(
+          "https://cdcnylgokphyltkctymi.functions.supabase.co/check-stripe-account",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({ user_id: user.id }),
+          }
+        );
+
+        const data = await res.json();
+        if (data.connected) {
+          // Mettre à jour localement le statut Stripe
+          setForm((f) => ({
+            ...f,
+            payouts_enabled: data.payouts_enabled,
+            stripe_account_ready: data.details_submitted,
+            stripe_account_id: user.stripe_account_id || "ok",
+          }));
+        }
+      } catch (err) {
+        console.error("❌ Stripe check failed:", err);
+      }
+    };
+
+    checkStripe();
+  }, [user?.id, session?.access_token]);
 
   return (
     <div className="space-y-6">
@@ -286,14 +321,48 @@ export default function LegalSettings() {
         </div>
       )}
 
-      {/* Stripe section (inchangée) */}
+      {/* Stripe Connect Section */}
       <div className="mt-8 border-t pt-4">
         <h4 className="font-semibold text-gray-800 mb-2">Payouts (Stripe Connect)</h4>
 
         {form.payouts_enabled ? (
-          <p className="text-green-600 text-sm flex items-center gap-1">
-            ✅ Connected to Stripe — payouts enabled
-          </p>
+          <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
+            <p className="text-green-700 text-sm flex items-center gap-2">
+              ✅ Connected to Stripe — payouts enabled
+            </p>
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch(
+                    "https://cdcnylgokphyltkctymi.functions.supabase.co/disconnect-stripe-account",
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${session?.access_token}`,
+                      },
+                      body: JSON.stringify({ user_id: user.id }),
+                    }
+                  );
+                  const data = await res.json();
+                  if (data.success) {
+                    setForm((f) => ({
+                      ...f,
+                      payouts_enabled: false,
+                      stripe_account_ready: false,
+                      stripe_account_id: null,
+                    }));
+                    setToast({ message: "Disconnected from Stripe.", type: "info" });
+                  } else throw new Error(data.error || "Failed to disconnect");
+                } catch (err) {
+                  setToast({ message: "❌ Error disconnecting Stripe.", type: "error" });
+                }
+              }}
+              className="text-xs text-gray-500 underline hover:text-gray-700"
+            >
+              Disconnect
+            </button>
+          </div>
         ) : (
           <button
             onClick={async () => {
@@ -308,28 +377,18 @@ export default function LegalSettings() {
                       Authorization: `Bearer ${session?.access_token}`,
                     },
                     body: JSON.stringify({
-                      user_id: user?.id,
-                      email: user?.email,
+                      user_id: user.id,
+                      email: user.email,
                     }),
                   }
                 );
                 const data = await res.json();
-                if (data.url) {
-                  await supabase
-                    .from("users")
-                    .update({ stripe_account_id: data.account_id })
-                    .eq("id", user.id);
-                  window.location.href = data.url;
-                } else {
-                  setToast({
-                    message: "❌ Error creating Stripe account.",
-                    type: "error",
-                  });
-                }
+                if (data.url) window.location.href = data.url;
+                else throw new Error("Stripe onboarding URL not returned.");
               } catch (err) {
                 console.error(err);
                 setToast({
-                  message: "❌ Connection error.",
+                  message: "❌ Stripe connection failed.",
                   type: "error",
                 });
               } finally {

@@ -1,0 +1,7 @@
+# Ignore les fonctions Supabase (Deno)
+supabase/functions/*
+
+# Optionnel : ignore les builds et dépendances
+node_modules/
+dist/
+build/

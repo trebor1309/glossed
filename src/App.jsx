@@ -16,6 +16,7 @@ import Legal from "./pages/Legal";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import FAQ from "./pages/FAQ";
+import ChatPage from "@/components/chat/ChatPage";
 
 import ScrollToTop from "./components/ScrollToTop";
 import Navbar from "@/components/Navbar";
@@ -185,6 +186,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
             <Route path="payments" element={<ProDashboardPayments />} />
             <Route path="settings" element={<ProDashboardSettings />} />
             <Route path="more" element={<ProDashboardMore />} />
+            <Route path="/dashboard/chat/:mission_id" element={<ChatPage />} />
           </Route>
         </Routes>
       </main>
