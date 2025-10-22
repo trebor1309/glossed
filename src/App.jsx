@@ -186,8 +186,8 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
             <Route path="payments" element={<ProDashboardPayments />} />
             <Route path="settings" element={<ProDashboardSettings />} />
             <Route path="more" element={<ProDashboardMore />} />
-            <Route path="/dashboard/chat/:mission_id" element={<ChatPage />} />
           </Route>
+          <Route path="/dashboard/chat/:mission_id" element={<ChatPage />} />
         </Routes>
       </main>
 
