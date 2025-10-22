@@ -365,13 +365,14 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
 
       if (bookingError) throw bookingError;
 
-      // 🔍 Charger tous les pros
+      // 🔍 Charger tous les pros (avec infos utiles)
       const { data: pros, error: prosError } = await supabase
         .from("users")
-        .select("id, latitude, longitude, business_type, radius_km");
+        .select("id, first_name, last_name, email, latitude, longitude, business_type, radius_km");
 
       if (prosError) throw prosError;
 
+      // 🌍 Fonction distance (en km)
       const distanceKm = (lat1, lon1, lat2, lon2) => {
         const R = 6371;
         const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -386,7 +387,10 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
 
       // ✅ Trouver les pros compatibles (distance + service)
       const matchingPros = pros.filter((p) => {
-        if (!p.latitude || !p.longitude) return false;
+        if (!p.latitude || !p.longitude) {
+          console.warn(`❌ Pro ${p.first_name || p.id} sans coordonnées`);
+          return false;
+        }
 
         const dist = distanceKm(
           bookingData.latitude,
@@ -395,39 +399,41 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           p.longitude
         );
 
-        // ✅ Parser correctement le champ business_type (PostgreSQL text[])
+        // ✅ Parser correctement business_type (PostgreSQL text[] ou string)
         let proServices = [];
         try {
-          if (typeof p.business_type === "string" && p.business_type.startsWith("{")) {
-            // Ex: {"Hair Stylist","Barber"} → ["Hair Stylist", "Barber"]
-            proServices = p.business_type
-              .replace(/^{|}$/g, "")
-              .split(",")
-              .map((s) => s.replace(/"/g, "").trim());
-          } else if (Array.isArray(p.business_type)) {
+          if (Array.isArray(p.business_type)) {
             proServices = p.business_type.map((s) => s.trim());
           } else if (typeof p.business_type === "string") {
-            proServices = p.business_type.split(",").map((s) => s.trim());
+            if (p.business_type.startsWith("{")) {
+              // Format PostgreSQL text[]
+              proServices = p.business_type
+                .replace(/^{|}$/g, "")
+                .split(",")
+                .map((s) => s.replace(/"/g, "").trim());
+            } else {
+              // Format CSV simple
+              proServices = p.business_type.split(",").map((s) => s.trim());
+            }
           }
         } catch (e) {
           console.warn("⚠️ Impossible de parser business_type pour", p.id, e);
         }
 
-        // ✅ Comparaison insensible à la casse
         const clientServices = bookingData.services.map((s) => s.trim().toLowerCase());
         const offersService = proServices.some((s) =>
           clientServices.some((c) => s.toLowerCase().includes(c))
         );
 
-        // ✅ Vérifie si le pro est dans le rayon
         const isInRange = dist <= (p.radius_km || 20);
 
         return isInRange && offersService;
       });
 
-      // 🔍 Logs de debug
+      // 🔍 Logs de contrôle
       console.log("📋 Pros trouvés:", pros);
       console.log("✅ Pros correspondants:", matchingPros);
+      if (!matchingPros.length) console.warn("⚠️ Aucun pro correspondant trouvé.");
 
       // ✅ Insérer les notifications pour les pros trouvés
       if (matchingPros.length > 0) {
