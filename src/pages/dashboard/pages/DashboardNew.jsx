@@ -365,10 +365,12 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
 
       if (bookingError) throw bookingError;
 
-      // Recherche pros compatibles
-      const { data: pros } = await supabase
+      // 🔍 Charger tous les pros
+      const { data: pros, error: prosError } = await supabase
         .from("users")
         .select("id, latitude, longitude, business_type, radius_km");
+
+      if (prosError) throw prosError;
 
       const distanceKm = (lat1, lon1, lat2, lon2) => {
         const R = 6371;
@@ -382,6 +384,7 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       };
 
+      // ✅ Trouver les pros compatibles (distance + service)
       const matchingPros = pros.filter((p) => {
         if (!p.latitude || !p.longitude) return false;
 
@@ -392,40 +395,65 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           p.longitude
         );
 
-        // 🔸 Normalise les chaînes pour comparer sans casse ni espaces parasites
+        // ✅ Parser correctement le champ business_type (PostgreSQL text[])
+        let proServices = [];
+        try {
+          if (typeof p.business_type === "string" && p.business_type.startsWith("{")) {
+            // Ex: {"Hair Stylist","Barber"} → ["Hair Stylist", "Barber"]
+            proServices = p.business_type
+              .replace(/^{|}$/g, "")
+              .split(",")
+              .map((s) => s.replace(/"/g, "").trim());
+          } else if (Array.isArray(p.business_type)) {
+            proServices = p.business_type.map((s) => s.trim());
+          } else if (typeof p.business_type === "string") {
+            proServices = p.business_type.split(",").map((s) => s.trim());
+          }
+        } catch (e) {
+          console.warn("⚠️ Impossible de parser business_type pour", p.id, e);
+        }
+
+        // ✅ Comparaison insensible à la casse
         const clientServices = bookingData.services.map((s) => s.trim().toLowerCase());
-        const proTypes = Array.isArray(p.business_type)
-          ? p.business_type.map((s) => s.trim().toLowerCase())
-          : p.business_type
-            ? p.business_type.split(",").map((s) => s.trim().toLowerCase())
-            : [];
+        const offersService = proServices.some((s) =>
+          clientServices.some((c) => s.toLowerCase().includes(c))
+        );
 
-        const offersService = proTypes.some((t) => clientServices.some((s) => t.includes(s)));
-
-        // 🔸 élargis légèrement le rayon pour test (20 km par défaut)
-        const isInRange = !p.latitude || !p.longitude || dist <= (p.radius_km || 20);
+        // ✅ Vérifie si le pro est dans le rayon
+        const isInRange = dist <= (p.radius_km || 20);
 
         return isInRange && offersService;
       });
 
+      // 🔍 Logs de debug
       console.log("📋 Pros trouvés:", pros);
       console.log("✅ Pros correspondants:", matchingPros);
 
+      // ✅ Insérer les notifications pour les pros trouvés
       if (matchingPros.length > 0) {
         const notifRows = matchingPros.map((p) => ({
           booking_id: bookingId,
           pro_id: p.id,
         }));
-        await supabase.from("booking_notifications").insert(notifRows);
+
+        const { error: notifError } = await supabase
+          .from("booking_notifications")
+          .insert(notifRows);
+
+        if (notifError) throw notifError;
+      } else {
+        console.log("⚠️ Aucun pro correspondant trouvé.");
       }
 
       setToast({ message: "✅ Booking created & sent to nearby pros!", type: "success" });
+
       setTimeout(() => {
         if (onSuccess) onSuccess();
         if (isModal && onClose) onClose();
         navigate("/dashboard/reservations");
       }, 1500);
     } catch (err) {
+      console.error("❌ handleConfirm error:", err);
       setToast({ message: `❌ ${err.message}`, type: "error" });
       setIsSubmitting(false);
     }
