@@ -16,7 +16,7 @@ import Legal from "./pages/Legal";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import FAQ from "./pages/FAQ";
-import ChatPage from "@/components/chat/ChatPage";
+import ChatPage from "@/pages/dashboard/ChatPage";
 
 import ScrollToTop from "./components/ScrollToTop";
 import Navbar from "@/components/Navbar";
