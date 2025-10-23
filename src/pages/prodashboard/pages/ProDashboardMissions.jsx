@@ -43,18 +43,35 @@ export default function ProDashboardMissions() {
     const fetchMissions = async () => {
       setLoading(true);
       try {
-        // 1) Bookings liés au pro (directement OU via notifications persistées)
-        const { data: bookings, error: bookingsError } = await supabase
+        // 1️⃣ Bookings directement assignés à ce pro
+        const { data: directBookings, error: directError } = await supabase
           .from("bookings")
           .select("*")
-          .or(
-            `pro_id.eq.${session.user.id},id.in.(select booking_id from booking_notifications where pro_id='${session.user.id}')`
-          )
-          .order("date", { ascending: true });
+          .eq("pro_id", session.user.id);
 
-        if (bookingsError) throw bookingsError;
+        if (directError) throw directError;
 
-        // 2) Missions créées par le pro (proposed/confirmed/completed/etc.)
+        // 2️⃣ Bookings notifiés à ce pro via booking_notifications
+        const { data: notifications, error: notifError } = await supabase
+          .from("booking_notifications")
+          .select("booking_id")
+          .eq("pro_id", session.user.id);
+
+        if (notifError) throw notifError;
+
+        const notifiedIds = notifications.map((n) => n.booking_id);
+
+        let notifiedBookings = [];
+        if (notifiedIds.length > 0) {
+          const { data: nb, error: nbError } = await supabase
+            .from("bookings")
+            .select("*")
+            .in("id", notifiedIds);
+          if (nbError) throw nbError;
+          notifiedBookings = nb;
+        }
+
+        // 3️⃣ Missions créées par le pro
         const { data: proMissions, error: missionsError } = await supabase
           .from("missions")
           .select("*")
@@ -63,8 +80,18 @@ export default function ProDashboardMissions() {
 
         if (missionsError) throw missionsError;
 
-        // 3) Fusion (bookings en attente + missions envoyées/confirmées)
-        const merged = [...(bookings || []), ...(proMissions || [])];
+        // 4️⃣ Fusion finale
+        const merged = [
+          ...(directBookings || []),
+          ...(notifiedBookings || []),
+          ...(proMissions || []),
+        ];
+
+        console.log("📦 Direct bookings:", directBookings);
+        console.log("📨 Notified bookings:", notifiedBookings);
+        console.log("🚀 Pro missions:", proMissions);
+        console.log("🧩 Merged result:", merged);
+
         setMissions(merged);
       } catch (err) {
         console.error("❌ fetchMissions error:", err);
