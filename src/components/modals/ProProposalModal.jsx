@@ -5,11 +5,12 @@ import { supabase } from "@/lib/supabaseClient";
 import Toast from "@/components/ui/Toast";
 
 export default function ProProposalModal({ booking, onClose, onSuccess, session }) {
-  // 🧠 Extraction automatique de l’heure du time_slot du client
+  // 🧠 Extraire une heure de départ depuis le time_slot du client
   const extractTimeFromSlot = (slot) => {
     if (!slot) return "";
-    const match = slot.match(/\((\d{2})[–-](\d{2})\)/); // ex: "(13–18)" -> ["(13–18)", "13", "18"]
-    if (match) return `${match[1]}:00`; // renvoie "13:00"
+    // ex: "Afternoon (13–18)" → match "(13–18)" → retourne "13:00"
+    const match = slot.match(/\((\d{2})[–-](\d{2})\)/);
+    if (match) return `${match[1]}:00`;
     return "";
   };
 
@@ -35,7 +36,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
 
     setLoading(true);
     try {
-      // ✅ Créer la mission dans Supabase
+      // ✅ Créer la mission proposée dans Supabase
       const { error: missionError } = await supabase.from("missions").insert([
         {
           client_id: booking.client_id,
@@ -46,13 +47,13 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
           time: form.time, // format "HH:mm"
           duration: 60,
           price: parseFloat(form.service_price || 0) + parseFloat(form.travel_fee || 0),
-          status: "proposed", // ⚠️ nécessite que la contrainte missions_status_check contienne "proposed"
+          status: "proposed", // ⚠️ Assure-toi que ce statut existe dans missions_status_check
         },
       ]);
 
       if (missionError) throw missionError;
 
-      // ✅ Mettre à jour la demande client originale
+      // ✅ Mettre à jour la demande client d'origine
       const { error: updateError } = await supabase
         .from("bookings")
         .update({
