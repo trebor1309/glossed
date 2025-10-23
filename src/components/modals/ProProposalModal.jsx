@@ -5,16 +5,28 @@ import { supabase } from "@/lib/supabaseClient";
 import Toast from "@/components/ui/Toast";
 
 export default function ProProposalModal({ booking, onClose, onSuccess, session }) {
+  // 🧠 Extraction automatique de l’heure du time_slot du client
+  const extractTimeFromSlot = (slot) => {
+    if (!slot) return "";
+    const match = slot.match(/\((\d{2})[–-](\d{2})\)/); // ex: "(13–18)" -> ["(13–18)", "13", "18"]
+    if (match) return `${match[1]}:00`; // renvoie "13:00"
+    return "";
+  };
+
   const [form, setForm] = useState({
     service_price: "",
     travel_fee: "",
     date: booking?.date || "",
-    time: booking?.time_slot?.split(" ")[0] || "",
+    time: extractTimeFromSlot(booking?.time_slot),
     note: "",
   });
+
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // -------------------------------------------------------
+  // 📤 Envoi de la proposition du pro
+  // -------------------------------------------------------
   const handleSubmit = async () => {
     if (!form.service_price || !form.date || !form.time) {
       setToast({ message: "❌ Please fill all required fields", type: "error" });
@@ -23,7 +35,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
 
     setLoading(true);
     try {
-      // ✅ créer la mission proposée
+      // ✅ Créer la mission dans Supabase
       const { error: missionError } = await supabase.from("missions").insert([
         {
           client_id: booking.client_id,
@@ -31,19 +43,16 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
           service: booking.service,
           description: form.note || booking.notes,
           date: form.date,
+          time: form.time, // format "HH:mm"
           duration: 60,
-          price: parseFloat(form.service_price) + parseFloat(form.travel_fee || 0),
-          status: "proposed",
-          meta: {
-            service_price: form.service_price,
-            travel_fee: form.travel_fee,
-            time: form.time,
-          },
+          price: parseFloat(form.service_price || 0) + parseFloat(form.travel_fee || 0),
+          status: "proposed", // ⚠️ nécessite que la contrainte missions_status_check contienne "proposed"
         },
       ]);
+
       if (missionError) throw missionError;
 
-      // ✅ mettre à jour la demande d'origine
+      // ✅ Mettre à jour la demande client originale
       const { error: updateError } = await supabase
         .from("bookings")
         .update({
@@ -55,11 +64,13 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
       if (updateError) throw updateError;
 
       setToast({ message: "✅ Proposal sent successfully!", type: "success" });
+
       setTimeout(() => {
         onSuccess?.();
         onClose?.();
       }, 1500);
     } catch (err) {
+      console.error("❌ handleSubmit error:", err);
       setToast({ message: `❌ ${err.message}`, type: "error" });
     } finally {
       setLoading(false);
@@ -81,6 +92,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
       >
+        {/* ❌ Bouton de fermeture */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
@@ -88,8 +100,10 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
           <X size={20} />
         </button>
 
+        {/* 🧾 Titre */}
         <h2 className="text-xl font-semibold mb-4 text-center">Propose Your Offer</h2>
 
+        {/* 🧮 Formulaire */}
         <div className="space-y-3">
           <div>
             <label className="text-sm font-medium">Service price (€)</label>
@@ -100,6 +114,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
               onChange={(e) => setForm({ ...form, service_price: e.target.value })}
             />
           </div>
+
           <div>
             <label className="text-sm font-medium">Travel fee (€)</label>
             <input
@@ -109,6 +124,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
               onChange={(e) => setForm({ ...form, travel_fee: e.target.value })}
             />
           </div>
+
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="text-sm font-medium">Date</label>
@@ -119,6 +135,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
               />
             </div>
+
             <div className="flex-1">
               <label className="text-sm font-medium">Time</label>
               <input
@@ -129,6 +146,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
               />
             </div>
           </div>
+
           <div>
             <label className="text-sm font-medium">Remark</label>
             <textarea
@@ -141,6 +159,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
           </div>
         </div>
 
+        {/* 🪄 Boutons */}
         <div className="mt-6 flex justify-end gap-3">
           <button
             onClick={onClose}
@@ -157,12 +176,9 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
           </button>
         </div>
 
+        {/* 🧈 Toast */}
         {toast && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
+          <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
         )}
       </motion.div>
     </motion.div>

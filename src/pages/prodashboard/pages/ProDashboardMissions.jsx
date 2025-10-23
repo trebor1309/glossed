@@ -50,13 +50,27 @@ export default function ProDashboardMissions() {
 
     const fetchMissions = async () => {
       setLoading(true);
-      const { data, error } = await supabase
+
+      // 🔹 1. bookings liés au pro (demandes reçues)
+      const { data: bookings } = await supabase
         .from("bookings")
+        .select("*")
+        .or(
+          `pro_id.eq.${session.user.id},id.in.(select booking_id from booking_notifications where pro_id='${session.user.id}')`
+        )
+        .order("date", { ascending: true });
+
+      // 🔹 2. missions créées par le pro (proposals, confirmed, etc.)
+      const { data: missions } = await supabase
+        .from("missions")
         .select("*")
         .eq("pro_id", session.user.id)
         .order("date", { ascending: true });
 
-      if (!error && data) setMissions(data);
+      // 🔹 3. fusionner les deux tableaux
+      const merged = [...(bookings || []), ...(missions || [])];
+
+      setMissions(merged);
       setLoading(false);
     };
 
