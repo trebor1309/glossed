@@ -50,10 +50,12 @@ export default function ProDashboardMissions() {
 
     const fetchMissions = async () => {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: bookings, error } = await supabase
         .from("bookings")
         .select("*")
-        .eq("pro_id", session.user.id)
+        .or(
+          `pro_id.eq.${session.user.id},id.in.(select booking_id from booking_notifications where pro_id='${session.user.id}')`
+        )
         .order("date", { ascending: true });
 
       if (!error && data) setMissions(data);

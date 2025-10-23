@@ -9,9 +9,14 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
     service_price: "",
     travel_fee: "",
     date: booking?.date || "",
-    time: booking?.time_slot?.split(" ")[0] || "",
+    // ⬇️ si le time_slot contient une heure entre parenthèses, on l’extrait
+    time: (() => {
+      const match = booking?.time_slot?.match(/\((\d{2})[–-](\d{2})\)/);
+      return match ? `${match[1]}:00` : ""; // ex: "(13–18)" → "13:00"
+    })(),
     note: "",
   });
+
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -23,7 +28,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
 
     setLoading(true);
     try {
-      // ✅ créer la mission proposée
+      // ✅ Créer la mission proposée (avec time)
       const { error: missionError } = await supabase.from("missions").insert([
         {
           client_id: booking.client_id,
@@ -31,19 +36,16 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
           service: booking.service,
           description: form.note || booking.notes,
           date: form.date,
+          time: form.time, // <-- nouvelle ligne
           duration: 60,
-          price: parseFloat(form.service_price) + parseFloat(form.travel_fee || 0),
+          price: parseFloat(form.service_price || 0) + parseFloat(form.travel_fee || 0),
           status: "proposed",
-          meta: {
-            service_price: form.service_price,
-            travel_fee: form.travel_fee,
-            time: form.time,
-          },
         },
       ]);
+
       if (missionError) throw missionError;
 
-      // ✅ mettre à jour la demande d'origine
+      // ✅ Mettre à jour la demande d'origine
       const { error: updateError } = await supabase
         .from("bookings")
         .update({
@@ -60,6 +62,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
         onClose?.();
       }, 1500);
     } catch (err) {
+      console.error("❌ handleSubmit error:", err);
       setToast({ message: `❌ ${err.message}`, type: "error" });
     } finally {
       setLoading(false);
@@ -158,11 +161,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
         </div>
 
         {toast && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
+          <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
         )}
       </motion.div>
     </motion.div>

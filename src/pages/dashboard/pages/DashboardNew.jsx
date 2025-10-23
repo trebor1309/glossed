@@ -254,7 +254,7 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
 /* ---------------------------------------------------------
    STEP 4 – Recap
 --------------------------------------------------------- */
-function StepRecap({ bookingData, onPrev, onConfirm, loading, isEdit }) {
+function StepRecap({ bookingData, onPrev, onConfirm, loading }) {
   return (
     <motion.div
       key="step4"
@@ -265,7 +265,7 @@ function StepRecap({ bookingData, onPrev, onConfirm, loading, isEdit }) {
       className="space-y-6"
     >
       <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-        <Clock size={20} /> {isEdit ? "Confirm your updates" : "Confirm your booking"}
+        <Clock size={20} /> Confirm your booking
       </h2>
       <div className="bg-gray-50 p-4 rounded-xl border space-y-2">
         <p>
@@ -298,7 +298,7 @@ function StepRecap({ bookingData, onPrev, onConfirm, loading, isEdit }) {
           disabled={loading}
           className="px-6 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.02] transition disabled:opacity-60"
         >
-          {loading ? "Saving..." : isEdit ? "Save changes" : "Confirm Booking"}
+          {loading ? "Saving..." : "Confirm Booking"}
         </button>
       </div>
     </motion.div>
@@ -308,35 +308,22 @@ function StepRecap({ bookingData, onPrev, onConfirm, loading, isEdit }) {
 /* ---------------------------------------------------------
    MAIN COMPONENT
 --------------------------------------------------------- */
-export default function DashboardNew({ isModal = false, onClose, onSuccess, editBooking = null }) {
+export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
   const { session } = useUser();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [bookingData, setBookingData] = useState(
-    editBooking
-      ? {
-          services: editBooking.service?.split(", ") || [],
-          date: editBooking.date || "",
-          timeSlots: editBooking.time_slot?.split(", ") || [],
-          address: editBooking.address || "",
-          notes: editBooking.notes || "",
-          latitude: editBooking.client_lat || null,
-          longitude: editBooking.client_lng || null,
-        }
-      : {
-          services: [],
-          date: "",
-          timeSlots: [],
-          address: "",
-          notes: "",
-          latitude: null,
-          longitude: null,
-        }
-  );
+  const [bookingData, setBookingData] = useState({
+    services: [],
+    date: "",
+    timeSlots: [],
+    address: "",
+    notes: "",
+    latitude: null,
+    longitude: null,
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
 
-  /* ✅ SAVE / UPDATE BOOKING + NOTIFY PROS */
   const handleConfirm = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -344,35 +331,32 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
 
     try {
       const bookingId = uuid();
-      const { data: bookingInsert, error: bookingError } = await supabase
-        .from("bookings")
-        .insert([
-          {
-            id: bookingId,
-            client_id: session.user.id,
-            service: bookingData.services.join(", "),
-            date: bookingData.date,
-            time_slot: bookingData.timeSlots.join(", "),
-            address: bookingData.address,
-            notes: bookingData.notes,
-            client_lat: bookingData.latitude,
-            client_lng: bookingData.longitude,
-            status: "pending",
-          },
-        ])
-        .select()
-        .single();
+      const { error: bookingError } = await supabase.from("bookings").insert([
+        {
+          id: bookingId,
+          client_id: session.user.id,
+          service: bookingData.services.join(", "),
+          date: bookingData.date,
+          time_slot: bookingData.timeSlots.join(", "),
+          address: bookingData.address,
+          notes: bookingData.notes,
+          client_lat: bookingData.latitude,
+          client_lng: bookingData.longitude,
+          status: "pending",
+        },
+      ]);
 
       if (bookingError) throw bookingError;
 
-      // 🔍 Charger tous les pros (avec infos utiles)
       const { data: pros, error: prosError } = await supabase
         .from("users")
-        .select("id, first_name, last_name, email, latitude, longitude, business_type, radius_km");
+        .select(
+          "id, first_name, last_name, email, latitude, longitude, business_type, radius_km, role"
+        )
+        .eq("role", "pro");
 
       if (prosError) throw prosError;
 
-      // 🌍 Fonction distance (en km)
       const distanceKm = (lat1, lon1, lat2, lon2) => {
         const R = 6371;
         const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -384,6 +368,9 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
             Math.sin(dLon / 2) ** 2;
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       };
+
+      // 🔍 Vérifier les services demandés par le client
+      console.log("🎨 BookingData.services:", bookingData.services);
 
       // ✅ Trouver les pros compatibles (distance + service)
       const matchingPros = pros.filter((p) => {
@@ -420,11 +407,20 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           console.warn("⚠️ Impossible de parser business_type pour", p.id, e);
         }
 
-        const clientServices = bookingData.services.map((s) => s.trim().toLowerCase());
-        const offersService = proServices.some((s) =>
-          clientServices.some((c) => s.toLowerCase().includes(c))
-        );
+        // ✅ Comparaison souple (tolère les différences de casse ou d’intitulé)
+        const clientServices = Array.isArray(bookingData.services)
+          ? bookingData.services.map((s) => s.toLowerCase().trim())
+          : [String(bookingData.services).toLowerCase().trim()];
 
+        const offersService = proServices.some((s) => {
+          const cleanPro = s.toLowerCase().trim();
+          return clientServices.some((c) => {
+            const cleanClient = c.toLowerCase().trim();
+            return cleanPro.includes(cleanClient) || cleanClient.includes(cleanPro);
+          });
+        });
+
+        // ✅ Vérifie si le pro est dans le rayon
         const isInRange = dist <= (p.radius_km || 20);
 
         return isInRange && offersService;
@@ -435,24 +431,20 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
       console.log("✅ Pros correspondants:", matchingPros);
       if (!matchingPros.length) console.warn("⚠️ Aucun pro correspondant trouvé.");
 
-      // ✅ Insérer les notifications pour les pros trouvés
       if (matchingPros.length > 0) {
         const notifRows = matchingPros.map((p) => ({
           booking_id: bookingId,
           pro_id: p.id,
         }));
-
         const { error: notifError } = await supabase
           .from("booking_notifications")
           .insert(notifRows);
-
         if (notifError) throw notifError;
       } else {
-        console.log("⚠️ Aucun pro correspondant trouvé.");
+        console.warn("⚠️ Aucun pro correspondant trouvé.");
       }
 
       setToast({ message: "✅ Booking created & sent to nearby pros!", type: "success" });
-
       setTimeout(() => {
         if (onSuccess) onSuccess();
         if (isModal && onClose) onClose();
@@ -465,44 +457,11 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
     }
   };
 
-  const steps = {
-    1: (
-      <StepServices
-        bookingData={bookingData}
-        setBookingData={setBookingData}
-        onNext={() => setStep(2)}
-      />
-    ),
-    2: (
-      <StepWhen
-        bookingData={bookingData}
-        setBookingData={setBookingData}
-        onNext={() => setStep(3)}
-        onPrev={() => setStep(1)}
-      />
-    ),
-    3: (
-      <StepAddress
-        bookingData={bookingData}
-        setBookingData={setBookingData}
-        onNext={() => setStep(4)}
-        onPrev={() => setStep(2)}
-      />
-    ),
-    4: (
-      <StepRecap
-        bookingData={bookingData}
-        onPrev={() => setStep(3)}
-        onConfirm={handleConfirm}
-        loading={isSubmitting}
-        isEdit={!!editBooking}
-      />
-    ),
-  };
-
   return (
     <motion.div
-      className={`max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg space-y-8 relative ${isModal ? "fixed inset-0 z-50 overflow-y-auto" : ""}`}
+      className={`max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg space-y-8 relative ${
+        isModal ? "fixed inset-0 z-50 overflow-y-auto" : ""
+      }`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
@@ -515,14 +474,14 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           <X size={22} />
         </button>
       )}
-      {/* Stepper */}
+
       <div className="mb-6">
         <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
           <span>Step {step} of 4</span>
           {step === 1 && <span>Select services</span>}
           {step === 2 && <span>Choose time</span>}
           {step === 3 && <span>Address & notes</span>}
-          {step === 4 && <span>{editBooking ? "Review changes" : "Review & confirm"}</span>}
+          {step === 4 && <span>Review & confirm</span>}
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
           <motion.div
@@ -533,7 +492,39 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess, edit
           />
         </div>
       </div>
-      {steps[step]}
+
+      {step === 1 && (
+        <StepServices
+          bookingData={bookingData}
+          setBookingData={setBookingData}
+          onNext={() => setStep(2)}
+        />
+      )}
+      {step === 2 && (
+        <StepWhen
+          bookingData={bookingData}
+          setBookingData={setBookingData}
+          onNext={() => setStep(3)}
+          onPrev={() => setStep(1)}
+        />
+      )}
+      {step === 3 && (
+        <StepAddress
+          bookingData={bookingData}
+          setBookingData={setBookingData}
+          onNext={() => setStep(4)}
+          onPrev={() => setStep(2)}
+        />
+      )}
+      {step === 4 && (
+        <StepRecap
+          bookingData={bookingData}
+          onPrev={() => setStep(3)}
+          onConfirm={handleConfirm}
+          loading={isSubmitting}
+        />
+      )}
+
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </motion.div>
   );
