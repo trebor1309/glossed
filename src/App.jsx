@@ -22,6 +22,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Logo from "./components/Logo";
+import SessionGate from "@/components/SessionGate";
 
 import LoginModal from "./components/modals/LoginModal";
 import SignupModal from "./components/modals/SignupModal";
@@ -81,25 +82,29 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
   const isDashboardRoute =
     location.pathname.startsWith("/dashboard") || location.pathname.startsWith("/prodashboard");
 
-  // 🔄 Redirection du rôle vers la bonne zone
+  // 🔁 Redirection automatique selon le rôle (fix avec timeout)
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      if (isPro && location.pathname === "/dashboard") {
-        navigate("/prodashboard", { replace: true });
-      }
-      if (!isPro && location.pathname === "/prodashboard") {
-        navigate("/dashboard", { replace: true });
-      }
+      const timer = setTimeout(() => {
+        if (isPro && location.pathname === "/dashboard") {
+          navigate("/prodashboard", { replace: true });
+        } else if (!isPro && location.pathname === "/prodashboard") {
+          navigate("/dashboard", { replace: true });
+        }
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isAuthenticated, isPro, loading, location.pathname, navigate]);
 
-  // 🔐 Garde : empêche un client d'accéder au prodashboard
-  if (!loading && isAuthenticated && !isPro && location.pathname.startsWith("/prodashboard")) {
-    navigate("/dashboard", { replace: true });
-    return null;
-  }
+  // 🔐 Garde supplémentaire : empêche un client d'accéder à /prodashboard
+  useEffect(() => {
+    if (!loading && isAuthenticated && !isPro && location.pathname.startsWith("/prodashboard")) {
+      const timer = setTimeout(() => navigate("/dashboard", { replace: true }), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, isAuthenticated, isPro, location.pathname, navigate]);
 
-  // 💫 Écran de chargement
+  // 💫 Écran de chargement global
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-rose-50 via-white to-amber-50 text-gray-700 overflow-hidden">
@@ -132,68 +137,71 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
 
       <ScrollToTop />
 
-      <main className="flex-grow">
-        <Routes>
-          {/* 🌍 Pages publiques */}
-          <Route
-            path="/"
-            element={
-              <Home
-                onOpenLogin={() => setShowLogin(true)}
-                onOpenSignup={() => setShowSignup(true)}
-                onOpenProSignup={() => setShowProSignup(true)}
-                onOpenDownload={() => setShowDownload(true)}
-              />
-            }
-          />
-          <Route path="/about" element={<About />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/legal" element={<Legal />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/faq" element={<FAQ />} />
-          <Route path="/about-us" element={<AboutUs />} />
-          <Route path="/careers" element={<Careers />} />
-          <Route path="/press" element={<Press />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/help-center" element={<HelpCenter />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/safety" element={<Safety />} />
+      {/* ✅ SessionGate protège tout le rendu */}
+      <SessionGate>
+        <main className="flex-grow">
+          <Routes>
+            {/* 🌍 Pages publiques */}
+            <Route
+              path="/"
+              element={
+                <Home
+                  onOpenLogin={() => setShowLogin(true)}
+                  onOpenSignup={() => setShowSignup(true)}
+                  onOpenProSignup={() => setShowProSignup(true)}
+                  onOpenDownload={() => setShowDownload(true)}
+                />
+              }
+            />
+            <Route path="/about" element={<About />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/legal" element={<Legal />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/faq" element={<FAQ />} />
+            <Route path="/about-us" element={<AboutUs />} />
+            <Route path="/careers" element={<Careers />} />
+            <Route path="/press" element={<Press />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/help-center" element={<HelpCenter />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/safety" element={<Safety />} />
 
-          {/* 💬 Chat accessible à tous les utilisateurs connectés */}
-          <Route path="/chat/:mission_id" element={isAuthenticated ? <ChatPage /> : <Home />} />
+            {/* 💬 Chat (dispo pour tout utilisateur connecté) */}
+            <Route path="/chat/:mission_id" element={isAuthenticated ? <ChatPage /> : <Home />} />
 
-          {/* 👤 Dashboard Client */}
-          <Route path="/dashboard" element={isAuthenticated ? <DashboardLayout /> : <Home />}>
-            <Route index element={<DashboardHome />} />
-            <Route path="new" element={<DashboardNew />} />
-            <Route path="reservations" element={<DashboardReservations />} />
-            <Route path="account" element={<DashboardAccount />} />
-            <Route path="settings" element={<DashboardSettings />} />
-            <Route path="more" element={<DashboardMore />} />
-          </Route>
+            {/* 👤 Dashboard Client */}
+            <Route path="/dashboard" element={isAuthenticated ? <DashboardLayout /> : <Home />}>
+              <Route index element={<DashboardHome />} />
+              <Route path="new" element={<DashboardNew />} />
+              <Route path="reservations" element={<DashboardReservations />} />
+              <Route path="account" element={<DashboardAccount />} />
+              <Route path="settings" element={<DashboardSettings />} />
+              <Route path="more" element={<DashboardMore />} />
+            </Route>
 
-          {/* 💼 Dashboard Pro */}
-          <Route
-            path="/prodashboard"
-            element={
-              isAuthenticated && (isPro || user?.roles?.includes("pro")) ? (
-                <ProDashboardLayout />
-              ) : (
-                <Home />
-              )
-            }
-          >
-            <Route index element={<ProDashboardHome />} />
-            <Route path="missions" element={<ProDashboardMissions />} />
-            <Route path="payments" element={<ProDashboardPayments />} />
-            <Route path="settings" element={<ProDashboardSettings />} />
-            <Route path="more" element={<ProDashboardMore />} />
-          </Route>
-        </Routes>
-      </main>
+            {/* 💼 Dashboard Pro */}
+            <Route
+              path="/prodashboard"
+              element={
+                isAuthenticated && (isPro || user?.roles?.includes("pro")) ? (
+                  <ProDashboardLayout />
+                ) : (
+                  <Home />
+                )
+              }
+            >
+              <Route index element={<ProDashboardHome />} />
+              <Route path="missions" element={<ProDashboardMissions />} />
+              <Route path="payments" element={<ProDashboardPayments />} />
+              <Route path="settings" element={<ProDashboardSettings />} />
+              <Route path="more" element={<ProDashboardMore />} />
+            </Route>
+          </Routes>
+        </main>
+      </SessionGate>
 
-      {/* 🌸 Footer visible sur toutes les pages hors dashboard */}
+      {/* 🌸 Footer visible hors dashboard */}
       {!isDashboardRoute && <Footer />}
 
       {/* 🪄 Modales */}

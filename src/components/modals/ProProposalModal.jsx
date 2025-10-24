@@ -5,13 +5,11 @@ import { supabase } from "@/lib/supabaseClient";
 import Toast from "@/components/ui/Toast";
 
 export default function ProProposalModal({ booking, onClose, onSuccess, session }) {
-  // 🧠 Extraire une heure de départ depuis le time_slot du client
+  // 🧠 Extraction de l'heure depuis la fourchette du client (ex: "Noon (12–14)" → "12:00")
   const extractTimeFromSlot = (slot) => {
     if (!slot) return "";
-    // ex: "Afternoon (13–18)" → match "(13–18)" → retourne "13:00"
     const match = slot.match(/\((\d{2})[–-](\d{2})\)/);
-    if (match) return `${match[1]}:00`;
-    return "";
+    return match ? `${match[1]}:00` : "";
   };
 
   const [form, setForm] = useState({
@@ -21,7 +19,6 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
     time: extractTimeFromSlot(booking?.time_slot),
     note: "",
   });
-
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -36,40 +33,55 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
 
     setLoading(true);
     try {
-      // ✅ Créer la mission proposée dans Supabase
-      const { error: missionError } = await supabase.from("missions").insert([
-        {
-          client_id: booking.client_id,
-          pro_id: session.user.id,
-          service: booking.service,
-          description: form.note || booking.notes,
-          date: form.date,
-          time: form.time, // format "HH:mm"
-          duration: 60,
-          price: parseFloat(form.service_price || 0) + parseFloat(form.travel_fee || 0),
-          status: "proposed", // ⚠️ Assure-toi que ce statut existe dans missions_status_check
-        },
-      ]);
+      const total = parseFloat(form.service_price || 0) + parseFloat(form.travel_fee || 0);
+
+      // ✅ Créer la mission avec les deux montants distincts
+      const { data: created, error: missionError } = await supabase
+        .from("missions")
+        .insert([
+          {
+            client_id: booking.client_id,
+            pro_id: session.user.id,
+            service: booking.service,
+            description: form.note || booking.notes,
+            date: form.date,
+            time: form.time,
+            duration: 60,
+            price: total,
+            status: "proposed",
+            meta: {
+              service_price: parseFloat(form.service_price),
+              travel_fee: parseFloat(form.travel_fee || 0),
+            },
+          },
+        ])
+        .select()
+        .single();
 
       if (missionError) throw missionError;
 
-      // ✅ Mettre à jour la demande client d'origine
-      const { error: updateError } = await supabase
-        .from("bookings")
-        .update({
-          status: "proposed",
-          pro_id: session.user.id,
-        })
-        .eq("id", booking.id);
+      // ✅ Mettre à jour la demande du client (statut offers)
+      console.log("🔄 Updating booking status → offers for:", booking.id);
 
-      if (updateError) throw updateError;
+      const { error: updateBookingErr } = await supabase
+        .from("bookings")
+        .update({ status: "offers", pro_id: session.user.id })
+        .eq("id", booking.id);
+      if (updateBookingErr) console.error("❌ updateBookingErr:", updateBookingErr);
+
+      // ✅ Supprimer la notification pour ce pro
+      await supabase
+        .from("booking_notifications")
+        .delete()
+        .eq("booking_id", booking.id)
+        .eq("pro_id", session.user.id);
 
       setToast({ message: "✅ Proposal sent successfully!", type: "success" });
 
       setTimeout(() => {
-        onSuccess?.();
+        onSuccess?.(created); // renvoie la mission créée au parent
         onClose?.();
-      }, 1500);
+      }, 800);
     } catch (err) {
       console.error("❌ handleSubmit error:", err);
       setToast({ message: `❌ ${err.message}`, type: "error" });
@@ -136,7 +148,6 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
               />
             </div>
-
             <div className="flex-1">
               <label className="text-sm font-medium">Time</label>
               <input

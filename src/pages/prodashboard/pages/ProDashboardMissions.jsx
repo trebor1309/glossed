@@ -9,17 +9,9 @@ import ProMissionDetailsModal from "@/components/modals/ProMissionDetailsModal";
 import ProEvaluationModal from "@/components/modals/ProEvaluationModal";
 
 /* ---------------------------------------------------------
-   🧠 Helper – format "time" (e.g. "13:00:00" -> "13:00")
+   🧠 Utils
 --------------------------------------------------------- */
-const formatTime = (t) => {
-  if (!t) return "";
-  // Supabase time => "HH:MM:SS"
-  if (typeof t === "string" && t.includes(":")) {
-    const [hh, mm] = t.split(":");
-    return `${hh}:${mm}`;
-  }
-  return t;
-};
+const formatTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
 
 /* ---------------------------------------------------------
    🌸 Composant principal
@@ -43,58 +35,40 @@ export default function ProDashboardMissions() {
     const fetchMissions = async () => {
       setLoading(true);
       try {
-        // 1️⃣ Bookings directement assignés à ce pro
-        const { data: directBookings, error: directError } = await supabase
+        // 1) Bookings directement assignés au pro
+        const { data: directBookings } = await supabase
           .from("bookings")
           .select("*")
           .eq("pro_id", session.user.id);
 
-        if (directError) throw directError;
-
-        // 2️⃣ Bookings notifiés à ce pro via booking_notifications
-        const { data: notifications, error: notifError } = await supabase
+        // 2) Bookings notifiés mais pas encore traités
+        const { data: notifications } = await supabase
           .from("booking_notifications")
           .select("booking_id")
           .eq("pro_id", session.user.id);
 
-        if (notifError) throw notifError;
-
-        const notifiedIds = notifications.map((n) => n.booking_id);
-
+        const ids = (notifications || []).map((n) => n.booking_id);
         let notifiedBookings = [];
-        if (notifiedIds.length > 0) {
-          const { data: nb, error: nbError } = await supabase
+        if (ids.length) {
+          const { data: nb } = await supabase
             .from("bookings")
             .select("*")
-            .in("id", notifiedIds);
-          if (nbError) throw nbError;
-          notifiedBookings = nb;
+            .in("id", ids)
+            .eq("status", "pending"); // uniquement pending
+          notifiedBookings = nb || [];
         }
 
-        // 3️⃣ Missions créées par le pro
-        const { data: proMissions, error: missionsError } = await supabase
+        // 3) Missions du pro (proposals, confirmed, completed…)
+        const { data: proMissions } = await supabase
           .from("missions")
           .select("*")
           .eq("pro_id", session.user.id)
           .order("date", { ascending: true });
 
-        if (missionsError) throw missionsError;
-
-        // 4️⃣ Fusion finale
-        const merged = [
-          ...(directBookings || []),
-          ...(notifiedBookings || []),
-          ...(proMissions || []),
-        ];
-
-        console.log("📦 Direct bookings:", directBookings);
-        console.log("📨 Notified bookings:", notifiedBookings);
-        console.log("🚀 Pro missions:", proMissions);
-        console.log("🧩 Merged result:", merged);
-
-        setMissions(merged);
-      } catch (err) {
-        console.error("❌ fetchMissions error:", err);
+        // Fusion
+        setMissions([...(directBookings || []), ...notifiedBookings, ...(proMissions || [])]);
+      } catch (e) {
+        console.error("❌ fetchMissions error:", e);
       } finally {
         setLoading(false);
       }
@@ -104,11 +78,10 @@ export default function ProDashboardMissions() {
   }, [session?.user?.id]);
 
   /* ---------------------------------------------------------
-     2️⃣ Écoute temps réel des nouvelles notifications
+     2️⃣ Écoute temps réel pour nouvelles demandes
   --------------------------------------------------------- */
   useEffect(() => {
     if (!session?.user?.id) return;
-    console.log("🛰️ Connecting Realtime channel for pro:", session.user.id);
 
     const channel = supabase
       .channel("booking-notifications")
@@ -122,25 +95,21 @@ export default function ProDashboardMissions() {
         },
         async (payload) => {
           const { booking_id } = payload.new;
-          const { data: booking, error } = await supabase
+          const { data: booking } = await supabase
             .from("bookings")
             .select("*")
             .eq("id", booking_id)
             .single();
 
-          if (!error && booking) {
+          if (booking) {
             console.log("📩 New booking received via Realtime:", booking);
             setMissions((prev) => [booking, ...prev]);
-            setProBadge?.((n) => (n || 0) + 1);
+            setProBadge((n) => (n || 0) + 1);
             setToast({ message: "📩 New booking request in your area!", type: "success" });
           }
         }
       )
-      .subscribe((status) => {
-        console.log("📡 Channel status:", status);
-      });
-
-    console.log("✅ Subscribed to Realtime successfully!");
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -148,7 +117,7 @@ export default function ProDashboardMissions() {
   }, [session?.user?.id, setProBadge]);
 
   /* ---------------------------------------------------------
-     3️⃣ Refuser une demande (supprime la notif pour CE pro)
+     3️⃣ Refuser une demande
   --------------------------------------------------------- */
   const handleRefuse = async (booking) => {
     try {
@@ -158,11 +127,9 @@ export default function ProDashboardMissions() {
         .eq("booking_id", booking.id)
         .eq("pro_id", session.user.id);
 
-      // On enlève ce booking de la liste (les autres pros gardent leur notif)
       setMissions((prev) => prev.filter((m) => m.id !== booking.id));
       setToast({ message: "❌ Request removed from your list", type: "info" });
     } catch (err) {
-      console.error(err);
       setToast({ message: `❌ ${err.message}`, type: "error" });
     }
   };
@@ -206,7 +173,12 @@ export default function ProDashboardMissions() {
           booking={selectedBooking}
           session={session}
           onClose={() => setSelectedBooking(null)}
-          onSuccess={() => {
+          onSuccess={(createdMission) => {
+            // enlève le booking et ajoute la mission
+            setMissions((prev) => [
+              createdMission,
+              ...prev.filter((m) => m.id !== selectedBooking.id),
+            ]);
             setSelectedBooking(null);
             setToast({ message: "Proposal sent!", type: "success" });
           }}
@@ -276,7 +248,7 @@ export default function ProDashboardMissions() {
         setSelectedMission={setSelectedMission}
       />
 
-      {/* ✅ Modals Détails & Evaluation */}
+      {/* ✅ Modal Détails */}
       {selectedMission && (
         <ProMissionDetailsModal
           booking={selectedMission}
@@ -336,9 +308,15 @@ function MissionSection({
                 <p className="text-sm text-gray-500">
                   {m.date} — {m.time_slot || formatTime(m.time) || ""}
                 </p>
-                {/* address / notes existent sur bookings; missions peuvent ne pas les avoir */}
-                {(m.address || m.description) && (
-                  <p className="text-sm text-gray-500">{m.address || m.description}</p>
+                {typeof m.price !== "undefined" && (
+                  <p className="text-sm text-gray-700 font-medium">
+                    € {Number(m.price).toFixed(2)}
+                  </p>
+                )}
+                {m.address && (
+                  <p className="text-sm text-gray-500">
+                    <span className="font-medium">Address:</span> {m.address}
+                  </p>
                 )}
                 {m.notes && <p className="text-xs text-gray-400 italic mt-1">“{m.notes}”</p>}
               </div>
@@ -351,13 +329,13 @@ function MissionSection({
                 {m.status === "pending" ? (
                   <div className="flex gap-2">
                     <button
-                      onClick={() => onOpenProposal?.(m)}
+                      onClick={() => onOpenProposal && onOpenProposal(m)}
                       className="px-3 py-1.5 text-sm bg-rose-600 text-white rounded-full hover:bg-rose-700 transition"
                     >
                       Accept
                     </button>
                     <button
-                      onClick={() => onRefuse?.(m)}
+                      onClick={() => onRefuse && onRefuse(m)}
                       className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition"
                     >
                       Refuse
@@ -365,7 +343,7 @@ function MissionSection({
                   </div>
                 ) : (
                   <button
-                    onClick={() => setSelectedMission?.(m)}
+                    onClick={() => setSelectedMission && setSelectedMission(m)}
                     className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
                     title="View details"
                   >

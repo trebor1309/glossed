@@ -1,14 +1,39 @@
+// src/components/modals/ProMissionDetailsModal.jsx
 import { motion } from "framer-motion";
-import { X, Calendar, Clock, MapPin, FileText, MessageSquare, Star } from "lucide-react";
+import {
+  X,
+  Calendar,
+  Clock,
+  MapPin,
+  FileText,
+  MessageSquare,
+  Star,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-/* ---------------------------------------------------------
-   🧠 Modal Détails d'une mission (Pro)
---------------------------------------------------------- */
+
+const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
+const fmtDate = (d) => {
+  try {
+    return new Date(d).toLocaleDateString();
+  } catch {
+    return d;
+  }
+};
+
 export default function ProMissionDetailsModal({ booking, onClose, onChat, onEvaluate }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   if (!booking) return null;
+
+  const isMission = typeof booking.price !== "undefined" || typeof booking.time !== "undefined";
+  const status = booking.status;
+  const showChat = status === "confirmed"; // ⬅️ chat seulement confirmé
+
+  const dateLabel = isMission ? fmtDate(booking.date) : booking.date;
+  const timeLabel = isMission ? fmtTime(booking.time) : booking.time_slot;
 
   return (
     <motion.div
@@ -25,7 +50,6 @@ export default function ProMissionDetailsModal({ booking, onClose, onChat, onEva
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
       >
-        {/* ❌ Close */}
         <button
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 transition"
@@ -37,69 +61,86 @@ export default function ProMissionDetailsModal({ booking, onClose, onChat, onEva
           <FileText size={20} /> Mission details
         </h2>
 
-        {/* Infos principales */}
         <div className="space-y-3 text-gray-700">
           <p>
             <strong>Service:</strong> {booking.service}
           </p>
           <p className="flex items-center gap-2">
             <Calendar size={16} className="text-rose-500" />
-            <span>{booking.date}</span>
+            <span>{dateLabel}</span>
           </p>
-          <p className="flex items-center gap-2">
-            <Clock size={16} className="text-rose-500" />
-            <span>{booking.time_slot}</span>
-          </p>
-          <p className="flex items-center gap-2">
-            <MapPin size={16} className="text-rose-500" />
-            <span>{booking.address}</span>
-          </p>
-
+          {timeLabel && (
+            <p className="flex items-center gap-2">
+              <Clock size={16} className="text-rose-500" />
+              <span>{timeLabel}</span>
+            </p>
+          )}
+          {(booking.address || booking.description) && (
+            <p className="flex items-center gap-2">
+              <MapPin size={16} className="text-rose-500" />
+              <span>{booking.address || booking.description}</span>
+            </p>
+          )}
+          {typeof booking.price !== "undefined" && (
+            <p>
+              <strong>Price:</strong> € {Number(booking.price).toFixed(2)}
+            </p>
+          )}
           {booking.notes && <p className="italic text-sm text-gray-500">“{booking.notes}”</p>}
 
           <div className="mt-4">
             <span
               className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${
-                booking.status === "pending"
+                status === "pending"
                   ? "bg-amber-100 text-amber-700"
-                  : booking.status === "proposed"
+                  : status === "proposed"
                     ? "bg-blue-100 text-blue-700"
-                    : booking.status === "confirmed"
+                    : status === "confirmed"
                       ? "bg-green-100 text-green-700"
-                      : booking.status === "completed"
+                      : status === "completed"
                         ? "bg-rose-100 text-rose-700"
                         : "bg-gray-100 text-gray-600"
               }`}
             >
-              {booking.status}
+              {status}
             </span>
           </div>
         </div>
 
-        {/* Boutons d'action */}
-        <div className="mt-8 flex justify-end gap-3">
-          {["proposed", "confirmed", "completed"].includes(booking.status) && (
+        <div className="mt-8 flex flex-wrap justify-end gap-3">
+          {/* Proposé: Edit / Cancel (brancher ensuite) */}
+          {status === "proposed" && (
+            <>
+              <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-full font-medium hover:bg-gray-100 transition flex items-center gap-2">
+                <Pencil size={16} /> Edit proposal
+              </button>
+              <button className="px-4 py-2 border border-red-200 text-red-600 rounded-full font-medium hover:bg-red-50 transition flex items-center gap-2">
+                <Trash2 size={16} /> Cancel proposal
+              </button>
+            </>
+          )}
+
+          {/* Chat seulement quand confirmé */}
+          {showChat && (
             <button
-              onClick={() => navigate(`/dashboard/chat/${booking.id}`)} // ✅ redirection directe
+              onClick={() => navigate(`/dashboard/chat/${booking.id}`)}
               className="px-4 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.03] transition flex items-center gap-2"
             >
-              <MessageSquare size={16} />
-              Chat
+              <MessageSquare size={16} /> Chat
             </button>
           )}
 
-          {booking.status === "completed" && (
+          {status === "completed" && (
             <button
               onClick={() => {
                 setLoading(true);
-                onEvaluate && onEvaluate(booking);
+                onEvaluate?.(booking);
                 setTimeout(() => setLoading(false), 300);
               }}
               disabled={loading}
               className="px-4 py-2 bg-amber-500 text-white rounded-full font-semibold hover:bg-amber-600 transition disabled:opacity-60 flex items-center gap-2"
             >
-              <Star size={16} />
-              Evaluate
+              <Star size={16} /> Evaluate
             </button>
           )}
 

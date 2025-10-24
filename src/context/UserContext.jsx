@@ -54,41 +54,41 @@ export function UserProvider({ children }) {
   // -----------------------------------------------------------
   // 🔄 Initialisation de la session (cross-browser)
   // -----------------------------------------------------------
+  // remplace ton useEffect principal (auth listener)
   useEffect(() => {
-    const initSession = async () => {
+    const init = async () => {
       setLoading(true);
-      const { data, error } = await supabase.auth.getSession();
-
-      if (error) console.error("❌ getSession error:", error);
-
+      const { data } = await supabase.auth.getSession();
       if (data?.session) {
         setSession(data.session);
         await fetchUserProfile(data.session.user);
       } else {
-        // 🔹 On tente de restaurer depuis localStorage
-        const stored = localStorage.getItem("glossed_user");
-        if (stored) setUser(JSON.parse(stored));
+        setUser(null);
       }
       setLoading(false);
     };
+    init();
 
-    initSession();
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("🔄 Auth state changed:", event);
 
-    // ✅ Écoute en temps réel des changements de session
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("🔄 Auth state changed:", _event);
-      if (session) {
+      // ✅ corrige le cas TOKEN_REFRESHED : on ne réinitialise pas tout
+      if (event === "TOKEN_REFRESHED" && session) {
+        setSession(session);
+        return; // pas de reset inutile
+      }
+
+      if (session?.user) {
         setSession(session);
         await fetchUserProfile(session.user);
       } else {
-        setSession(null);
         setUser(null);
         localStorage.removeItem("glossed_user");
       }
     });
 
     return () => {
-      listener.subscription.unsubscribe();
+      authListener.subscription.unsubscribe();
     };
   }, []);
 
