@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { Clock, Bell, CheckCircle, Star, XCircle, Trash2, Edit3, Eye } from "lucide-react";
-import OffersModal from "@/components/modals/OffersModal";
+import ClientOffersModal from "@/components/modals/ClientOffersModal";
 import { AnimatePresence } from "framer-motion";
 import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 import CalendarView from "@/components/CalendarView";
@@ -29,30 +29,77 @@ export default function DashboardReservations() {
     setShowEditModal(true);
   };
 
-  // 🔹 Charger les réservations du client
+  // -----------------------------------------------------
+  // 🔹 Charger les réservations et offres du client
+  // -----------------------------------------------------
   useEffect(() => {
     if (!session?.user) return;
 
     const fetchBookings = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("bookings")
-        .select("*")
-        .eq("client_id", session.user.id)
-        .order("date", { ascending: true });
+      try {
+        const clientId = session.user.id;
+        console.log("🧩 Client ID:", clientId);
 
-      if (!error) setBookings(data);
-      setLoading(false);
+        // 1️⃣ Bookings du client
+        const { data: bookingsData, error: bookingErr } = await supabase
+          .from("bookings")
+          .select("*")
+          .eq("client_id", clientId)
+          .order("date", { ascending: true });
+        if (bookingErr) throw bookingErr;
+
+        // 2️⃣ Missions proposées au client
+        const { data: offersData, error: offersErr } = await supabase
+          .from("missions")
+          .select("*")
+          .eq("client_id", clientId)
+          .in("status", ["proposed", "offers"])
+          .order("date", { ascending: true });
+        if (offersErr) throw offersErr;
+
+        // 3️⃣ Tag + Fusion
+        const bookingsTagged = (bookingsData || []).map((b) => ({
+          ...b,
+          type: "booking",
+        }));
+        const offersTagged = (offersData || []).map((m) => ({
+          ...m,
+          type: "mission",
+        }));
+
+        // 4️⃣ Regrouper les missions par booking_id pour n’avoir qu’une ligne
+        const merged = [...bookingsTagged, ...offersTagged];
+        const groupedMap = new Map();
+
+        for (const item of merged) {
+          const key = item.type === "mission" ? item.booking_id : item.id;
+          if (!groupedMap.has(key)) groupedMap.set(key, item);
+        }
+
+        const groupedList = Array.from(groupedMap.values());
+
+        console.log("📋 BOOKINGS:", bookingsTagged);
+        console.log("📋 OFFERS:", offersTagged);
+
+        setBookings(groupedList);
+      } catch (err) {
+        console.error("❌ fetchBookings error:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchBookings();
   }, [session]);
 
+  // -----------------------------------------------------
+  // 🗑️ Supprimer une réservation
+  // -----------------------------------------------------
   const handleDelete = async (id) => {
     if (!confirm("Are you sure you want to delete this reservation?")) return;
 
     const { error } = await supabase.from("bookings").delete().eq("id", id);
-
     if (error) {
       setToast({
         message: "Failed to delete booking. Please try again.",
@@ -68,14 +115,19 @@ export default function DashboardReservations() {
     });
   };
 
+  // -----------------------------------------------------
+  // 🎨 Groupement par statut
+  // -----------------------------------------------------
   const displayBookings = selectedDayBookings ? selectedDayBookings.dayBookings : bookings;
 
   const grouped = {
-    pending: displayBookings.filter((b) => b.status === "pending"),
-    offers: displayBookings.filter((b) => b.status === "offers"),
-    confirmed: displayBookings.filter((b) => b.status === "confirmed"),
-    completed: displayBookings.filter((b) => b.status === "completed"),
-    cancelled: displayBookings.filter((b) => b.status === "cancelled"),
+    pending: displayBookings.filter((b) => (b.status || "").toLowerCase() === "pending"),
+    offers: displayBookings.filter((b) =>
+      ["offers", "proposed"].includes((b.status || "").toLowerCase())
+    ),
+    confirmed: displayBookings.filter((b) => (b.status || "").toLowerCase() === "confirmed"),
+    completed: displayBookings.filter((b) => (b.status || "").toLowerCase() === "completed"),
+    cancelled: displayBookings.filter((b) => (b.status || "").toLowerCase() === "cancelled"),
   };
 
   if (loading)
@@ -85,8 +137,10 @@ export default function DashboardReservations() {
       </div>
     );
 
+  // -----------------------------------------------------
+  // 🧱 Rendu principal
+  // -----------------------------------------------------
   return (
-    // ✅ même structure que DashboardAccount / DashboardSettings
     <section className="mt-10 max-w-4xl mx-auto p-4 space-y-6">
       <h1 className="text-2xl font-bold text-gray-800 text-center mb-4">My Reservations</h1>
 
@@ -160,18 +214,13 @@ export default function DashboardReservations() {
         empty="No cancelled reservations."
       />
 
-      {/* ✅ Modals gérés ici */}
+      {/* ✅ Modals */}
       <AnimatePresence>
         {showOffersModal && selectedBooking && (
-          <OffersModal
+          <ClientOffersModal
             booking={selectedBooking}
             onClose={() => setShowOffersModal(false)}
-            onAccept={(id, offer) => {
-              setBookings((prev) =>
-                prev.map((b) =>
-                  b.id === id ? { ...b, status: "confirmed", accepted_offer: offer } : b
-                )
-              );
+            onAccepted={() => {
               setToast({
                 message: "Offer accepted successfully!",
                 type: "success",
@@ -204,13 +253,12 @@ export default function DashboardReservations() {
         )}
       </AnimatePresence>
 
-      {/* ✅ Notification Glossed */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </section>
   );
 }
 
-/* 🔸 Sous-composant */
+/* 🔸 Sous-composant Section */
 function ReservationSection({
   title,
   icon,
@@ -232,15 +280,18 @@ function ReservationSection({
         <ul className="divide-y divide-gray-100">
           {data.map((b) => (
             <li
-              key={b.id}
+              key={`${b.type || "item"}-${b.id}`}
               className="py-3 flex justify-between items-start hover:bg-gray-50 px-2 rounded-lg transition"
             >
               <div className="flex-1">
                 <p className="font-medium text-gray-800">{b.service}</p>
                 <p className="text-sm text-gray-500">
-                  {b.date} — {b.time_slot}
+                  {b.date ? new Date(b.date).toLocaleDateString() : "No date"} —{" "}
+                  {b.time || b.time_slot || "No time"}
                 </p>
-                <p className="text-sm text-gray-500">{b.address}</p>
+                <p className="text-sm text-gray-500">
+                  {b.address || b.description || "No address provided"}
+                </p>
                 {b.notes && <p className="text-xs text-gray-400 italic mt-1">“{b.notes}”</p>}
               </div>
 

@@ -1,3 +1,4 @@
+// src/components/modals/ProProposalModal.jsx
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useState } from "react";
@@ -5,13 +6,11 @@ import { supabase } from "@/lib/supabaseClient";
 import Toast from "@/components/ui/Toast";
 
 export default function ProProposalModal({ booking, onClose, onSuccess, session }) {
-  // 🧠 Extraire une heure de départ depuis le time_slot du client
+  // 🧠 Extraire une heure utilisable "HH:mm" depuis le time_slot du client (ex: "Afternoon (13–18)" → "13:00")
   const extractTimeFromSlot = (slot) => {
     if (!slot) return "";
-    // ex: "Afternoon (13–18)" → match "(13–18)" → retourne "13:00"
     const match = slot.match(/\((\d{2})[–-](\d{2})\)/);
-    if (match) return `${match[1]}:00`;
-    return "";
+    return match ? `${match[1]}:00` : "";
   };
 
   const [form, setForm] = useState({
@@ -25,51 +24,74 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
+  const requiredOk = () =>
+    form.service_price !== "" &&
+    !Number.isNaN(parseFloat(form.service_price)) &&
+    form.date &&
+    form.time;
+
   // -------------------------------------------------------
   // 📤 Envoi de la proposition du pro
   // -------------------------------------------------------
   const handleSubmit = async () => {
-    if (!form.service_price || !form.date || !form.time) {
-      setToast({ message: "❌ Please fill all required fields", type: "error" });
+    if (!requiredOk()) {
+      setToast({
+        message: "❌ Please fill all required fields (price, date, time).",
+        type: "error",
+      });
       return;
     }
 
+    const service = parseFloat(form.service_price || 0);
+    const travel = parseFloat(form.travel_fee || 0);
+    const total = Number.isFinite(service + travel) ? service + travel : 0;
+
     setLoading(true);
     try {
-      // ✅ Créer la mission proposée dans Supabase
-      const { error: missionError } = await supabase.from("missions").insert([
-        {
-          client_id: booking.client_id,
-          pro_id: session.user.id,
-          service: booking.service,
-          description: form.note || booking.notes,
-          date: form.date,
-          time: form.time, // format "HH:mm"
-          duration: 60,
-          price: parseFloat(form.service_price || 0) + parseFloat(form.travel_fee || 0),
-          status: "proposed", // ⚠️ Assure-toi que ce statut existe dans missions_status_check
-        },
-      ]);
+      // 1) créer la mission (statut proposed)
+      const { data: created, error: missionError } = await supabase
+        .from("missions")
+        .insert([
+          {
+            booking_id: booking.id, // LIEN ENTRE BOOKING ET MISSION
+            client_id: booking.client_id,
+            pro_id: session.user.id,
+            service: booking.service,
+            description: form.note || booking.notes || null,
+            date: form.date, // DATE (timestamp/timestamptz côté DB)
+            time: form.time, // "HH:mm" (time without time zone côté DB)
+            duration: 60,
+            price: total,
+            status: "proposed", // doit exister dans missions_status_check
+          },
+        ])
+        .select()
+        .single();
 
       if (missionError) throw missionError;
 
-      // ✅ Mettre à jour la demande client d'origine
-      const { error: updateError } = await supabase
+      // 2) marquer la demande comme "offers" côté client (sans la lier à ce pro)
+      const { error: updateBookingErr } = await supabase
         .from("bookings")
-        .update({
-          status: "proposed",
-          pro_id: session.user.id,
-        })
+        .update({ status: "offers" }) // on ne met PAS pro_id ici → autres pros peuvent encore proposer
         .eq("id", booking.id);
+      if (updateBookingErr) throw updateBookingErr;
 
-      if (updateError) throw updateError;
+      // 3) enlever la notif pour CE pro → la demande sort de “Pending requests” chez lui
+      const { error: notifErr } = await supabase
+        .from("booking_notifications")
+        .delete()
+        .eq("booking_id", booking.id)
+        .eq("pro_id", session.user.id);
+      if (notifErr) throw notifErr;
 
       setToast({ message: "✅ Proposal sent successfully!", type: "success" });
 
+      // ⚡ remonter la mission créée pour rafraîchir immédiatement “Proposals Sent”
       setTimeout(() => {
-        onSuccess?.();
+        onSuccess?.(created);
         onClose?.();
-      }, 1500);
+      }, 600);
     } catch (err) {
       console.error("❌ handleSubmit error:", err);
       setToast({ message: `❌ ${err.message}`, type: "error" });
@@ -93,7 +115,7 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
       >
-        {/* ❌ Bouton de fermeture */}
+        {/* Close */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
@@ -101,15 +123,16 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
           <X size={20} />
         </button>
 
-        {/* 🧾 Titre */}
         <h2 className="text-xl font-semibold mb-4 text-center">Propose Your Offer</h2>
 
-        {/* 🧮 Formulaire */}
+        {/* Form */}
         <div className="space-y-3">
           <div>
             <label className="text-sm font-medium">Service price (€)</label>
             <input
               type="number"
+              min="0"
+              step="0.01"
               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-rose-500"
               value={form.service_price}
               onChange={(e) => setForm({ ...form, service_price: e.target.value })}
@@ -120,6 +143,8 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
             <label className="text-sm font-medium">Travel fee (€)</label>
             <input
               type="number"
+              min="0"
+              step="0.01"
               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-rose-500"
               value={form.travel_fee}
               onChange={(e) => setForm({ ...form, travel_fee: e.target.value })}
@@ -136,7 +161,6 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
               />
             </div>
-
             <div className="flex-1">
               <label className="text-sm font-medium">Time</label>
               <input
@@ -158,9 +182,16 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
               placeholder="Optional note..."
             />
           </div>
+
+          {/* Rappel adresse (utile pour le pro) */}
+          {booking?.address && (
+            <p className="text-xs text-gray-500 mt-1">
+              <strong>Address:</strong> {booking.address}
+            </p>
+          )}
         </div>
 
-        {/* 🪄 Boutons */}
+        {/* Actions */}
         <div className="mt-6 flex justify-end gap-3">
           <button
             onClick={onClose}
@@ -177,7 +208,6 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
           </button>
         </div>
 
-        {/* 🧈 Toast */}
         {toast && (
           <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
         )}
