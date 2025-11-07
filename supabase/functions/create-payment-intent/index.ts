@@ -93,6 +93,12 @@ Deno.serve(async (req) => {
           quantity: 1,
         },
       ],
+      metadata: {
+        mission_id: mission.id,
+        pro_id: mission.pro_id,
+        client_id,
+      },
+
       success_url: `${BASE_URL}/dashboard/payment/success`,
       cancel_url: `${BASE_URL}/dashboard/payment/cancel`,
     });
