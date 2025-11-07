@@ -64,6 +64,11 @@ Deno.serve(async (req) => {
           destination: pro.stripe_account_id,
         },
         application_fee_amount: fee,
+        metadata: {
+          mission_id: mission.id,
+          pro_id: mission.pro_id,
+          client_id,
+        },
       },
       line_items: [
         {
@@ -78,7 +83,7 @@ Deno.serve(async (req) => {
           quantity: 1,
         },
       ],
-      // ✅ C'est ICI que la metadata doit être ajoutée
+      // ✅ aussi ici pour la session elle-même
       metadata: {
         mission_id: mission.id,
         pro_id: mission.pro_id,
