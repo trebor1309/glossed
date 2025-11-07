@@ -1,236 +1,132 @@
-import { useEffect, useMemo, useState } from "react";
+// src/components/modals/ClientOffersModal.jsx
+import { useEffect, useState } from "react";
+import { useUser } from "@/context/UserContext";
+
 import { motion } from "framer-motion";
-import { X, User2, CreditCard, Loader2 } from "lucide-react";
+import { X, CreditCard, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import Toast from "@/components/ui/Toast";
 
-/**
- * ClientOffersModal
- * - Liste les missions.status='proposed' pour un booking donné
- * - Affiche le prix PRO + majoration 10% = total client
- * - Au clic "Accept & pay": crée un paiement + appelle une Edge Function Stripe
- *   -> la fonction doit renvoyer { url } = URL Checkout, on redirige
- *
- * Prérequis DB conseillés:
- * missions: id, booking_id, pro_id, price, platform_fee, client_total, status, payment_status
- * payments: id, mission_id, client_id, amount, provider, status
- *
- * Edge Function attendue: "create_checkout_session"
- * payload: { mission_id, booking_id, amount, currency? }
- * response: { url }
- */
 export default function ClientOffersModal({ booking, onClose, onAccepted }) {
-  const [loading, setLoading] = useState(true);
   const [offers, setOffers] = useState([]);
-  const [proMap, setProMap] = useState({});
-  const [submitId, setSubmitId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
+  const { session } = useUser();
 
-  // charger offres proposées pour ce booking
+  // 🔹 Charger les offres liées à ce booking
   useEffect(() => {
     if (!booking?.id) return;
-    let mounted = true;
 
     (async () => {
       try {
-        setLoading(true);
-
-        const { data: missions, error: mErr } = await supabase
+        const { data, error } = await supabase
           .from("missions")
           .select("*")
-          .eq("booking_id", booking.id)
+          .eq("client_id", booking.client_id)
           .eq("status", "proposed")
           .order("created_at", { ascending: false });
 
-        if (mErr) throw mErr;
-
-        // Récupérer infos pros (affichage nom)
-        const proIds = [...new Set((missions || []).map((m) => m.pro_id).filter(Boolean))];
-        let map = {};
-        if (proIds.length) {
-          const { data: users, error: uErr } = await supabase
-            .from("users")
-            .select("id, full_name, business_name")
-            .in("id", proIds);
-          if (uErr) throw uErr;
-          (users || []).forEach((u) => {
-            map[u.id] = u.business_name || u.full_name || u.id;
-          });
-        }
-
-        if (!mounted) return;
-        setOffers(missions || []);
-        setProMap(map);
+        if (error) throw error;
+        setOffers(data || []);
       } catch (err) {
-        setToast({ type: "error", message: `❌ ${err.message}` });
+        console.error("❌ Error loading offers:", err);
+        setToast({ type: "error", message: err.message });
       } finally {
-        if (mounted) setLoading(false);
+        setLoading(false);
       }
     })();
-
-    return () => {
-      mounted = false;
-    };
   }, [booking?.id]);
 
-  // calcule total client avec majoration 10% si non précalculé
-  const displayOffers = useMemo(() => {
-    return offers.map((o) => {
-      const price = Number(o.price || 0);
-      const fee = Number(
-        o.platform_fee != null ? o.platform_fee : Math.round(price * 0.1 * 100) / 100
-      );
-      const total = Number(
-        o.client_total != null ? o.client_total : Math.round((price + fee) * 100) / 100
-      );
-      return { ...o, _computed_fee: fee, _computed_total: total };
-    });
-  }, [offers]);
-
-  const acceptAndPay = async (offer) => {
+  // 💳 Lancer le paiement Stripe via la fonction Supabase
+  const handlePayAndConfirm = async (offer) => {
     try {
-      setSubmitId(offer.id);
+      setSubmitting(true);
+      console.log("🚀 Sending payment intent for:", {
+        mission_id: offer.id,
+        client_id: booking.client_id,
+      });
 
-      // 1) Assurer que platform_fee & client_total sont bien stockés
-      const fee = offer._computed_fee;
-      const total = offer._computed_total;
-
-      const { error: upErr } = await supabase
-        .from("missions")
-        .update({
-          platform_fee: fee,
-          client_total: total,
-          payment_status: "pending", // démarre le process
-        })
-        .eq("id", offer.id);
-      if (upErr) throw upErr;
-
-      // 2) Créer l'enregistrement de paiement
-      const { data: payment, error: payErr } = await supabase
-        .from("payments")
-        .insert([
-          {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-payment-intent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`, // ✅ ajoute ce header
+          },
+          body: JSON.stringify({
             mission_id: offer.id,
             client_id: booking.client_id,
-            amount: total,
-            provider: "stripe",
-            status: "pending",
-          },
-        ])
-        .select()
-        .single();
-      if (payErr) throw payErr;
-
-      // 3) Appeler l'Edge Function Stripe pour créer la session checkout
-      //    ➜ tu dois avoir déployé la fonction "create_checkout_session"
-      //    ➜ elle doit renvoyer { url }
-      const { data: fnRes, error: fnErr } = await supabase.functions.invoke(
-        "create_checkout_session",
-        {
-          body: {
-            mission_id: offer.id,
-            booking_id: booking.id,
-            payment_id: payment.id,
-            amount: total,
-            currency: "eur",
-            // Optionnel: success_url / cancel_url côté fonction
-          },
+          }),
         }
       );
-      if (fnErr) throw fnErr;
-      if (!fnRes?.url) throw new Error("No checkout URL returned.");
 
-      // 4) Rediriger vers la page de paiement
-      onAccepted?.(); // ferme le modal côté parent
-      window.location.href = fnRes.url;
+      const data = await res.json();
+      console.log("💳 Stripe response:", data);
+
+      if (!res.ok) throw new Error(data?.error || "Payment creation failed");
+      if (!data?.url) throw new Error("No checkout URL returned");
+
+      // ✅ Redirige vers Stripe Checkout
+      window.location.href = data.url;
     } catch (err) {
-      setToast({ type: "error", message: `❌ ${err.message}` });
+      console.error("❌ Payment error:", err);
+      setToast({ type: "error", message: err.message });
     } finally {
-      setSubmitId(null);
+      setSubmitting(false);
     }
   };
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
       onClick={onClose}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
     >
       <motion.div
         className="bg-white w-11/12 max-w-2xl rounded-2xl shadow-xl p-6 relative"
         onClick={(e) => e.stopPropagation()}
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
       >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
-          aria-label="Close"
         >
           <X size={20} />
         </button>
 
-        <h2 className="text-xl font-semibold text-gray-800 mb-2 text-center">
+        <h2 className="text-xl font-semibold mb-2 text-center text-gray-800">
           Offers for “{booking?.service}”
         </h2>
-        <p className="text-sm text-gray-500 text-center mb-4">
-          Prices below include a 10% service fee.
-        </p>
 
         {loading ? (
-          <div className="flex items-center gap-2 justify-center text-gray-600 py-10">
-            <Loader2 className="animate-spin" size={18} />
-            Loading offers…
+          <div className="flex items-center justify-center py-10 text-gray-600">
+            <Loader2 className="animate-spin" />
           </div>
-        ) : displayOffers.length === 0 ? (
+        ) : offers.length === 0 ? (
           <div className="text-center text-gray-500 py-10">No offers yet.</div>
         ) : (
           <ul className="space-y-3">
-            {displayOffers.map((o) => (
+            {offers.map((o) => (
               <li
                 key={o.id}
-                className="border rounded-xl p-4 flex items-center justify-between gap-4"
+                className="border rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center"
               >
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center">
-                    <User2 size={18} className="text-gray-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-800">{proMap[o.pro_id] || o.pro_id}</p>
-                    <p className="text-sm text-gray-600">
-                      Proposed date: <span className="font-medium">{o.date}</span>
-                      {o.meta?.time ? ` – ${o.meta.time}` : ""}
-                    </p>
-                    {o.description && (
-                      <p className="text-xs text-gray-400 italic mt-0.5">“{o.description}”</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="text-right min-w-[180px]">
+                <div>
+                  <p className="font-medium text-gray-800">{o.description || "No note"}</p>
                   <p className="text-sm text-gray-600">
-                    Pro price:{" "}
-                    <span className="font-medium">{Number(o.price || 0).toFixed(2)} €</span>
+                    {new Date(o.date).toLocaleDateString()} — {o.time}
                   </p>
-                  <p className="text-sm text-gray-600">
-                    Service fee (10%):{" "}
-                    <span className="font-medium">{Number(o._computed_fee).toFixed(2)} €</span>
-                  </p>
-                  <p className="text-base font-semibold text-gray-900">
-                    Total: {Number(o._computed_total).toFixed(2)} €
-                  </p>
-
-                  <button
-                    onClick={() => acceptAndPay(o)}
-                    disabled={!!submitId && submitId !== o.id}
-                    className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-rose-600 to-red-600 text-white text-sm font-semibold hover:scale-[1.02] transition disabled:opacity-60"
-                  >
-                    <CreditCard size={16} />
-                    {submitId === o.id ? "Redirecting…" : "Accept & pay"}
-                  </button>
+                  <p className="text-sm text-gray-800 font-semibold">{o.price} €</p>
                 </div>
+                <button
+                  onClick={() => handlePayAndConfirm(o)}
+                  disabled={submitting}
+                  className="mt-3 sm:mt-0 px-4 py-2 rounded-full bg-gradient-to-r from-rose-600 to-red-600 text-white font-semibold hover:scale-[1.02] transition disabled:opacity-60"
+                >
+                  <CreditCard size={16} /> {submitting ? "Processing…" : "Pay & Confirm"}
+                </button>
               </li>
             ))}
           </ul>

@@ -40,6 +40,7 @@ import DashboardAccount from "./pages/dashboard/pages/DashboardAccount";
 import DashboardSettings from "./pages/dashboard/pages/DashboardSettings";
 import DashboardMore from "./pages/dashboard/pages/DashboardMore";
 import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
+import PaymentSuccess from "@/pages/dashboard/payment/Success";
 
 // Pro dashboard
 import ProDashboardLayout from "./pages/prodashboard/ProDashboardLayout";
@@ -48,6 +49,8 @@ import ProDashboardMissions from "./pages/prodashboard/pages/ProDashboardMission
 import ProDashboardPayments from "./pages/prodashboard/pages/ProDashboardPayments";
 import ProDashboardSettings from "./pages/prodashboard/pages/ProDashboardSettings";
 import ProDashboardMore from "./pages/prodashboard/pages/ProDashboardMore";
+import StripeSuccess from "@/pages/prodashboard/stripe/Success";
+import StripeRefresh from "@/pages/prodashboard/stripe/Refresh";
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(() =>
@@ -179,6 +182,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               <Route path="settings" element={<DashboardSettings />} />
               <Route path="more" element={<DashboardMore />} />
             </Route>
+            <Route path="/dashboard/payment/success" element={<PaymentSuccess />} />
 
             {/* 💼 Dashboard Pro */}
             <Route
@@ -196,6 +200,8 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               <Route path="payments" element={<ProDashboardPayments />} />
               <Route path="settings" element={<ProDashboardSettings />} />
               <Route path="more" element={<ProDashboardMore />} />
+              <Route path="/prodashboard/stripe/success" element={<StripeSuccess />} />
+              <Route path="/prodashboard/stripe/refresh" element={<StripeRefresh />} />
             </Route>
           </Routes>
         </main>

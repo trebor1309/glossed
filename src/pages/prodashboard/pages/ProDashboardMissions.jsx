@@ -1,3 +1,4 @@
+// src/pages/prodashboard/pages/ProDashboardMissions.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -35,40 +36,49 @@ export default function ProDashboardMissions() {
     const fetchMissions = async () => {
       setLoading(true);
       try {
-        // 1) Bookings directement assignés au pro
-        const { data: directBookings } = await supabase
+        const proId = session.user.id;
+
+        // 1️⃣ Bookings directement assignés au pro
+        const { data: directBookings, error: directErr } = await supabase
           .from("bookings")
           .select("*")
-          .eq("pro_id", session.user.id);
+          .eq("pro_id", proId)
+          .order("date", { ascending: true });
+        if (directErr) throw directErr;
 
-        // 2) Bookings notifiés mais pas encore traités
-        const { data: notifications } = await supabase
+        // 2️⃣ Bookings reçus via notifications
+        const { data: notifData, error: notifErr } = await supabase
           .from("booking_notifications")
           .select("booking_id")
-          .eq("pro_id", session.user.id);
+          .eq("pro_id", proId);
+        if (notifErr) throw notifErr;
 
-        const ids = (notifications || []).map((n) => n.booking_id);
         let notifiedBookings = [];
-        if (ids.length) {
-          const { data: nb } = await supabase
+        if (notifData?.length) {
+          const bookingIds = notifData.map((n) => n.booking_id);
+          const { data, error } = await supabase
             .from("bookings")
             .select("*")
-            .in("id", ids)
-            .eq("status", "pending"); // uniquement pending
-          notifiedBookings = nb || [];
+            .in("id", bookingIds)
+            .eq("status", "pending")
+            .order("date", { ascending: true });
+          if (error) throw error;
+          notifiedBookings = data || [];
         }
 
-        // 3) Missions du pro (proposals, confirmed, completed…)
-        const { data: proMissions } = await supabase
+        // 3️⃣ Missions créées par le pro
+        const { data: proMissions, error: missionsErr } = await supabase
           .from("missions")
           .select("*")
-          .eq("pro_id", session.user.id)
+          .eq("pro_id", proId)
           .order("date", { ascending: true });
+        if (missionsErr) throw missionsErr;
 
-        // Fusion
-        setMissions([...(directBookings || []), ...notifiedBookings, ...(proMissions || [])]);
-      } catch (e) {
-        console.error("❌ fetchMissions error:", e);
+        // 4️⃣ Fusionner le tout
+        const merged = [...directBookings, ...notifiedBookings, ...proMissions];
+        setMissions(merged);
+      } catch (err) {
+        console.error("❌ fetchMissions error:", err);
       } finally {
         setLoading(false);
       }
@@ -161,20 +171,17 @@ export default function ProDashboardMissions() {
     <section className="mt-10 max-w-4xl mx-auto p-4 space-y-10 overflow-x-hidden">
       <h1 className="text-2xl font-bold text-gray-800 text-center mb-4">My Missions</h1>
 
-      {/* ✅ Vue calendrier */}
       <CalendarView
         bookings={missions}
         onSelectDay={(date, dayMissions) => setSelectedDayMissions({ date, dayMissions })}
       />
 
-      {/* ✅ Modal de proposition */}
       {selectedBooking && (
         <ProProposalModal
           booking={selectedBooking}
           session={session}
           onClose={() => setSelectedBooking(null)}
           onSuccess={(createdMission) => {
-            // enlève le booking et ajoute la mission
             setMissions((prev) => [
               createdMission,
               ...prev.filter((m) => m.id !== selectedBooking.id),
@@ -201,7 +208,6 @@ export default function ProDashboardMissions() {
         </div>
       )}
 
-      {/* ✅ Sections par statut */}
       <MissionSection
         title="Pending Requests"
         icon={<Clock size={20} className="text-amber-500" />}
@@ -248,7 +254,6 @@ export default function ProDashboardMissions() {
         setSelectedMission={setSelectedMission}
       />
 
-      {/* ✅ Modal Détails */}
       {selectedMission && (
         <ProMissionDetailsModal
           booking={selectedMission}
