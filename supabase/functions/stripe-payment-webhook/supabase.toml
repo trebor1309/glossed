@@ -1,0 +1,3 @@
+# supabase/functions/stripe-payment-webhook/supabase.toml
+[functions.stripe-payment-webhook]
+verify_jwt = false

@@ -1,4 +1,12 @@
 // /supabase/functions/stripe-payment-webhook/index.ts
+// -----------------------------------------------------------
+// ✅ Configuration Supabase Edge Function
+// Désactive la vérification JWT directement dans le code
+// -----------------------------------------------------------
+export const config = {
+  verifyJWT: false,
+};
+
 import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
