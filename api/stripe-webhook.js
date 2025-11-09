@@ -1,14 +1,18 @@
+// /api/stripe-webhook.js
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
+    // 🔑 URL de ton Edge Function Supabase
     const SUPABASE_FUNCTION_URL =
       "https://cdcnylgokphyltkctymi.functions.supabase.co/stripe-payment-webhook-v2";
 
-    const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    // 🔐 Utilise la variable Vite que tu as déjà sur Vercel
+    const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
+    // 📦 Transfère le corps reçu tel quel à Supabase
     const response = await fetch(SUPABASE_FUNCTION_URL, {
       method: "POST",
       headers: {
