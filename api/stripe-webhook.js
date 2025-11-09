@@ -1,9 +1,9 @@
 // /api/stripe-webhook.js
-// ✅ Proxy entre Stripe et Supabase — version finale (signature conservée)
+// ✅ Proxy entre Stripe et Supabase — version finale (envoi Buffer brut)
 
 export const config = {
   api: {
-    bodyParser: false, // Stripe veut le corps brut pour la vérification
+    bodyParser: false, // 🔒 Empêche tout parsing automatique
   },
 };
 
@@ -15,21 +15,21 @@ export default async function handler(req, res) {
   try {
     const SUPABASE_FUNCTION_URL =
       "https://cdcnylgokphyltkctymi.functions.supabase.co/stripe-payment-webhook-v2";
-
     const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
+
     if (!SUPABASE_ANON_KEY) {
       console.error("❌ Missing VITE_SUPABASE_ANON_KEY");
       return res.status(500).json({ error: "Missing Supabase anon key" });
     }
 
-    // 🧱 Lis le corps brut tel que Stripe l’envoie
+    // 🧱 Lis les données brutes (exactement comme Stripe les a envoyées)
     const chunks = [];
     for await (const chunk of req) {
-      chunks.push(chunk);
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
-    const rawBody = Buffer.concat(chunks).toString("utf8");
+    const rawBody = Buffer.concat(chunks);
 
-    // 📦 Envoie à Supabase exactement le même corps + mêmes headers
+    // 📦 Transmets exactement le même corps et les mêmes headers à Supabase
     const response = await fetch(SUPABASE_FUNCTION_URL, {
       method: "POST",
       headers: {
@@ -37,7 +37,8 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         "Stripe-Signature": req.headers["stripe-signature"] || "",
       },
-      body: rawBody, // ✅ Texte brut
+      // ⛔️ Pas de transformation — on envoie le Buffer brut
+      body: rawBody,
     });
 
     const text = await response.text();
