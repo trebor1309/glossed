@@ -1,15 +1,13 @@
 // /api/stripe-webhook.js
-// ✅ Proxy sécurisé entre Stripe et Supabase
-// Version JavaScript compatible Vercel + Vite
+// ✅ Proxy entre Stripe et Supabase — version finale (signature conservée)
 
 export const config = {
   api: {
-    bodyParser: false, // ⛔️ Empêche Vercel de parser le JSON (Stripe veut le corps brut)
+    bodyParser: false, // Stripe veut le corps brut pour la vérification
   },
 };
 
 export default async function handler(req, res) {
-  // Stripe n’envoie que des POST
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -19,34 +17,36 @@ export default async function handler(req, res) {
       "https://cdcnylgokphyltkctymi.functions.supabase.co/stripe-payment-webhook-v2";
 
     const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
-
     if (!SUPABASE_ANON_KEY) {
       console.error("❌ Missing VITE_SUPABASE_ANON_KEY");
       return res.status(500).json({ error: "Missing Supabase anon key" });
     }
 
-    // 🧱 Lis le corps brut envoyé par Stripe (nécessaire pour conserver la signature)
+    // 🧱 Lis le corps brut tel que Stripe l’envoie
     const chunks = [];
     for await (const chunk of req) {
-      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+      chunks.push(chunk);
     }
-    const rawBody = Buffer.concat(chunks);
+    const rawBody = Buffer.concat(chunks).toString("utf8");
 
-    // 📦 Transmets le corps brut à ton Edge Function Supabase
+    // 📦 Envoie à Supabase exactement le même corps + mêmes headers
     const response = await fetch(SUPABASE_FUNCTION_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": req.headers["content-type"] || "application/json",
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         "Stripe-Signature": req.headers["stripe-signature"] || "",
       },
-      body: rawBody, // ✅ envoie le corps brut
+      body: rawBody, // ✅ Texte brut
     });
 
     const text = await response.text();
     res.status(response.status).send(text);
   } catch (err) {
     console.error("❌ Proxy error:", err);
-    res.status(500).json({ error: "Internal Server Error", details: err.message });
+    res.status(500).json({
+      error: "Internal Server Error",
+      details: err.message,
+    });
   }
 }
