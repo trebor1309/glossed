@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   try {
     // 🔗 URL de ta fonction Supabase
     const SUPABASE_FUNCTION_URL =
-      "https://cdcnylgokphyltkctymi.functions.supabase.co/stripe-payment-webhook";
+      "https://cdcnylgokphyltkctymi.supabase.co/functions/v1/stripe-payment-webhook";
 
     // 🔑 Utilisation de la clé SERVICE_ROLE côté serveur (plus de 401)
     const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;

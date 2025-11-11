@@ -1,38 +1,34 @@
-// /supabase/functions/stripe-payment-webhook/index.ts
-// -----------------------------------------------------------
-// ✅ Configuration Supabase Edge Function
-// Désactive la vérification JWT directement dans le code
-// -----------------------------------------------------------
-export const config = {
-  verifyJWT: false,
-};
+// /supabase/functions/stripe-payment-webhook-v2/index.ts
+// ✅ Version corrigée : utilise constructEventAsync (compatible Deno)
+// ✅ Met à jour les missions après paiement réussi
 
 import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// ✅ Initialisation
+// 🔐 Initialisation
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
   apiVersion: "2023-10-16",
 });
+
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-// ✅ Récupération de la clé de signature du webhook Stripe
 const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 
-// ⚙️ Helper pour les logs
-const log = (...args: any[]) => console.log("[stripe-webhook]", ...args);
-
+// ------------------------------------------------------
+// 🚀 Serveur principal (Deno.serve = point d’entrée Edge Function)
+// ------------------------------------------------------
 Deno.serve(async (req) => {
-  // --- Gérer le preflight CORS ---
+  // --- CORS preflight ---
   if (req.method === "OPTIONS") {
     return new Response("ok", {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, Stripe-Signature",
+        "Access-Control-Allow-Headers":
+          "Content-Type, Authorization, Stripe-Signature",
       },
     });
   }
@@ -46,31 +42,42 @@ Deno.serve(async (req) => {
 
   try {
     const rawBody = await req.text();
-    event = stripe.webhooks.constructEvent(rawBody, sig!, webhookSecret!);
+
+    // ✅ Correction majeure : version asynchrone (obligatoire en Deno)
+    event = await stripe.webhooks.constructEventAsync(
+      rawBody,
+      sig!,
+      webhookSecret!
+    );
+
+    console.log("🔔 Webhook reçu :", event.type);
   } catch (err) {
-    log("❌ Signature verification failed:", err.message);
-    return new Response(JSON.stringify({ error: `Webhook Error: ${err.message}` }), {
-      status: 400,
-      headers: { "Access-Control-Allow-Origin": "*" },
-    });
+    console.error("❌ Signature verification failed:", err.message);
+    return new Response(
+      JSON.stringify({ error: `Webhook Error: ${err.message}` }),
+      {
+        status: 400,
+        headers: { "Access-Control-Allow-Origin": "*" },
+      }
+    );
   }
 
   try {
     switch (event.type) {
       case "checkout.session.completed": {
-        const session = event.data.object as any;
+        const session = event.data.object;
         const missionId = session.metadata?.mission_id;
         const clientId = session.metadata?.client_id;
         const proId = session.metadata?.pro_id;
 
+        console.log("💳 Paiement réussi pour mission:", missionId);
+
         if (!missionId) {
-          log("⚠️ No mission_id in metadata");
+          console.warn("⚠️ Aucun mission_id dans metadata");
           break;
         }
 
-        log(`✅ Payment completed for mission ${missionId}`);
-
-        // Mettre à jour la mission
+        // ✅ Met à jour la mission en base de données
         const { error } = await supabase
           .from("missions")
           .update({
@@ -81,23 +88,22 @@ Deno.serve(async (req) => {
           .eq("id", missionId);
 
         if (error) {
-          log("❌ Supabase update error:", error.message);
+          console.error("❌ Erreur lors de la mise à jour de la mission:", error.message);
         } else {
-          log(`💾 Mission ${missionId} marked as confirmed`);
+          console.log(`💾 Mission ${missionId} marquée comme confirmée ✅`);
         }
 
-        // (Facultatif) notifier le pro ou le client ici plus tard
         break;
       }
 
       case "payment_intent.payment_failed": {
-        const intent = event.data.object as any;
-        log(`❌ Payment failed for ${intent.id}`);
+        const intent = event.data.object;
+        console.warn(`❌ Paiement échoué pour ${intent.id}`);
         break;
       }
 
       default:
-        log(`ℹ️ Unhandled event type: ${event.type}`);
+        console.log(`ℹ️ Événement ignoré : ${event.type}`);
     }
 
     return new Response(JSON.stringify({ received: true }), {
@@ -105,7 +111,7 @@ Deno.serve(async (req) => {
       headers: { "Access-Control-Allow-Origin": "*" },
     });
   } catch (err) {
-    log("❌ Webhook processing error:", err);
+    console.error("❌ Erreur interne webhook:", err);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 400,
       headers: { "Access-Control-Allow-Origin": "*" },
