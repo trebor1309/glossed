@@ -34,7 +34,8 @@ export default async function handler(req, res) {
       method: "POST",
       headers: {
         "Content-Type": req.headers["content-type"] || "application/json",
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+
         "Stripe-Signature": req.headers["stripe-signature"] || "",
       },
       // ⛔️ Pas de transformation — on envoie le Buffer brut
