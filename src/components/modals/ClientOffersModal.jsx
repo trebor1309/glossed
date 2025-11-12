@@ -75,11 +75,26 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
   const handlePayAndConfirm = async (offer) => {
     try {
       console.log("💳 Creating payment session for mission:", offer.id);
+
+      // 1️⃣ Récupérer le jeton de session de l’utilisateur
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        alert("Veuillez vous reconnecter avant de procéder au paiement.");
+        return;
+      }
+
+      // 2️⃣ Appeler la fonction Supabase avec le header Authorization
       const response = await fetch(
         "https://cdcnylgokphyltkctymi.supabase.co/functions/v1/create-payment-intent",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
           body: JSON.stringify({
             mission_id: offer.id,
             client_id: offer.client_id,
@@ -88,20 +103,22 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
       );
 
       const result = await response.json();
-
-      // ⬇️ C’est ici qu’on ajoute notre log
       console.log("📦 Payment intent response:", result);
 
-      if (!result?.url) {
-        alert("Unable to start payment. Please try again later.");
+      if (!response.ok || !result?.url) {
+        alert(
+          result?.error ||
+            result?.message ||
+            "Impossible de démarrer le paiement, réessayez plus tard."
+        );
         return;
       }
 
-      // ✅ Redirection Stripe
+      // 3️⃣ Redirection Stripe
       window.location.href = result.url;
     } catch (err) {
       console.error("❌ Payment error:", err);
-      alert("Payment could not be initiated. Please try again.");
+      alert("Erreur lors du paiement, veuillez réessayer.");
     }
   };
 
