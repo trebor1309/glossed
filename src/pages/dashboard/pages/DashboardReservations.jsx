@@ -33,68 +33,98 @@ export default function DashboardReservations() {
   // -----------------------------------------------------
   // 🔹 Charger les réservations + offres liées au client
   // -----------------------------------------------------
+  const fetchBookings = async () => {
+    setLoading(true);
+    try {
+      const clientId = session.user.id;
+      console.log("🧩 Client ID:", clientId);
+
+      // 1️⃣ Bookings du client
+      const { data: bookingsData, error: bookingErr } = await supabase
+        .from("bookings")
+        .select("*")
+        .eq("client_id", clientId)
+        .order("date", { ascending: true });
+      if (bookingErr) throw bookingErr;
+
+      // 2️⃣ Missions proposées au client (✅ inclure confirmed, completed, cancelled)
+      const { data: offersData, error: offersErr } = await supabase
+        .from("missions")
+        .select("*")
+        .eq("client_id", clientId)
+        .in("status", ["proposed", "offers", "confirmed", "completed", "cancelled"]) // ✅ ajouté
+        .order("date", { ascending: true });
+      if (offersErr) throw offersErr;
+
+      // ✅ Nettoyer les bookings déjà confirmés via missions.confirmed
+      const confirmedBookingIds = (offersData || [])
+        .filter((m) => (m.status || "").toLowerCase() === "confirmed")
+        .map((m) => m.booking_id);
+
+      const cleanedBookingsData = (bookingsData || []).filter(
+        (b) => !confirmedBookingIds.includes(b.id)
+      );
+
+      // 3️⃣ Taguer pour distinguer bookings et missions
+      const bookingsTagged = (cleanedBookingsData || []).map((b) => ({
+        ...b,
+        type: "booking",
+      }));
+      const offersTagged = (offersData || []).map((m) => ({
+        ...m,
+        type: "mission",
+      }));
+
+      // 4️⃣ Fusionner proprement sans écraser les offres multiples
+      const bookingsMap = new Map();
+      (bookingsTagged || []).forEach((b) => bookingsMap.set(b.id, b));
+
+      const merged = [
+        ...bookingsMap.values(),
+        ...(offersTagged || []).filter((m) => m.booking_id && bookingsMap.has(m.booking_id)),
+      ];
+
+      // facultatif : on ajoute les missions orphelines (au cas où)
+      const orphans = (offersTagged || []).filter((m) => !m.booking_id);
+      const all = [...merged, ...orphans];
+
+      console.log("📋 BOOKINGS:", bookingsTagged);
+      console.log("📋 OFFERS:", offersTagged);
+      console.log("📦 MERGED CLEAN:", all);
+
+      setBookings(all);
+    } catch (err) {
+      console.error("❌ fetchBookings error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => {
     if (!session?.user) return;
 
-    const fetchBookings = async () => {
-      setLoading(true);
-      try {
-        const clientId = session.user.id;
-        console.log("🧩 Client ID:", clientId);
-
-        // 1️⃣ Bookings du client
-        const { data: bookingsData, error: bookingErr } = await supabase
-          .from("bookings")
-          .select("*")
-          .eq("client_id", clientId)
-          .order("date", { ascending: true });
-        if (bookingErr) throw bookingErr;
-
-        // 2️⃣ Missions proposées au client
-        const { data: offersData, error: offersErr } = await supabase
-          .from("missions")
-          .select("*")
-          .eq("client_id", clientId)
-          .in("status", ["proposed", "offers"])
-          .order("date", { ascending: true });
-        if (offersErr) throw offersErr;
-
-        // 3️⃣ Taguer pour distinguer bookings et missions
-        const bookingsTagged = (bookingsData || []).map((b) => ({
-          ...b,
-          type: "booking",
-        }));
-        const offersTagged = (offersData || []).map((m) => ({
-          ...m,
-          type: "mission",
-        }));
-
-        // 4️⃣ Fusionner proprement sans écraser les offres multiples
-        const bookingsMap = new Map();
-        (bookingsTagged || []).forEach((b) => bookingsMap.set(b.id, b));
-
-        const merged = [
-          ...bookingsMap.values(),
-          ...(offersTagged || []).filter((m) => m.booking_id && bookingsMap.has(m.booking_id)),
-        ];
-
-        // facultatif : on ajoute les missions orphelines (au cas où)
-        const orphans = (offersTagged || []).filter((m) => !m.booking_id);
-        const all = [...merged, ...orphans];
-
-        console.log("📋 BOOKINGS:", bookingsTagged);
-        console.log("📋 OFFERS:", offersTagged);
-        console.log("📦 MERGED CLEAN:", all);
-
-        setBookings(all);
-      } catch (err) {
-        console.error("❌ fetchBookings error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchBookings();
+
+    // ✅ Écoute en temps réel des changements dans missions (confirmation via Stripe)
+    const channel = supabase
+      .channel(`missions_client_${session.user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "missions",
+          filter: `client_id=eq.${session.user.id}`,
+        },
+        (payload) => {
+          console.log("🔁 Missions changed:", payload);
+          fetchBookings();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [session]);
 
   // -----------------------------------------------------
@@ -131,6 +161,11 @@ export default function DashboardReservations() {
     completed: displayBookings.filter((b) => (b.status || "").toLowerCase() === "completed"),
     cancelled: displayBookings.filter((b) => (b.status || "").toLowerCase() === "cancelled"),
   };
+
+  // ✅ Supprimer les pending qui ont déjà une mission confirmée (sécurité)
+  grouped.pending = grouped.pending.filter(
+    (b) => !grouped.confirmed.some((c) => c.booking_id === b.id)
+  );
 
   if (loading)
     return (
@@ -227,12 +262,15 @@ export default function DashboardReservations() {
           <ClientOffersModal
             booking={{
               ...selectedBooking,
-              booking_id: selectedBooking.booking_id || selectedBooking.id, // 🔧 Fix clé pour les missions
+              booking_id: selectedBooking.booking_id || selectedBooking.id,
             }}
             onClose={() => setShowOffersModal(false)}
-            onAccepted={() => {
+            onPay={() => {
+              // ✅ Rafraîchir après paiement (Stripe)
+              setShowOffersModal(false);
+              fetchBookings();
               setToast({
-                message: "Offer accepted successfully!",
+                message: "Payment confirmed successfully!",
                 type: "success",
               });
             }}

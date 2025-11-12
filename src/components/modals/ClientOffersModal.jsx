@@ -1,141 +1,90 @@
-// src/components/modals/ClientOffersModal.jsx
 import { useEffect, useState } from "react";
-import { useUser } from "@/context/UserContext";
-
-import { motion } from "framer-motion";
-import { X, CreditCard, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import Toast from "@/components/ui/Toast";
 
-export default function ClientOffersModal({ booking, onClose, onAccepted }) {
+export default function ClientOffersModal({ booking, onClose, onPay }) {
   const [offers, setOffers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [toast, setToast] = useState(null);
-  const { session } = useUser();
+  const [loading, setLoading] = useState(false);
 
-  // 🔹 Charger les offres liées à ce booking
   useEffect(() => {
-    if (!booking?.id) return;
+    if (!booking) return;
 
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from("missions")
-          .select("*")
-          .eq("client_id", booking.client_id)
-          .eq("status", "proposed")
-          .order("created_at", { ascending: false });
+    const fetchOffers = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("missions")
+        .select("*, pro:users!missions_pro_id_fkey(full_name, avatar_url)")
+        .eq("client_id", booking.client_id)
+        .eq("booking_id", booking.id)
+        .order("created_at", { ascending: true });
 
-        if (error) throw error;
-        setOffers(data || []);
-      } catch (err) {
-        console.error("❌ Error loading offers:", err);
-        setToast({ type: "error", message: err.message });
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [booking?.id]);
+      if (!error) setOffers(data || []);
+      setLoading(false);
+    };
 
-  // 💳 Lancer le paiement Stripe via la fonction Supabase
-  const handlePayAndConfirm = async (offer) => {
-    try {
-      setSubmitting(true);
-      console.log("🚀 Sending payment intent for:", {
-        mission_id: offer.id,
-        client_id: booking.client_id,
-      });
+    fetchOffers();
+  }, [booking]);
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-payment-intent`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session?.access_token}`, // ✅ ajoute ce header
-          },
-          body: JSON.stringify({
-            mission_id: offer.id,
-            client_id: booking.client_id,
-          }),
-        }
-      );
-
-      const data = await res.json();
-      console.log("💳 Stripe response:", data);
-
-      if (!res.ok) throw new Error(data?.error || "Payment creation failed");
-      if (!data?.url) throw new Error("No checkout URL returned");
-
-      // ✅ Redirige vers Stripe Checkout
-      window.location.href = data.url;
-    } catch (err) {
-      console.error("❌ Payment error:", err);
-      setToast({ type: "error", message: err.message });
-    } finally {
-      setSubmitting(false);
-    }
+  const handlePayAndConfirm = (offer) => {
+    if (onPay) onPay(offer);
   };
 
   return (
-    <motion.div
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
-      onClick={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-    >
-      <motion.div
-        className="bg-white w-11/12 max-w-2xl rounded-2xl shadow-xl p-6 relative"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-lg w-full max-w-md p-5 relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
+          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
         >
-          <X size={20} />
+          ✕
         </button>
 
-        <h2 className="text-xl font-semibold mb-2 text-center text-gray-800">
-          Offers for “{booking?.service}”
-        </h2>
+        <h2 className="text-lg font-bold mb-4 text-gray-800">Offers for your request</h2>
 
         {loading ? (
-          <div className="flex items-center justify-center py-10 text-gray-600">
-            <Loader2 className="animate-spin" />
-          </div>
+          <p className="text-center text-gray-500">Loading...</p>
         ) : offers.length === 0 ? (
-          <div className="text-center text-gray-500 py-10">No offers yet.</div>
+          <p className="text-center text-gray-400">No offers yet</p>
         ) : (
-          <ul className="space-y-3">
-            {offers.map((o) => (
-              <li
-                key={o.id}
-                className="border rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center"
-              >
-                <div>
-                  <p className="font-medium text-gray-800">{o.description || "No note"}</p>
-                  <p className="text-sm text-gray-600">
-                    {new Date(o.date).toLocaleDateString()} — {o.time}
-                  </p>
-                  <p className="text-sm text-gray-800 font-semibold">{o.price} €</p>
-                </div>
-                <button
-                  onClick={() => handlePayAndConfirm(o)}
-                  disabled={submitting}
-                  className="mt-3 sm:mt-0 px-4 py-2 rounded-full bg-gradient-to-r from-rose-600 to-red-600 text-white font-semibold hover:scale-[1.02] transition disabled:opacity-60"
+          <div className="space-y-3">
+            {offers.map((o) => {
+              const totalPrice = (Number(o.price) * 1.1).toFixed(2); // 10% fee included
+              return (
+                <div
+                  key={o.id}
+                  className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition"
                 >
-                  <CreditCard size={16} /> {submitting ? "Processing…" : "Pay & Confirm"}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={o.pro?.avatar_url || "/placeholder-user.jpg"}
+                      alt=""
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                    <div>
+                      <p className="font-semibold text-gray-800">{o.pro?.full_name || "Pro"}</p>
+                      <p className="text-sm text-gray-500">{o.service || "Service"}</p>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <p className="text-sm font-semibold text-gray-800">{totalPrice} €</p>
+                      <p className="text-xs text-gray-500">(incl. fees)</p>
+                    </div>
+                  </div>
 
-        {toast && (
-          <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />
+                  <p className="text-gray-600 text-sm mt-3">{o.description}</p>
+
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={() => handlePayAndConfirm(o)}
+                      className="bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition"
+                    >
+                      Pay & Confirm
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }

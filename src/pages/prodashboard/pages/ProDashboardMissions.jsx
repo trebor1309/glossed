@@ -1,4 +1,3 @@
-// src/pages/prodashboard/pages/ProDashboardMissions.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -9,14 +8,8 @@ import ProProposalModal from "@/components/modals/ProProposalModal";
 import ProMissionDetailsModal from "@/components/modals/ProMissionDetailsModal";
 import ProEvaluationModal from "@/components/modals/ProEvaluationModal";
 
-/* ---------------------------------------------------------
-   🧠 Utils
---------------------------------------------------------- */
 const formatTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
 
-/* ---------------------------------------------------------
-   🌸 Composant principal
---------------------------------------------------------- */
 export default function ProDashboardMissions() {
   const { session, setProBadge } = useUser();
   const [missions, setMissions] = useState([]);
@@ -27,74 +20,100 @@ export default function ProDashboardMissions() {
   const [selectedMission, setSelectedMission] = useState(null);
   const [selectedEvaluation, setSelectedEvaluation] = useState(null);
 
-  /* ---------------------------------------------------------
-     1️⃣ Charger les bookings + missions liés à ce pro
-  --------------------------------------------------------- */
-  useEffect(() => {
-    if (!session?.user?.id) return;
+  // ---------------------------------------------------------
+  // 🔁 Charger toutes les missions liées à ce pro
+  // ---------------------------------------------------------
+  const fetchMissions = async () => {
+    setLoading(true);
+    try {
+      const proId = session.user.id;
 
-    const fetchMissions = async () => {
-      setLoading(true);
-      try {
-        const proId = session.user.id;
+      // 1️⃣ Bookings directs (jamais proposés)
+      const { data: directBookings, error: directErr } = await supabase
+        .from("bookings")
+        .select("*")
+        .eq("pro_id", proId)
+        .order("date", { ascending: true });
+      if (directErr) throw directErr;
 
-        // 1️⃣ Bookings directement assignés au pro
-        const { data: directBookings, error: directErr } = await supabase
+      // 2️⃣ Notifications reçues
+      const { data: notifData, error: notifErr } = await supabase
+        .from("booking_notifications")
+        .select("booking_id")
+        .eq("pro_id", proId);
+      if (notifErr) throw notifErr;
+
+      let notifiedBookings = [];
+      if (notifData?.length) {
+        const bookingIds = notifData.map((n) => n.booking_id);
+        const { data, error } = await supabase
           .from("bookings")
           .select("*")
-          .eq("pro_id", proId)
+          .in("id", bookingIds)
+          .eq("status", "pending")
           .order("date", { ascending: true });
-        if (directErr) throw directErr;
-
-        // 2️⃣ Bookings reçus via notifications
-        const { data: notifData, error: notifErr } = await supabase
-          .from("booking_notifications")
-          .select("booking_id")
-          .eq("pro_id", proId);
-        if (notifErr) throw notifErr;
-
-        let notifiedBookings = [];
-        if (notifData?.length) {
-          const bookingIds = notifData.map((n) => n.booking_id);
-          const { data, error } = await supabase
-            .from("bookings")
-            .select("*")
-            .in("id", bookingIds)
-            .eq("status", "pending")
-            .order("date", { ascending: true });
-          if (error) throw error;
-          notifiedBookings = data || [];
-        }
-
-        // 3️⃣ Missions créées par le pro
-        const { data: proMissions, error: missionsErr } = await supabase
-          .from("missions")
-          .select("*")
-          .eq("pro_id", proId)
-          .order("date", { ascending: true });
-        if (missionsErr) throw missionsErr;
-
-        // 4️⃣ Fusionner le tout
-        const merged = [...directBookings, ...notifiedBookings, ...proMissions];
-        setMissions(merged);
-      } catch (err) {
-        console.error("❌ fetchMissions error:", err);
-      } finally {
-        setLoading(false);
+        if (error) throw error;
+        notifiedBookings = data || [];
       }
-    };
 
-    fetchMissions();
-  }, [session?.user?.id]);
+      // 3️⃣ Missions du pro
+      const { data: proMissions, error: missionsErr } = await supabase
+        .from("missions")
+        .select("*")
+        .eq("pro_id", proId)
+        .order("date", { ascending: true });
+      if (missionsErr) throw missionsErr;
 
-  /* ---------------------------------------------------------
-     2️⃣ Écoute temps réel pour nouvelles demandes
-  --------------------------------------------------------- */
+      // 🧮 Ajouter le montant net reçu (90 %)
+      const missionsWithNet = (proMissions || []).map((m) => ({
+        ...m,
+        net_amount: Math.round(m.price * 0.9 * 100) / 100, // 10% fee for Glossed
+      }));
+
+      // ✅ Filtrer doublons : ne pas montrer les bookings déjà confirmés
+      const confirmedIds = missionsWithNet
+        .filter((m) => m.status === "confirmed")
+        .map((m) => m.booking_id);
+      const cleanedBookings = directBookings.filter((b) => !confirmedIds.includes(b.id));
+
+      const merged = [...cleanedBookings, ...notifiedBookings, ...missionsWithNet];
+      setMissions(merged);
+    } catch (err) {
+      console.error("❌ fetchMissions error:", err);
+      setToast({ message: `❌ ${err.message}`, type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ---------------------------------------------------------
+  // 🔂 Initialisation + écoute Realtime (missions & bookings)
+  // ---------------------------------------------------------
   useEffect(() => {
     if (!session?.user?.id) return;
+    fetchMissions();
 
+    // 🧩 Écoute temps réel des missions (confirmations Stripe, updates, etc.)
     const channel = supabase
-      .channel("booking-notifications")
+      .channel(`missions_pro_${session.user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "missions",
+          filter: `pro_id=eq.${session.user.id}`,
+        },
+        (payload) => {
+          console.log("🔁 Mission change:", payload);
+          fetchMissions();
+        }
+      )
+      .subscribe();
+
+    // 🧩 Écoute temps réel des nouvelles notifications de booking
+    const notifChannel = supabase
+      .channel(`booking_notifications_pro_${session.user.id}`)
       .on(
         "postgres_changes",
         {
@@ -112,7 +131,7 @@ export default function ProDashboardMissions() {
             .single();
 
           if (booking) {
-            console.log("📩 New booking received via Realtime:", booking);
+            console.log("📩 New booking received:", booking);
             setMissions((prev) => [booking, ...prev]);
             setProBadge((n) => (n || 0) + 1);
             setToast({ message: "📩 New booking request in your area!", type: "success" });
@@ -123,12 +142,13 @@ export default function ProDashboardMissions() {
 
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(notifChannel);
     };
-  }, [session?.user?.id, setProBadge]);
+  }, [session?.user?.id]);
 
-  /* ---------------------------------------------------------
-     3️⃣ Refuser une demande
-  --------------------------------------------------------- */
+  // ---------------------------------------------------------
+  // ❌ Refuser une demande
+  // ---------------------------------------------------------
   const handleRefuse = async (booking) => {
     try {
       await supabase
@@ -144,11 +164,10 @@ export default function ProDashboardMissions() {
     }
   };
 
-  /* ---------------------------------------------------------
-     4️⃣ Regroupement par statut
-  --------------------------------------------------------- */
+  // ---------------------------------------------------------
+  // 🎨 Regroupement par statut
+  // ---------------------------------------------------------
   const displayMissions = selectedDayMissions ? selectedDayMissions.dayMissions : missions;
-
   const grouped = {
     pending: displayMissions.filter((m) => m.status === "pending"),
     proposed: displayMissions.filter((m) => m.status === "proposed"),
@@ -164,9 +183,9 @@ export default function ProDashboardMissions() {
       </div>
     );
 
-  /* ---------------------------------------------------------
-     5️⃣ Rendu principal
-  --------------------------------------------------------- */
+  // ---------------------------------------------------------
+  // 🧱 Rendu principal
+  // ---------------------------------------------------------
   return (
     <section className="mt-10 max-w-4xl mx-auto p-4 space-y-10 overflow-x-hidden">
       <h1 className="text-2xl font-bold text-gray-800 text-center mb-4">My Missions</h1>
@@ -283,7 +302,7 @@ export default function ProDashboardMissions() {
 }
 
 /* ---------------------------------------------------------
-   🔸 Sous-composant : MissionSection
+   🔸 MissionSection
 --------------------------------------------------------- */
 function MissionSection({
   title,
@@ -313,11 +332,17 @@ function MissionSection({
                 <p className="text-sm text-gray-500">
                   {m.date} — {m.time_slot || formatTime(m.time) || ""}
                 </p>
+
+                {/* ✅ Affichage net pour le pro */}
                 {typeof m.price !== "undefined" && (
                   <p className="text-sm text-gray-700 font-medium">
-                    € {Number(m.price).toFixed(2)}
+                    Client: € {Number(m.price).toFixed(2)} — You:{" "}
+                    <span className="text-green-600">
+                      € {Number(m.net_amount || m.price * 0.9).toFixed(2)}
+                    </span>
                   </p>
                 )}
+
                 {m.address && (
                   <p className="text-sm text-gray-500">
                     <span className="font-medium">Address:</span> {m.address}

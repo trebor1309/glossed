@@ -13,11 +13,7 @@ const supabase = createClient(
 
 const BASE_URL = "https://glossed.vercel.app";
 
-// ---------------------------------------------------------------
-// 🧠 Function: create-payment-intent
-// ---------------------------------------------------------------
 Deno.serve(async (req) => {
-  // ✅ Autoriser les requêtes CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", {
       headers: {
@@ -32,7 +28,7 @@ Deno.serve(async (req) => {
     const { mission_id, client_id } = await req.json();
     if (!mission_id || !client_id) throw new Error("Missing mission_id or client_id");
 
-    // 1️⃣ Charger la mission depuis Supabase
+    // 1️⃣ Charger la mission
     const { data: mission, error: missionError } = await supabase
       .from("missions")
       .select("id, pro_id, client_id, price, service, description")
@@ -41,34 +37,42 @@ Deno.serve(async (req) => {
 
     if (missionError || !mission) throw new Error("Mission not found in Supabase");
 
-    // 2️⃣ Charger le pro et son compte Stripe
+    // 2️⃣ Charger le pro
     const { data: pro, error: proError } = await supabase
       .from("users")
       .select("id, stripe_account_id, email")
       .eq("id", mission.pro_id)
       .maybeSingle();
 
-    if (proError || !pro?.stripe_account_id) throw new Error("Pro Stripe account not found");
+    if (proError || !pro) throw new Error("Pro Stripe account not found");
 
-    // 3️⃣ Créer le PaymentIntent + session Checkout
-    const amount = Math.round(Number(mission.price) * 100); // € → centimes
-    const fee = Math.round(amount * 0.1); // 💸 10 % de commission
+    // 3️⃣ Calculs
+    const baseAmount = Math.round(Number(mission.price) * 100); // montant pro (ex: 33€)
+    const fee = Math.round(baseAmount * 0.1); // 10%
+    const totalAmount = baseAmount + fee; // ce que paie le client (ex: 36,30€)
 
-    console.log("💳 Creating payment session for mission:", mission.id, "→ pro:", pro.id);
+    console.log(
+      `💳 Creating checkout for mission ${mission.id}: client pays ${totalAmount}, pro gets ${baseAmount}, fee ${fee}`
+    );
 
+    // 4️⃣ Créer la session Stripe
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
+      expand: ["payment_intent"],
       payment_intent_data: {
-        transfer_data: {
-          destination: pro.stripe_account_id,
-        },
-        application_fee_amount: fee,
         metadata: {
           mission_id: mission.id,
           pro_id: mission.pro_id,
           client_id,
+          fee: fee.toString(),
         },
+      },
+      metadata: {
+        mission_id: mission.id,
+        pro_id: mission.pro_id,
+        client_id,
+        fee: fee.toString(),
       },
       line_items: [
         {
@@ -76,24 +80,19 @@ Deno.serve(async (req) => {
             currency: "eur",
             product_data: {
               name: mission.service || "Service booking",
-              description: mission.description || "",
+              ...(mission.description ? { description: mission.description } : {}),
             },
-            unit_amount: amount,
+            unit_amount: totalAmount, // 💰 le client paie tout (pro + frais)
           },
           quantity: 1,
         },
       ],
-      // ✅ aussi ici pour la session elle-même
-      metadata: {
-        mission_id: mission.id,
-        pro_id: mission.pro_id,
-        client_id,
-      },
       success_url: `${BASE_URL}/dashboard/payment/success`,
       cancel_url: `${BASE_URL}/dashboard/payment/cancel`,
     });
 
-    // 4️⃣ Retourner l’URL vers Stripe Checkout
+    console.log("✅ Checkout session created:", session.id);
+
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { "Access-Control-Allow-Origin": "*" },
     });
