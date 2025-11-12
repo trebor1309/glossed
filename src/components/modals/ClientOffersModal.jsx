@@ -10,14 +10,22 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
 
     const fetchOffers = async () => {
       setLoading(true);
+
+      // ✅ Inclure plusieurs statuts (sinon "no offers yet" trop fréquent)
       const { data, error } = await supabase
         .from("missions")
         .select("*, pro:users!missions_pro_id_fkey(full_name, avatar_url)")
-        .eq("client_id", booking.client_id)
         .eq("booking_id", booking.id)
+        .eq("client_id", booking.client_id)
+        .in("status", ["proposed", "offers", "confirmed"]) // 🧠 Fix ici
         .order("created_at", { ascending: true });
 
-      if (!error) setOffers(data || []);
+      if (error) {
+        console.error("❌ Error loading offers:", error);
+      } else {
+        console.log("🎯 ClientOffersModal - Offers trouvées:", data);
+        setOffers(data || []);
+      }
       setLoading(false);
     };
 
@@ -25,6 +33,7 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
   }, [booking]);
 
   const handlePayAndConfirm = (offer) => {
+    console.log("💳 Pay & Confirm clicked:", offer);
     if (onPay) onPay(offer);
   };
 
@@ -38,16 +47,20 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
           ✕
         </button>
 
-        <h2 className="text-lg font-bold mb-4 text-gray-800">Offers for your request</h2>
+        <h2 className="text-lg font-bold mb-4 text-gray-800 text-center">
+          Offers for your request
+        </h2>
 
         {loading ? (
-          <p className="text-center text-gray-500">Loading...</p>
+          <p className="text-center text-gray-500">Loading offers...</p>
         ) : offers.length === 0 ? (
-          <p className="text-center text-gray-400">No offers yet</p>
+          <p className="text-center text-gray-400 italic">No offers available yet.</p>
         ) : (
           <div className="space-y-3">
             {offers.map((o) => {
-              const totalPrice = (Number(o.price) * 1.1).toFixed(2); // 10% fee included
+              const proPrice = Number(o.price);
+              const totalPrice = (proPrice * 1.1).toFixed(2); // 💰 10% fees added for client
+
               return (
                 <div
                   key={o.id}
@@ -60,16 +73,18 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
                       className="w-10 h-10 rounded-full object-cover"
                     />
                     <div>
-                      <p className="font-semibold text-gray-800">{o.pro?.full_name || "Pro"}</p>
+                      <p className="font-semibold text-gray-800">
+                        {o.pro?.full_name || "Professional"}
+                      </p>
                       <p className="text-sm text-gray-500">{o.service || "Service"}</p>
                     </div>
                     <div className="ml-auto text-right">
                       <p className="text-sm font-semibold text-gray-800">{totalPrice} €</p>
-                      <p className="text-xs text-gray-500">(incl. fees)</p>
+                      <p className="text-xs text-gray-500">(incl. 10% fees)</p>
                     </div>
                   </div>
 
-                  <p className="text-gray-600 text-sm mt-3">{o.description}</p>
+                  {o.description && <p className="text-gray-600 text-sm mt-3">{o.description}</p>}
 
                   <div className="mt-4 flex justify-end">
                     <button

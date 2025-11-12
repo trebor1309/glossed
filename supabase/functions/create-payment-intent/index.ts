@@ -47,32 +47,24 @@ Deno.serve(async (req) => {
     if (proError || !pro) throw new Error("Pro Stripe account not found");
 
     // 3️⃣ Calculs
-    const baseAmount = Math.round(Number(mission.price) * 100); // montant pro (ex: 33€)
-    const fee = Math.round(baseAmount * 0.1); // 10%
-    const totalAmount = baseAmount + fee; // ce que paie le client (ex: 36,30€)
+    const proPrice = Number(mission.price);
+    const clientPrice = proPrice * 1.1; // 💰 Client paye +10%
+    const amount = Math.round(clientPrice * 100); // convert to cents
+    const fee = Math.round(proPrice * 0.1 * 100); // 10% sur le prix du pro
 
-    console.log(
-      `💳 Creating checkout for mission ${mission.id}: client pays ${totalAmount}, pro gets ${baseAmount}, fee ${fee}`
-    );
-
-    // 4️⃣ Créer la session Stripe
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
-      expand: ["payment_intent"],
       payment_intent_data: {
+        transfer_data: {
+          destination: pro.stripe_account_id,
+        },
+        application_fee_amount: fee,
         metadata: {
           mission_id: mission.id,
           pro_id: mission.pro_id,
           client_id,
-          fee: fee.toString(),
         },
-      },
-      metadata: {
-        mission_id: mission.id,
-        pro_id: mission.pro_id,
-        client_id,
-        fee: fee.toString(),
       },
       line_items: [
         {
@@ -80,22 +72,23 @@ Deno.serve(async (req) => {
             currency: "eur",
             product_data: {
               name: mission.service || "Service booking",
-              ...(mission.description ? { description: mission.description } : {}),
+              description: mission.description || "",
             },
-            unit_amount: totalAmount, // 💰 le client paie tout (pro + frais)
+            unit_amount: amount, // ✅ total payé par le client (pro + 10%)
           },
           quantity: 1,
         },
       ],
+      metadata: {
+        mission_id: mission.id,
+        pro_id: mission.pro_id,
+        client_id,
+      },
       success_url: `${BASE_URL}/dashboard/payment/success`,
       cancel_url: `${BASE_URL}/dashboard/payment/cancel`,
     });
 
     console.log("✅ Checkout session created:", session.id);
-
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { "Access-Control-Allow-Origin": "*" },
-    });
   } catch (err) {
     console.error("❌ Payment error:", err);
     return new Response(JSON.stringify({ error: err.message }), {
