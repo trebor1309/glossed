@@ -72,8 +72,30 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
   // ------------------------------------------------------------
   // 💳 Paiement et confirmation
   // ------------------------------------------------------------
-  const handlePayAndConfirm = (offer) => {
-    if (onPay) onPay(offer);
+  const handlePayAndConfirm = async (offer) => {
+    try {
+      console.log("💳 Creating payment session for mission:", offer.id);
+      const response = await fetch(
+        "https://cdcnylgokphyltkctymi.supabase.co/functions/v1/create-payment-intent",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mission_id: offer.id,
+            client_id: offer.client_id,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+
+      // ✅ Redirection vers Stripe Checkout
+      window.location.href = result.url;
+    } catch (err) {
+      console.error("❌ Payment error:", err);
+      alert("Payment could not be initiated. Please try again.");
+    }
   };
 
   // ------------------------------------------------------------
