@@ -2,6 +2,9 @@
 import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// ------------------------------------------------------------
+// 🔐 Initialisation des clés
+// ------------------------------------------------------------
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
   apiVersion: "2023-10-16",
 });
@@ -13,6 +16,9 @@ const supabase = createClient(
 
 const BASE_URL = "https://glossed.vercel.app";
 
+// ------------------------------------------------------------
+// 🚀 Point d’entrée principal
+// ------------------------------------------------------------
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", {
@@ -50,15 +56,14 @@ Deno.serve(async (req) => {
     const proPrice = Number(mission.price);
     const clientPrice = proPrice * 1.1; // 💰 Client paye +10%
     const amount = Math.round(clientPrice * 100); // convert to cents
-    const fee = Math.round((clientPrice - proPrice) * 100); // ✅ ta marge, sans toucher le pro
+    const fee = Math.round((clientPrice - proPrice) * 100); // ta marge
 
+    // 4️⃣ Créer la session Stripe
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
       payment_intent_data: {
-        transfer_data: {
-          destination: pro.stripe_account_id,
-        },
+        transfer_data: { destination: pro.stripe_account_id },
         application_fee_amount: fee,
         metadata: {
           mission_id: mission.id,
@@ -72,9 +77,9 @@ Deno.serve(async (req) => {
             currency: "eur",
             product_data: {
               name: mission.service || "Service booking",
-              description: mission.description || "",
+              ...(mission.description ? { description: mission.description } : {}),
             },
-            unit_amount: amount, // ✅ total payé par le client (pro + 10%)
+            unit_amount: amount,
           },
           quantity: 1,
         },
@@ -89,6 +94,14 @@ Deno.serve(async (req) => {
     });
 
     console.log("✅ Checkout session created:", session.id);
+
+    // ⚡️💥 C’est cette partie qui manquait
+    return new Response(JSON.stringify({ url: session.url }), {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Type": "application/json",
+      },
+    });
   } catch (err) {
     console.error("❌ Payment error:", err);
     return new Response(JSON.stringify({ error: err.message }), {

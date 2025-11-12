@@ -1,3 +1,4 @@
+// src/pages/dashboard/pages/DashboardReservations.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -47,12 +48,12 @@ export default function DashboardReservations() {
         .order("date", { ascending: true });
       if (bookingErr) throw bookingErr;
 
-      // 2️⃣ Missions proposées au client (✅ inclure confirmed, completed, cancelled)
+      // 2️⃣ Missions proposées ou confirmées
       const { data: offersData, error: offersErr } = await supabase
         .from("missions")
         .select("*")
         .eq("client_id", clientId)
-        .in("status", ["proposed", "offers", "confirmed", "completed", "cancelled"]) // ✅ ajouté
+        .in("status", ["proposed", "offers", "confirmed", "completed", "cancelled"])
         .order("date", { ascending: true });
       if (offersErr) throw offersErr;
 
@@ -65,7 +66,7 @@ export default function DashboardReservations() {
         (b) => !confirmedBookingIds.includes(b.id)
       );
 
-      // 3️⃣ Taguer pour distinguer bookings et missions
+      // 3️⃣ Taguer les éléments pour les distinguer
       const bookingsTagged = (cleanedBookingsData || []).map((b) => ({
         ...b,
         type: "booking",
@@ -75,16 +76,21 @@ export default function DashboardReservations() {
         type: "mission",
       }));
 
-      // 4️⃣ Fusionner proprement sans écraser les offres multiples
+      // 4️⃣ Fusion corrigée — inclut les confirmed / completed
       const bookingsMap = new Map();
       (bookingsTagged || []).forEach((b) => bookingsMap.set(b.id, b));
 
       const merged = [
         ...bookingsMap.values(),
-        ...(offersTagged || []).filter((m) => m.booking_id && bookingsMap.has(m.booking_id)),
+        ...(offersTagged || []).filter(
+          (m) =>
+            m.booking_id &&
+            (bookingsMap.has(m.booking_id) ||
+              ["confirmed", "completed", "cancelled"].includes((m.status || "").toLowerCase()))
+        ),
       ];
 
-      // facultatif : on ajoute les missions orphelines (au cas où)
+      // Ajouter les missions orphelines au cas où
       const orphans = (offersTagged || []).filter((m) => !m.booking_id);
       const all = [...merged, ...orphans];
 
@@ -99,12 +105,12 @@ export default function DashboardReservations() {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     if (!session?.user) return;
-
     fetchBookings();
 
-    // ✅ Écoute en temps réel des changements dans missions (confirmation via Stripe)
+    // 🔁 Realtime pour mise à jour Stripe
     const channel = supabase
       .channel(`missions_client_${session.user.id}`)
       .on(
@@ -162,7 +168,7 @@ export default function DashboardReservations() {
     cancelled: displayBookings.filter((b) => (b.status || "").toLowerCase() === "cancelled"),
   };
 
-  // ✅ Supprimer les pending qui ont déjà une mission confirmée (sécurité)
+  // ✅ Supprimer les pending liés à une mission confirmée
   grouped.pending = grouped.pending.filter(
     (b) => !grouped.confirmed.some((c) => c.booking_id === b.id)
   );
@@ -183,9 +189,7 @@ export default function DashboardReservations() {
 
       <CalendarView
         bookings={bookings}
-        onSelectDay={(date, dayBookings) => {
-          setSelectedDayBookings({ date, dayBookings });
-        }}
+        onSelectDay={(date, dayBookings) => setSelectedDayBookings({ date, dayBookings })}
       />
 
       {selectedDayBookings && (
@@ -266,7 +270,6 @@ export default function DashboardReservations() {
             }}
             onClose={() => setShowOffersModal(false)}
             onPay={() => {
-              // ✅ Rafraîchir après paiement (Stripe)
               setShowOffersModal(false);
               fetchBookings();
               setToast({
