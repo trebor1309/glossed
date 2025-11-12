@@ -88,9 +88,16 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
       );
 
       const result = await response.json();
-      if (result.error) throw new Error(result.error);
 
-      // ✅ Redirection vers Stripe Checkout
+      // ⬇️ C’est ici qu’on ajoute notre log
+      console.log("📦 Payment intent response:", result);
+
+      if (!result?.url) {
+        alert("Unable to start payment. Please try again later.");
+        return;
+      }
+
+      // ✅ Redirection Stripe
       window.location.href = result.url;
     } catch (err) {
       console.error("❌ Payment error:", err);
