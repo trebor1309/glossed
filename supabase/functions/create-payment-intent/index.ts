@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     const proPrice = Number(mission.price);
     const clientPrice = proPrice * 1.1; // 💰 Client paye +10%
     const amount = Math.round(clientPrice * 100); // convert to cents
-    const fee = Math.round(proPrice * 0.1 * 100); // 10% sur le prix du pro
+    const fee = Math.round((clientPrice - proPrice) * 100); // ✅ ta marge, sans toucher le pro
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
