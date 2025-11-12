@@ -17,7 +17,7 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
     const { data, error } = await supabase
       .from("missions")
       // ✅ correction du champ full_name → first_name / last_name
-      .select("*, pro:users!missions_pro_id_fkey(first_name, last_name, avatar_url)")
+      .select("*, pro:users!missions_pro_id_fkey(first_name, last_name, profile_photo)")
       .eq("client_id", booking.client_id)
       .eq("booking_id", booking.id)
       .order("created_at", { ascending: true });
@@ -108,10 +108,11 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
                 >
                   <div className="flex items-center gap-3">
                     <img
-                      src={o.pro?.avatar_url || "/placeholder-user.jpg"}
+                      src={o.pro?.profile_photo || "/placeholder-user.jpg"}
                       alt=""
                       className="w-10 h-10 rounded-full object-cover"
                     />
+
                     <div>
                       <p className="font-semibold text-gray-800">{proName}</p>
                       <p className="text-sm text-gray-500">{o.service || "Service"}</p>
