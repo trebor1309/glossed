@@ -39,33 +39,34 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
   // ------------------------------------------------------------
   useEffect(() => {
     if (!booking) return;
-    fetchOffers();
 
-    // 🔁 Listener Realtime : si une nouvelle mission est ajoutée pour cette réservation
-    const channel = supabase
-      .channel(`client_offers_${booking.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "missions",
-          filter: `booking_id=eq.${booking.id}`,
-        },
-        (payload) => {
-          console.log("📩 New offer received:", payload.new);
-          setToast({
-            type: "info",
-            message: "✨ A new offer has just arrived for your booking!",
-          });
-          fetchOffers(); // recharge les offres automatiquement
+    const fetchOffers = async () => {
+      try {
+        setLoading(true);
+        console.log("🎯 Fetching offers for:", booking.id, "client:", booking.client_id);
+
+        const { data, error } = await supabase
+          .from("missions")
+          .select("*, pro:users!missions_pro_id_fkey(full_name, profile_photo)")
+          .eq("client_id", booking.client_id)
+          .or(`booking_id.eq.${booking.id},id.eq.${booking.id}`) // ✅ supporte booking ou mission
+          .order("created_at", { ascending: true });
+
+        if (error) {
+          console.error("❌ Error loading offers:", error);
+          return;
         }
-      )
-      .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
+        console.log("📦 Offers fetched:", data);
+        setOffers(data || []);
+      } catch (err) {
+        console.error("💥 Unexpected error fetching offers:", err);
+      } finally {
+        setLoading(false);
+      }
     };
+
+    fetchOffers();
   }, [booking]);
 
   // ------------------------------------------------------------
