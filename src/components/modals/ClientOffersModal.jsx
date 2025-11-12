@@ -47,7 +47,7 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
 
         const { data, error } = await supabase
           .from("missions")
-          .select("*, pro:users!missions_pro_id_fkey(full_name, profile_photo)")
+          .select("*, pro:users!missions_pro_id_fkey(first_name, last_name, profile_photo)")
           .eq("client_id", booking.client_id)
           .or(`booking_id.eq.${booking.id},id.eq.${booking.id}`) // ✅ supporte booking ou mission
           .order("created_at", { ascending: true });
