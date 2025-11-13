@@ -7,6 +7,7 @@ import Toast from "@/components/ui/Toast";
 import ProProposalModal from "@/components/modals/ProProposalModal";
 import ProMissionDetailsModal from "@/components/modals/ProMissionDetailsModal";
 import ProEvaluationModal from "@/components/modals/ProEvaluationModal";
+import ProBookingDetailsModal from "@/components/modals/ProBookingDetailsModal"; // ✅ nouveau import
 
 const formatTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
 
@@ -16,7 +17,9 @@ export default function ProDashboardMissions() {
   const [loading, setLoading] = useState(true);
   const [selectedDayMissions, setSelectedDayMissions] = useState(null);
   const [toast, setToast] = useState(null);
-  const [selectedBooking, setSelectedBooking] = useState(null);
+
+  const [selectedView, setSelectedView] = useState(null); // ✅ nouveau
+  const [proposalTarget, setProposalTarget] = useState(null); // ✅ pour ouvrir ProProposalModal
   const [selectedMission, setSelectedMission] = useState(null);
   const [selectedEvaluation, setSelectedEvaluation] = useState(null);
 
@@ -93,7 +96,6 @@ export default function ProDashboardMissions() {
     if (!session?.user?.id) return;
     fetchMissions();
 
-    // 🧩 Écoute temps réel des missions (confirmations Stripe, updates, etc.)
     const channel = supabase
       .channel(`missions_pro_${session.user.id}`)
       .on(
@@ -111,7 +113,6 @@ export default function ProDashboardMissions() {
       )
       .subscribe();
 
-    // 🧩 Écoute temps réel des nouvelles notifications de booking
     const notifChannel = supabase
       .channel(`booking_notifications_pro_${session.user.id}`)
       .on(
@@ -147,9 +148,9 @@ export default function ProDashboardMissions() {
   }, [session?.user?.id]);
 
   // ---------------------------------------------------------
-  // ❌ Refuser une demande
+  // ❌ Supprimer une demande
   // ---------------------------------------------------------
-  const handleRefuse = async (booking) => {
+  const handleDelete = async (booking) => {
     try {
       await supabase
         .from("booking_notifications")
@@ -158,7 +159,7 @@ export default function ProDashboardMissions() {
         .eq("pro_id", session.user.id);
 
       setMissions((prev) => prev.filter((m) => m.id !== booking.id));
-      setToast({ message: "❌ Request removed from your list", type: "info" });
+      setToast({ message: "❌ Request deleted", type: "info" });
     } catch (err) {
       setToast({ message: `❌ ${err.message}`, type: "error" });
     }
@@ -177,11 +178,7 @@ export default function ProDashboardMissions() {
   };
 
   if (loading)
-    return (
-      <div className="flex justify-center items-center h-48 text-gray-600">
-        Loading your missions...
-      </div>
-    );
+    return <div className="flex justify-center items-center h-48 text-gray-600">Loading...</div>;
 
   // ---------------------------------------------------------
   // 🧱 Rendu principal
@@ -195,46 +192,62 @@ export default function ProDashboardMissions() {
         onSelectDay={(date, dayMissions) => setSelectedDayMissions({ date, dayMissions })}
       />
 
-      {selectedBooking && (
+      {/* 🧭 NEW: modal pour voir la demande */}
+      {selectedView && (
+        <ProBookingDetailsModal
+          booking={selectedView}
+          onClose={() => setSelectedView(null)}
+          onMakeProposal={(b) => {
+            setSelectedView(null);
+            setProposalTarget(b);
+          }}
+          onDelete={handleDelete}
+        />
+      )}
+
+      {/* 💌 Envoi de proposition */}
+      {proposalTarget && (
         <ProProposalModal
-          booking={selectedBooking}
+          booking={proposalTarget}
           session={session}
-          onClose={() => setSelectedBooking(null)}
+          onClose={() => setProposalTarget(null)}
           onSuccess={(createdMission) => {
-            setMissions((prev) => [
-              createdMission,
-              ...prev.filter((m) => m.id !== selectedBooking.id),
-            ]);
-            setSelectedBooking(null);
+            setProposalTarget(null);
             setToast({ message: "Proposal sent!", type: "success" });
+            fetchMissions();
           }}
         />
       )}
 
-      {selectedDayMissions && (
-        <div className="text-center text-gray-600 mb-4">
-          <p className="text-sm">
-            Showing missions for{" "}
-            <span className="font-semibold text-gray-800">{selectedDayMissions.date}</span> (
-            {selectedDayMissions.dayMissions.length} items)
-          </p>
-          <button
-            onClick={() => setSelectedDayMissions(null)}
-            className="mt-2 px-4 py-1.5 text-sm font-medium text-rose-600 border border-rose-200 rounded-full hover:bg-rose-50 transition"
-          >
-            Show all missions
-          </button>
-        </div>
+      {/* 🌸 Modals existants */}
+      {selectedMission && (
+        <ProMissionDetailsModal
+          booking={selectedMission}
+          onClose={() => setSelectedMission(null)}
+          onChat={(b) => console.log("💬 Chat with client:", b.client_id)}
+          onEvaluate={(b) => setSelectedEvaluation(b)}
+        />
       )}
 
+      {selectedEvaluation && (
+        <ProEvaluationModal
+          booking={selectedEvaluation}
+          onClose={() => setSelectedEvaluation(null)}
+          onSuccess={() => {
+            setSelectedEvaluation(null);
+            setToast({ message: "⭐ Review submitted!", type: "success" });
+          }}
+        />
+      )}
+
+      {/* ✅ Panneaux par statut */}
       <MissionSection
         title="Pending Requests"
         icon={<Clock size={20} className="text-amber-500" />}
         color="text-amber-600"
         data={grouped.pending}
         empty="No pending requests."
-        onOpenProposal={(b) => setSelectedBooking(b)}
-        onRefuse={handleRefuse}
+        onView={(b) => setSelectedView(b)} // ✅ view modal
       />
 
       <MissionSection
@@ -273,29 +286,6 @@ export default function ProDashboardMissions() {
         setSelectedMission={setSelectedMission}
       />
 
-      {selectedMission && (
-        <ProMissionDetailsModal
-          booking={selectedMission}
-          onClose={() => setSelectedMission(null)}
-          onChat={(b) => console.log("💬 Open chat with client:", b.client_id)}
-          onEvaluate={(b) => setSelectedEvaluation(b)}
-        />
-      )}
-
-      {selectedEvaluation && (
-        <ProEvaluationModal
-          booking={selectedEvaluation}
-          onClose={() => setSelectedEvaluation(null)}
-          onSuccess={() => {
-            setSelectedEvaluation(null);
-            setToast({
-              message: "⭐ Review submitted successfully!",
-              type: "success",
-            });
-          }}
-        />
-      )}
-
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </section>
   );
@@ -304,16 +294,7 @@ export default function ProDashboardMissions() {
 /* ---------------------------------------------------------
    🔸 MissionSection
 --------------------------------------------------------- */
-function MissionSection({
-  title,
-  icon,
-  data,
-  color,
-  empty,
-  onOpenProposal,
-  onRefuse,
-  setSelectedMission,
-}) {
+function MissionSection({ title, icon, data, color, empty, onView, setSelectedMission }) {
   return (
     <section className="bg-white rounded-2xl shadow p-6 border border-gray-100">
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
@@ -332,23 +313,11 @@ function MissionSection({
                 <p className="text-sm text-gray-500">
                   {m.date} — {m.time_slot || formatTime(m.time) || ""}
                 </p>
-
-                {/* ✅ Affichage net pour le pro */}
-                {typeof m.price !== "undefined" && (
-                  <p className="text-sm text-gray-700 font-medium">
-                    Client: € {Number(m.price).toFixed(2)} — You:{" "}
-                    <span className="text-green-600">
-                      € {Number(m.net_amount || m.price * 0.9).toFixed(2)}
-                    </span>
-                  </p>
-                )}
-
                 {m.address && (
                   <p className="text-sm text-gray-500">
                     <span className="font-medium">Address:</span> {m.address}
                   </p>
                 )}
-                {m.notes && <p className="text-xs text-gray-400 italic mt-1">“{m.notes}”</p>}
               </div>
 
               <div className="flex flex-col items-end gap-2">
@@ -356,24 +325,17 @@ function MissionSection({
                   {m.status}
                 </span>
 
+                {/* 🔹 Pending → View/Delete */}
                 {m.status === "pending" ? (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => onOpenProposal && onOpenProposal(m)}
-                      className="px-3 py-1.5 text-sm bg-rose-600 text-white rounded-full hover:bg-rose-700 transition"
-                    >
-                      Accept
-                    </button>
-                    <button
-                      onClick={() => onRefuse && onRefuse(m)}
-                      className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition"
-                    >
-                      Refuse
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => onView?.(m)}
+                    className="px-3 py-1.5 text-sm bg-rose-600 text-white rounded-full hover:bg-rose-700 transition"
+                  >
+                    View
+                  </button>
                 ) : (
                   <button
-                    onClick={() => setSelectedMission && setSelectedMission(m)}
+                    onClick={() => setSelectedMission?.(m)}
                     className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
                     title="View details"
                   >

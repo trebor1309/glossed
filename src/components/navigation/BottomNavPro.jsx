@@ -1,15 +1,16 @@
+// src/pages/prodashboard/components/ProBottomNav.jsx
 import { Home, Calendar, DollarSign, Settings, MoreHorizontal } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { createPortal } from "react-dom";
-import { useUser } from "@/context/UserContext";
+import { useNotifications } from "@/context/NotificationContext";
+import NotificationBadge from "@/components/navigation/NotificationBadge";
 
 export default function ProBottomNav() {
   const navigate = useNavigate();
-  const { proBadge = 0 } = useUser(); // 🆕 dynamique
+  const { notifications } = useNotifications();
 
-  const nav = (
+  return (
     <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-lg flex justify-around items-center py-2 md:hidden z-[40]">
-      {/* 🔘 Bouton central flottant (missions) */}
+      {/* 🔘 Missions bouton central */}
       <div className="absolute -top-5 left-1/2 -translate-x-1/2">
         <button
           onClick={() => navigate("/prodashboard/missions")}
@@ -18,15 +19,10 @@ export default function ProBottomNav() {
           title="My Missions"
         >
           <Calendar className="h-6 w-6 text-white" />
-
-          {/* ✅ Petit point rouge avec halo blanc */}
-          {proBadge > 0 && (
-            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-600 rounded-full ring-2 ring-white animate-pulse"></span>
-          )}
+          {notifications.proBookings > 0 && <NotificationBadge count={notifications.proBookings} />}
         </button>
       </div>
 
-      {/* 🏠 Home */}
       <NavLink
         to="/prodashboard"
         className={({ isActive }) =>
@@ -39,7 +35,6 @@ export default function ProBottomNav() {
         <span className="mt-1">Home</span>
       </NavLink>
 
-      {/* 💰 Payments */}
       <NavLink
         to="/prodashboard/payments"
         className={({ isActive }) =>
@@ -52,7 +47,6 @@ export default function ProBottomNav() {
         <span className="mt-1">Payments</span>
       </NavLink>
 
-      {/* ⚙️ Profile/Settings */}
       <NavLink
         to="/prodashboard/settings"
         className={({ isActive }) =>
@@ -65,7 +59,6 @@ export default function ProBottomNav() {
         <span className="mt-1">Profile</span>
       </NavLink>
 
-      {/* ⋯ More */}
       <NavLink
         to="/prodashboard/more"
         className={({ isActive }) =>
@@ -79,6 +72,4 @@ export default function ProBottomNav() {
       </NavLink>
     </nav>
   );
-
-  return createPortal(nav, document.body);
 }

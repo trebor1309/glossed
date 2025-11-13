@@ -19,7 +19,8 @@ import FAQ from "./pages/FAQ";
 import ChatPage from "@/pages/dashboard/ChatPage";
 
 import ScrollToTop from "./components/ScrollToTop";
-import Navbar from "@/components/Navbar";
+import Navbar from "@/components/navigation/NavbarMain";
+
 import Footer from "@/components/Footer";
 import Logo from "./components/Logo";
 import SessionGate from "@/components/SessionGate";
@@ -49,6 +50,7 @@ import ProDashboardMissions from "./pages/prodashboard/pages/ProDashboardMission
 import ProDashboardPayments from "./pages/prodashboard/pages/ProDashboardPayments";
 import ProDashboardSettings from "./pages/prodashboard/pages/ProDashboardSettings";
 import ProDashboardMore from "./pages/prodashboard/pages/ProDashboardMore";
+import ProDashboardAccount from "./pages/prodashboard/pages/ProDashboardAccount";
 import StripeSuccess from "@/pages/prodashboard/stripe/Success";
 import StripeRefresh from "@/pages/prodashboard/stripe/Refresh";
 
@@ -85,7 +87,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
   const isDashboardRoute =
     location.pathname.startsWith("/dashboard") || location.pathname.startsWith("/prodashboard");
 
-  // 🔁 Redirection automatique selon le rôle (fix avec timeout)
+  // 🔁 Redirection selon rôle
   useEffect(() => {
     if (!loading && isAuthenticated) {
       const timer = setTimeout(() => {
@@ -99,7 +101,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
     }
   }, [isAuthenticated, isPro, loading, location.pathname, navigate]);
 
-  // 🔐 Garde supplémentaire : empêche un client d'accéder à /prodashboard
+  // 🔐 Garde supplémentaire
   useEffect(() => {
     if (!loading && isAuthenticated && !isPro && location.pathname.startsWith("/prodashboard")) {
       const timer = setTimeout(() => navigate("/dashboard", { replace: true }), 0);
@@ -125,7 +127,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
   // 🧭 Application principale
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-amber-50 to-white text-gray-900 font-sans">
-      {/* 🌸 Navbar visible sur toutes les pages hors dashboard */}
+      {/* 🌸 Navbar hors dashboard */}
       {!isDashboardRoute && (
         <Navbar
           isAuthenticated={isAuthenticated}
@@ -144,7 +146,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
       <SessionGate>
         <main className="flex-grow">
           <Routes>
-            {/* 🌍 Pages publiques */}
+            {/* 🌍 Public */}
             <Route
               path="/"
               element={
@@ -170,7 +172,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
             <Route path="/contact" element={<Contact />} />
             <Route path="/safety" element={<Safety />} />
 
-            {/* 💬 Chat (dispo pour tout utilisateur connecté) */}
+            {/* 💬 Chat (utilisateur connecté) */}
             <Route path="/chat/:mission_id" element={isAuthenticated ? <ChatPage /> : <Home />} />
 
             {/* 👤 Dashboard Client */}
@@ -199,15 +201,17 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               <Route path="missions" element={<ProDashboardMissions />} />
               <Route path="payments" element={<ProDashboardPayments />} />
               <Route path="settings" element={<ProDashboardSettings />} />
+              <Route path="account" element={<ProDashboardAccount />} />
               <Route path="more" element={<ProDashboardMore />} />
-              <Route path="/prodashboard/stripe/success" element={<StripeSuccess />} />
-              <Route path="/prodashboard/stripe/refresh" element={<StripeRefresh />} />
+              {/* ⬇️ ⬇️ Corrigé : chemins relatifs dans le parent /prodashboard */}
+              <Route path="stripe/success" element={<StripeSuccess />} />
+              <Route path="stripe/refresh" element={<StripeRefresh />} />
             </Route>
           </Routes>
         </main>
       </SessionGate>
 
-      {/* 🌸 Footer visible hors dashboard */}
+      {/* 🌸 Footer hors dashboard */}
       {!isDashboardRoute && <Footer />}
 
       {/* 🪄 Modales */}

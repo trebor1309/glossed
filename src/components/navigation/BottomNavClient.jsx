@@ -1,20 +1,28 @@
+// src/pages/dashboard/components/BottomNav.jsx
 import { Home, Calendar, User, MoreHorizontal } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { createPortal } from "react-dom";
+import { useNotifications } from "@/context/NotificationContext";
+import NotificationBadge from "@/components/navigation/NotificationBadge";
 
 export default function BottomNav() {
   const navigate = useNavigate();
+  const { notifications } = useNotifications();
 
   const links = [
     { to: "/dashboard", icon: Home, label: "Home" },
-    { to: "/dashboard/reservations", icon: Calendar, label: "Bookings" },
+    {
+      to: "/dashboard/reservations",
+      icon: Calendar,
+      label: "Bookings",
+      badge: notifications.clientOffers,
+    },
     { to: "/dashboard/account", icon: User, label: "Account" },
     { to: "/dashboard/more", icon: MoreHorizontal, label: "More" },
   ];
 
-  const nav = (
+  return (
     <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-lg flex justify-around items-center py-2 md:hidden z-[9999]">
-      {/* 🔘 Bouton [+] flottant au centre */}
+      {/* 🔘 Bouton [+] flottant */}
       <div className="absolute -top-5 left-1/2 -translate-x-1/2">
         <button
           onClick={() => navigate("/dashboard/new")}
@@ -34,22 +42,23 @@ export default function BottomNav() {
         </button>
       </div>
 
-      {links.map(({ to, icon: Icon, label }) => (
+      {links.map(({ to, icon: Icon, label, badge }) => (
         <NavLink
           key={to}
           to={to}
           className={({ isActive }) =>
-            `flex flex-col items-center text-xs font-medium transition-colors ${
+            `relative flex flex-col items-center text-xs font-medium transition-colors ${
               isActive ? "text-rose-600" : "text-gray-500"
             }`
           }
         >
-          <Icon size={22} />
+          <div className="relative">
+            <Icon size={22} />
+            {badge > 0 && <NotificationBadge count={badge} />}
+          </div>
           <span className="mt-1">{label}</span>
         </NavLink>
       ))}
     </nav>
   );
-
-  return nav;
 }

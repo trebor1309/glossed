@@ -123,7 +123,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onChat, onEva
           {/* Chat seulement quand confirmé */}
           {showChat && (
             <button
-              onClick={() => navigate(`/dashboard/chat/${booking.id}`)}
+              onClick={() => navigate(`/chat/${booking.id}`)}
               className="px-4 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.03] transition flex items-center gap-2"
             >
               <MessageSquare size={16} /> Chat

@@ -6,8 +6,9 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import "./index.css";
 
-// ✅ On importe le contexte utilisateur
+// ✅ Contexts
 import { UserProvider } from "./context/UserContext.jsx";
+import { NotificationProvider } from "./context/NotificationContext.jsx"; // ← NEW
 
 function Root() {
   const [showUpgradeModal, setShowUpgradeModal] = React.useState(false);
@@ -16,7 +17,10 @@ function Root() {
 
   return (
     <UserProvider openUpgradeModal={openUpgradeModal}>
-      <App showUpgradeModal={showUpgradeModal} closeUpgradeModal={closeUpgradeModal} />
+      {/* 🔔 Notifications globales accessibles partout (landing + dashboards) */}
+      <NotificationProvider>
+        <App showUpgradeModal={showUpgradeModal} closeUpgradeModal={closeUpgradeModal} />
+      </NotificationProvider>
     </UserProvider>
   );
 }

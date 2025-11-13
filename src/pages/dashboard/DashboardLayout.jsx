@@ -3,8 +3,8 @@ import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
 import { Home, User, Calendar, CreditCard, Settings, Repeat, Plus } from "lucide-react";
 import { useJsApiLoader } from "@react-google-maps/api";
-import BottomNav from "./BottomNav";
-import Sidebar from "./Sidebar";
+import BottomNav from "../../components/navigation/BottomNavClient";
+import Sidebar from "../../components/navigation/SidebarClient";
 import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 
 const libraries = ["places"];

@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
 import { Home, Calendar, CreditCard, Settings, LogOut, Repeat } from "lucide-react";
-import ProBottomNav from "./ProBottomNav";
-import SidebarPro from "./SidebarPro";
+import ProBottomNav from "../../components/navigation/BottomNavPro";
+import SidebarPro from "../../components/navigation/SidebarPro";
 console.log("⚙️ ProDashboardSettings mounted");
 
 export default function ProDashboardLayout() {

@@ -1,15 +1,18 @@
+// src/pages/prodashboard/pages/ProDashboardHome.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { Clock, CheckCircle, DollarSign, Star } from "lucide-react";
+import Toast from "@/components/ui/Toast";
 
 export default function ProDashboardHome() {
   const navigate = useNavigate();
-  const { user } = useUser(); // ✅ On récupère directement les données du contexte
+  const { user } = useUser();
   const proId = user?.id;
   const firstName = user?.first_name || user?.business_name || "there";
   const [profilePhoto, setProfilePhoto] = useState(user?.profile_photo || null);
+  const [toast, setToast] = useState(null);
 
   const [stats, setStats] = useState({
     pending: 0,
@@ -18,125 +21,109 @@ export default function ProDashboardHome() {
     payments: 0,
   });
 
-  /* ----------------------------- 🧩 Photo de profil ----------------------------- */
+  /* 📸 Photo de profil avec cache */
   useEffect(() => {
     if (!proId) return;
+    const KEY = "glossed_pro_photo";
+    const cached = localStorage.getItem(KEY);
 
-    // Vérifie d’abord le cache local
-    const cached = localStorage.getItem("glossed_pro_photo");
     if (cached) {
       setProfilePhoto(cached);
       return;
     }
 
-    const fetchProfilePhoto = async () => {
-      const { data, error } = await supabase
-        .from("users")
-        .select("profile_photo")
-        .eq("id", proId)
-        .single();
-
-      if (!error && data?.profile_photo) {
-        setProfilePhoto(data.profile_photo);
-        localStorage.setItem("glossed_pro_photo", data.profile_photo);
-      }
-    };
-
-    fetchProfilePhoto();
+    supabase
+      .from("users")
+      .select("profile_photo")
+      .eq("id", proId)
+      .single()
+      .then(({ data }) => {
+        if (data?.profile_photo) {
+          setProfilePhoto(data.profile_photo);
+          localStorage.setItem(KEY, data.profile_photo);
+        }
+      });
   }, [proId]);
 
-  /* ----------------------------- 📊 Charger les stats ----------------------------- */
+  /* 📊 Stats corrigées */
+  const fetchStats = async () => {
+    if (!proId) return;
+    try {
+      const { data: notifications } = await supabase
+        .from("booking_notifications")
+        .select("id")
+        .eq("pro_id", proId);
+
+      const { data: missions } = await supabase
+        .from("missions")
+        .select("status")
+        .eq("pro_id", proId);
+
+      const pending = notifications?.length || 0;
+      const confirmed = missions?.filter((m) => m.status === "confirmed").length || 0;
+      const completed = missions?.filter((m) => m.status === "completed").length || 0;
+      const payments = confirmed;
+
+      setStats({ pending, confirmed, completed, payments });
+    } catch (err) {
+      console.error("❌ Error fetching stats:", err.message);
+    }
+  };
+
+  /* 🔁 Realtime */
   useEffect(() => {
     if (!proId) return;
-
-    const fetchStats = async () => {
-      const [pending, confirmed, completed, payments] = await Promise.all([
-        supabase
-          .from("bookings")
-          .select("*", { count: "exact", head: true })
-          .eq("pro_id", proId)
-          .eq("status", "pending"),
-        supabase
-          .from("bookings")
-          .select("*", { count: "exact", head: true })
-          .eq("pro_id", proId)
-          .eq("status", "confirmed"),
-        supabase
-          .from("bookings")
-          .select("*", { count: "exact", head: true })
-          .eq("pro_id", proId)
-          .eq("status", "completed"),
-        supabase.from("payments").select("*", { count: "exact", head: true }).eq("pro_id", proId),
-      ]);
-
-      setStats({
-        pending: pending.count || 0,
-        confirmed: confirmed.count || 0,
-        completed: completed.count || 0,
-        payments: payments.count || 0,
-      });
-    };
-
     fetchStats();
-  }, [proId]);
 
-  /* ----------------------------- 🔄 Realtime updates ----------------------------- */
-  useEffect(() => {
-    if (!proId) return;
-
-    const refreshStats = async () => {
-      const [pending, confirmed, completed, payments] = await Promise.all([
-        supabase
-          .from("bookings")
-          .select("*", { count: "exact", head: true })
-          .eq("pro_id", proId)
-          .eq("status", "pending"),
-        supabase
-          .from("bookings")
-          .select("*", { count: "exact", head: true })
-          .eq("pro_id", proId)
-          .eq("status", "confirmed"),
-        supabase
-          .from("bookings")
-          .select("*", { count: "exact", head: true })
-          .eq("pro_id", proId)
-          .eq("status", "completed"),
-        supabase.from("payments").select("*", { count: "exact", head: true }).eq("pro_id", proId),
-      ]);
-
-      setStats({
-        pending: pending.count || 0,
-        confirmed: confirmed.count || 0,
-        completed: completed.count || 0,
-        payments: payments.count || 0,
-      });
-    };
-
-    const bookingsChannel = supabase
-      .channel("bookings-updates")
+    const notifChannel = supabase
+      .channel(`pro_realtime_${proId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "bookings", filter: `pro_id=eq.${proId}` },
-        () => refreshStats()
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "booking_notifications",
+          filter: `pro_id=eq.${proId}`,
+        },
+        async (payload) => {
+          const { booking_id } = payload.new;
+          const { data: booking } = await supabase
+            .from("bookings")
+            .select("service")
+            .eq("id", booking_id)
+            .single();
+
+          setToast({
+            type: "success",
+            message: `📩 New booking request: ${booking?.service || "New request"}`,
+          });
+          fetchStats();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "missions",
+          filter: `pro_id=eq.${proId}`,
+        },
+        (payload) => {
+          if (payload.new.status === "confirmed") {
+            setToast({
+              type: "success",
+              message: `💰 Your offer for "${payload.new.service}" has been confirmed and paid!`,
+            });
+            fetchStats();
+          }
+        }
       )
       .subscribe();
 
-    const paymentsChannel = supabase
-      .channel("payments-updates")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "payments", filter: `pro_id=eq.${proId}` },
-        () => refreshStats()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(bookingsChannel);
-      supabase.removeChannel(paymentsChannel);
-    };
+    return () => supabase.removeChannel(notifChannel);
   }, [proId]);
 
-  /* ----------------------------- 🧱 Cartes ----------------------------- */
+  /* UI */
   const cards = [
     {
       title: "Pending Requests",
@@ -168,10 +155,9 @@ export default function ProDashboardHome() {
     },
   ];
 
-  /* ----------------------------- 🎨 Rendu ----------------------------- */
   return (
     <section className="mt-10 max-w-4xl mx-auto px-4 sm:px-6 md:px-8 space-y-10">
-      {/* 🔹 Welcome section */}
+      {/* Header */}
       <div className="text-center mb-6 flex flex-col items-center">
         <div className="relative mb-4">
           <div className="w-24 h-24 rounded-full bg-gradient-to-r from-rose-500 to-red-500 p-[2px]">
@@ -193,13 +179,12 @@ export default function ProDashboardHome() {
         <h1 className="text-2xl font-bold text-gray-800">
           Welcome back, <span className="text-rose-600">{firstName}</span> 👋
         </h1>
-
         <p className="text-gray-500 text-sm mt-1">
           Here’s a quick overview of your current activity.
         </p>
       </div>
 
-      {/* 🔹 Cards grid */}
+      {/* Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {cards.map(({ title, count, color, icon: Icon, link }) => (
           <button
@@ -214,7 +199,7 @@ export default function ProDashboardHome() {
         ))}
       </div>
 
-      {/* 🔹 Profile summary */}
+      {/* Profile summary */}
       <div className="bg-white rounded-2xl shadow p-6 border border-gray-100 mt-8 text-center">
         <h2 className="text-lg font-semibold text-gray-800 mb-2">Your Profile at a Glance</h2>
         <p className="text-sm text-gray-500 max-w-md mx-auto">
@@ -227,6 +212,8 @@ export default function ProDashboardHome() {
           Go to Profile
         </button>
       </div>
+
+      {toast && <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
     </section>
   );
 }
