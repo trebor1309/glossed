@@ -26,23 +26,37 @@ export default function DashboardReservations() {
 
   const [toast, setToast] = useState(null);
 
+  // --- NEW: sort mode
+  const [sortMode, setSortMode] = useState("closest");
+
+  const sortItems = (arr) => {
+    switch (sortMode) {
+      case "newest":
+        return [...arr].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      case "oldest":
+        return [...arr].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      case "farthest":
+        return [...arr].sort((a, b) => new Date(b.date) - new Date(a.date));
+      case "closest":
+      default:
+        return [...arr].sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+  };
+
   /* ----------------------------------------------------------------------
-     📌 Fonction principale : fetchBookings()
-     Fusionne bookings + missions correctement
+     📌 fetchBookings() – fusion bookings + missions
   ---------------------------------------------------------------------- */
   const fetchBookings = async () => {
     try {
       setLoading(true);
       const clientId = session.user.id;
 
-      // 1️⃣ Bookings
       const { data: bookingsData } = await supabase
         .from("bookings")
         .select("*")
         .eq("client_id", clientId)
         .order("date", { ascending: true });
 
-      // 2️⃣ Missions (offers / confirmed / completed)
       const { data: missionsData } = await supabase
         .from("missions")
         .select("*")
@@ -50,28 +64,17 @@ export default function DashboardReservations() {
         .in("status", ["proposed", "offers", "confirmed", "completed", "cancelled"])
         .order("date", { ascending: true });
 
-      // 🧮 Clean = booking → mission si confirmed
+      // éviter d'afficher une "pending" si mission confirmed existe
       const confirmedBookingIds = (missionsData || [])
         .filter((m) => m.status === "confirmed")
         .map((m) => m.booking_id);
 
-      const cleanedBookings = (bookingsData || []).filter(
-        (b) => !confirmedBookingIds.includes(b.id)
-      );
+      const cleaned = (bookingsData || []).filter((b) => !confirmedBookingIds.includes(b.id));
 
-      const bookingsTagged = cleanedBookings.map((b) => ({
-        ...b,
-        type: "booking",
-      }));
+      const bookingsTagged = cleaned.map((b) => ({ ...b, type: "booking" }));
+      const missionsTagged = (missionsData || []).map((m) => ({ ...m, type: "mission" }));
 
-      const missionsTagged = (missionsData || []).map((m) => ({
-        ...m,
-        type: "mission",
-      }));
-
-      const merged = [...bookingsTagged, ...missionsTagged];
-
-      setBookings(merged);
+      setBookings([...bookingsTagged, ...missionsTagged]);
     } catch (err) {
       console.error("❌ fetchBookings error:", err);
     } finally {
@@ -80,34 +83,28 @@ export default function DashboardReservations() {
   };
 
   /* ----------------------------------------------------------------------
-     🔁 Initialisation + realtime via OUVERTURE GLOBALE
-     (NotificationContext déclenche supabase-update)
+     🔁 realtime via NotificationContext (supabase-update)
   ---------------------------------------------------------------------- */
   useEffect(() => {
     if (!session?.user?.id) return;
 
     fetchBookings();
 
-    const handler = () => {
-      fetchBookings();
-    };
-
+    const handler = () => fetchBookings();
     window.addEventListener("supabase-update", handler);
 
-    return () => {
-      window.removeEventListener("supabase-update", handler);
-    };
+    return () => window.removeEventListener("supabase-update", handler);
   }, [session?.user?.id]);
 
   /* ----------------------------------------------------------------------
-     🗑️ Supprimer un booking
+     🗑️ delete booking
   ---------------------------------------------------------------------- */
   const handleDelete = async (id) => {
     if (!confirm("Are you sure?")) return;
 
     const { error } = await supabase.from("bookings").delete().eq("id", id);
     if (error) {
-      setToast({ message: "Failed to delete.", type: "error" });
+      setToast({ message: "Failed to delete", type: "error" });
       return;
     }
 
@@ -116,19 +113,19 @@ export default function DashboardReservations() {
   };
 
   /* ----------------------------------------------------------------------
-     🎨 Groupement par statut
+     🎨 grouping + tri
   ---------------------------------------------------------------------- */
   const displayBookings = selectedDayBookings ? selectedDayBookings.dayBookings : bookings;
 
   const grouped = {
-    pending: displayBookings.filter((b) => b.status === "pending"),
-    offers: displayBookings.filter((b) => ["offers", "proposed"].includes(b.status)),
-    confirmed: displayBookings.filter((b) => b.status === "confirmed"),
-    completed: displayBookings.filter((b) => b.status === "completed"),
-    cancelled: displayBookings.filter((b) => b.status === "cancelled"),
+    pending: sortItems(displayBookings.filter((b) => b.status === "pending")),
+    offers: sortItems(displayBookings.filter((b) => ["offers", "proposed"].includes(b.status))),
+    confirmed: sortItems(displayBookings.filter((b) => b.status === "confirmed")),
+    completed: sortItems(displayBookings.filter((b) => b.status === "completed")),
+    cancelled: sortItems(displayBookings.filter((b) => b.status === "cancelled")),
   };
 
-  // Nettoyage : ne pas afficher des pending déjà convertis
+  // Nettoyage: pending doublons
   grouped.pending = grouped.pending.filter(
     (b) => !grouped.confirmed.some((c) => c.booking_id === b.id)
   );
@@ -141,17 +138,33 @@ export default function DashboardReservations() {
     );
 
   /* ----------------------------------------------------------------------
-     🎨 Rendu
+     UI
   ---------------------------------------------------------------------- */
   return (
     <section className="mt-10 max-w-4xl mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800 text-center mb-4">My Reservations</h1>
+      <h1 className="text-2xl font-bold text-gray-800 text-center mb-2">My Reservations</h1>
 
+      {/* Sort dropdown */}
+      <div className="flex justify-end mb-2">
+        <select
+          value={sortMode}
+          onChange={(e) => setSortMode(e.target.value)}
+          className="px-3 py-2 border rounded-xl text-sm bg-white shadow-sm"
+        >
+          <option value="closest">Closest date</option>
+          <option value="farthest">Farthest date</option>
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+      </div>
+
+      {/* Calendar */}
       <CalendarView
         bookings={bookings}
         onSelectDay={(date, dayBookings) => setSelectedDayBookings({ date, dayBookings })}
       />
 
+      {/* Filter banner */}
       {selectedDayBookings && (
         <div className="text-center text-gray-600 mb-4">
           <p className="text-sm">
@@ -168,7 +181,7 @@ export default function DashboardReservations() {
         </div>
       )}
 
-      {/* ----- Sections ----- */}
+      {/* ──────────────── Sections ──────────────── */}
       <ReservationSection
         title="Pending Requests"
         icon={<Clock size={20} className="text-amber-500" />}
@@ -220,7 +233,7 @@ export default function DashboardReservations() {
         empty="No cancelled reservations."
       />
 
-      {/* ----- Modals ----- */}
+      {/* Modals */}
       <AnimatePresence>
         {showOffersModal && selectedBooking && (
           <ClientOffersModal
@@ -229,10 +242,7 @@ export default function DashboardReservations() {
             onPay={() => {
               setShowOffersModal(false);
               fetchBookings();
-              setToast({
-                message: "Payment confirmed!",
-                type: "success",
-              });
+              setToast({ message: "Payment confirmed!", type: "success" });
             }}
           />
         )}
@@ -246,10 +256,7 @@ export default function DashboardReservations() {
           onSuccess={() => {
             setShowEditModal(false);
             fetchBookings();
-            setToast({
-              message: "Booking updated!",
-              type: "success",
-            });
+            setToast({ message: "Booking updated!", type: "success" });
           }}
         />
       )}
@@ -260,7 +267,7 @@ export default function DashboardReservations() {
 }
 
 /* ----------------------------------------------------------------------
-   🔸 ReservationSection
+   🔸 ReservationSection – inchangé sauf petits ajustements
 ---------------------------------------------------------------------- */
 function ReservationSection({
   title,

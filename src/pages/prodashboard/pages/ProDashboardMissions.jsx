@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
+
 import { CheckCircle, Clock, XCircle, Star, Eye } from "lucide-react";
 
 import CalendarView from "@/components/CalendarView";
@@ -29,22 +30,40 @@ export default function ProDashboardMissions() {
   const [selectedMission, setSelectedMission] = useState(null);
   const [selectedEvaluation, setSelectedEvaluation] = useState(null);
 
+  // 🔽 tri
+  const [sortMode, setSortMode] = useState("closest");
+
+  const sortMissions = (arr) => {
+    switch (sortMode) {
+      case "newest":
+        return [...arr].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      case "oldest":
+        return [...arr].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      case "closest":
+        return [...arr].sort((a, b) => new Date(a.date) - new Date(b.date));
+      case "farthest":
+        return [...arr].sort((a, b) => new Date(b.date) - new Date(a.date));
+      default:
+        return arr;
+    }
+  };
+
   /* ------------------------------------------------------------------
-     📌 Fonction principale : charger toutes les missions liées au pro
+     📌 Charger toutes les missions liées au pro
   ------------------------------------------------------------------ */
   const fetchMissions = async () => {
     setLoading(true);
     try {
       const proId = session.user.id;
 
-      // BOOKINGS directs reçus
+      // bookings directs reçus
       const { data: directBookings } = await supabase
         .from("bookings")
         .select("*")
         .eq("pro_id", proId)
         .order("date", { ascending: true });
 
-      // Notifications reçues
+      // notifications
       const { data: notifData } = await supabase
         .from("booking_notifications")
         .select("booking_id")
@@ -52,17 +71,18 @@ export default function ProDashboardMissions() {
 
       let notifiedBookings = [];
       if (notifData?.length) {
-        const bookingIds = notifData.map((n) => n.booking_id);
+        const ids = notifData.map((n) => n.booking_id);
         const { data } = await supabase
           .from("bookings")
           .select("*")
-          .in("id", bookingIds)
+          .in("id", ids)
           .eq("status", "pending")
           .order("date", { ascending: true });
+
         notifiedBookings = data || [];
       }
 
-      // Missions
+      // missions existantes
       const { data: proMissions } = await supabase
         .from("missions")
         .select("*")
@@ -74,17 +94,15 @@ export default function ProDashboardMissions() {
         net_amount: Math.round(m.price * 0.9 * 100) / 100,
       }));
 
-      // Nettoyer doublons : bookings déjà confirmés
-      const confirmedBookingIds = missionsWithNet
+      // retirer booking déjà confirmés
+      const confirmedIds = missionsWithNet
         .filter((m) => m.status === "confirmed")
         .map((m) => m.booking_id);
 
-      const cleanedBookings = directBookings.filter((b) => !confirmedBookingIds.includes(b.id));
+      const cleaned = directBookings.filter((b) => !confirmedIds.includes(b.id));
 
-      // Fusion finalisée
-      const finalList = [...cleanedBookings, ...notifiedBookings, ...missionsWithNet];
-
-      setMissions(finalList);
+      // fusion
+      setMissions([...cleaned, ...notifiedBookings, ...missionsWithNet]);
       setProBadge(notifications.proBookings || 0);
     } catch (err) {
       console.error("❌ fetchMissions error:", err);
@@ -95,22 +113,18 @@ export default function ProDashboardMissions() {
   };
 
   /* ------------------------------------------------------------------
-     🔁 Initialisation + Réaction aux events globaux
+     🔁 Realtime (via NotificationContext)
   ------------------------------------------------------------------ */
   useEffect(() => {
     if (!session?.user?.id) return;
     fetchMissions();
 
-    // Écoute globale du NotificationContext
     const handler = () => {
       fetchMissions();
     };
-
     window.addEventListener("supabase-update", handler);
 
-    return () => {
-      window.removeEventListener("supabase-update", handler);
-    };
+    return () => window.removeEventListener("supabase-update", handler);
   }, [session?.user?.id]);
 
   /* ------------------------------------------------------------------
@@ -132,32 +146,64 @@ export default function ProDashboardMissions() {
   };
 
   /* ------------------------------------------------------------------
-     🧮 Regroupement propre
+     🧮 Regroupement + tri
   ------------------------------------------------------------------ */
   const displayMissions = selectedDayMissions ? selectedDayMissions.dayMissions : missions;
 
   const grouped = {
-    pending: displayMissions.filter((m) => m.status === "pending"),
-    proposed: displayMissions.filter((m) => m.status === "proposed"),
-    confirmed: displayMissions.filter((m) => m.status === "confirmed"),
-    completed: displayMissions.filter((m) => m.status === "completed"),
-    cancelled: displayMissions.filter((m) => m.status === "cancelled"),
+    pending: sortMissions(displayMissions.filter((m) => m.status === "pending")),
+    proposed: sortMissions(displayMissions.filter((m) => m.status === "proposed")),
+    confirmed: sortMissions(displayMissions.filter((m) => m.status === "confirmed")),
+    completed: sortMissions(displayMissions.filter((m) => m.status === "completed")),
+    cancelled: sortMissions(displayMissions.filter((m) => m.status === "cancelled")),
   };
 
   if (loading)
     return <div className="flex justify-center items-center h-48 text-gray-600">Loading...</div>;
 
   /* ------------------------------------------------------------------
-     🎨 Rendu
+     🎨 UI rendu
   ------------------------------------------------------------------ */
   return (
     <section className="mt-10 max-w-4xl mx-auto p-4 space-y-10 overflow-x-hidden">
-      <h1 className="text-2xl font-bold text-gray-800 text-center mb-4">My Missions</h1>
+      <h1 className="text-2xl font-bold text-gray-800 text-center mb-2">My Missions</h1>
 
+      {/* Sort menu */}
+      <div className="flex justify-end mb-4">
+        <select
+          value={sortMode}
+          onChange={(e) => setSortMode(e.target.value)}
+          className="px-3 py-2 border rounded-xl text-sm bg-white shadow-sm"
+        >
+          <option value="closest">Closest date</option>
+          <option value="farthest">Farthest date</option>
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+      </div>
+
+      {/* Calendar */}
       <CalendarView
         bookings={missions}
         onSelectDay={(date, dayMissions) => setSelectedDayMissions({ date, dayMissions })}
       />
+
+      {/* Filter banner */}
+      {selectedDayMissions && (
+        <div className="text-center text-gray-600 mb-4">
+          <p className="text-sm">
+            Showing missions for{" "}
+            <span className="font-semibold text-gray-800">{selectedDayMissions.date}</span> (
+            {selectedDayMissions.dayMissions.length} items)
+          </p>
+          <button
+            onClick={() => setSelectedDayMissions(null)}
+            className="mt-2 px-4 py-1.5 text-sm font-medium text-rose-600 border border-rose-200 rounded-full hover:bg-rose-50 transition"
+          >
+            Show all missions
+          </button>
+        </div>
+      )}
 
       {/* VIEW modal */}
       {selectedView && (
@@ -259,7 +305,7 @@ export default function ProDashboardMissions() {
 }
 
 /* ------------------------------------------------------------------
-   🔹 MissionSection (inchangé mais optimisé)
+   🔹 MissionSection
 ------------------------------------------------------------------ */
 function MissionSection({ title, icon, data, color, empty, onView, setSelectedMission }) {
   return (
