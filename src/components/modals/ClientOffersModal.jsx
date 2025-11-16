@@ -59,7 +59,7 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
       }
 
       const response = await fetch(
-        "https://cdcnylgokphyltkctymi.supabase.co/functions/v1/create-payment-intent",
+        "https://cdcnylgokphyltkctymi.supabase.co/functions/v1/create-checkout-session",
         {
           method: "POST",
           headers: {

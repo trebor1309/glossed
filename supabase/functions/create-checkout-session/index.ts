@@ -1,8 +1,8 @@
-// ✅ Compatible Deno + Supabase + Stripe Connect
+// /supabase/functions/create-checkout-session/index.ts
 import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// 🧠 Initialisation Stripe et Supabase
+// 🔐 Stripe & Supabase
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
   apiVersion: "2023-10-16",
 });
@@ -12,19 +12,18 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-// 🌍 URLs (prod = vercel)
-const BASE_URL = "https://glossed.vercel.app"; // ✅ ton URL Vercel
+// 🌍 URL front (Vercel)
+const BASE_URL = "https://glossed.vercel.app";
 
-// 🔒 Headers CORS
+// 🔒 CORS
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// 🚀 Fonction principale
 Deno.serve(async (req) => {
-  // ⚙️ Preflight (OPTIONS)
+  // Preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -40,91 +39,88 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 🔹 Récupérer la mission et le pro
+    // 1️⃣ Mission
     const { data: mission, error: missionError } = await supabase
       .from("missions")
-      .select("id, service, description, price, client_total, client_id, pro_id")
+      .select("id, service, description, price, client_id, pro_id")
       .eq("id", mission_id)
       .single();
 
     if (missionError || !mission) {
+      console.error("❌ Mission error:", missionError?.message);
       throw new Error("Mission not found");
     }
 
-    // 🔹 Récupérer l’account Stripe du pro
-    const { data: pro } = await supabase
+    // 2️⃣ Pro
+    const { data: pro, error: proError } = await supabase
       .from("users")
       .select("stripe_account_id, email, first_name, last_name")
       .eq("id", mission.pro_id)
       .single();
 
-    if (!pro?.stripe_account_id) {
+    if (proError || !pro) {
+      console.error("❌ Pro error:", proError?.message);
+      throw new Error("Pro Stripe account not found");
+    }
+
+    if (!pro.stripe_account_id) {
       throw new Error("Pro not connected to Stripe");
     }
 
-    // 💸 Calcul frais Glossed (10 %)
-    const baseAmount = Math.round(Number(mission.price) * 100); // cents
-    const glossedFee = Math.round(baseAmount * 0.1); // 10 %
+    // 3️⃣ Montants
+    const baseAmountCents = Math.round(Number(mission.price) * 100); // montant pro en cents
+    const glossedFeeCents = Math.round(baseAmountCents * 0.1); // 10% pour Glossed
+    const totalCents = baseAmountCents + glossedFeeCents; // payé par le client
 
-    // 🧾 Création de la session Checkout
-    const session = await stripe.checkout.sessions.create(
-      {
-        payment_method_types: ["card"],
-        mode: "payment",
-        customer_email: undefined, // on peut remplir plus tard
-        line_items: [
-          {
-            price_data: {
-              currency: "eur",
-              unit_amount: baseAmount + glossedFee,
-              product_data: {
-                name: `${mission.service}`,
-                description: mission.description || "Service Glossed",
-              },
+    const feeMetadata = String(glossedFeeCents);
+
+    // 4️⃣ Session Checkout (destination charge)
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "eur",
+            unit_amount: totalCents,
+            product_data: {
+              name: mission.service || "Glossed booking",
+              description: mission.description || undefined,
             },
-            quantity: 1,
           },
-        ],
-        payment_intent_data: {
-          application_fee_amount: glossedFee, // 💰 la commission Glossed
-          transfer_data: {
-            destination: pro.stripe_account_id, // 💼 paiement direct au pro
-          },
+          quantity: 1,
+        },
+      ],
+      payment_intent_data: {
+        application_fee_amount: glossedFeeCents,
+        transfer_data: {
+          destination: pro.stripe_account_id,
         },
         metadata: {
           mission_id: mission.id,
-          pro_id: mission.pro_id,
           client_id,
+          pro_id: mission.pro_id,
+          fee_cents: feeMetadata,
         },
-        success_url: `${BASE_URL}/dashboard/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${BASE_URL}/dashboard/payment/cancel`,
       },
-      {
-        stripeAccount: pro.stripe_account_id, // pour Stripe Connect
-      }
-    );
-
-    // 🧠 Enregistre le paiement côté Supabase (facultatif mais utile)
-    await supabase.from("payments").insert([
-      {
-        id: crypto.randomUUID(),
+      metadata: {
         mission_id: mission.id,
         client_id,
         pro_id: mission.pro_id,
-        amount: (baseAmount + glossedFee) / 100,
-        platform_fee: glossedFee / 100,
-        status: "pending",
-        stripe_session_id: session.id,
+        fee_cents: feeMetadata,
       },
-    ]);
+      success_url: `${BASE_URL}/dashboard/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${BASE_URL}/dashboard/payment/cancel`,
+    });
 
-    // ✅ Retourne l’URL de redirection Stripe
+    console.log("✅ Checkout session created:", session.id);
+
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (err) {
-    console.error("❌ Stripe checkout error:", err.message);
-    return new Response(JSON.stringify({ error: err.message }), {
+  } catch (err: any) {
+    console.error("❌ Stripe checkout error:", err?.message || err);
+    return new Response(JSON.stringify({ error: err?.message || "Unknown error" }), {
       status: 400,
       headers: corsHeaders,
     });
