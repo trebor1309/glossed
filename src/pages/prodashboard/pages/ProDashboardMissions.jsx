@@ -1,86 +1,91 @@
+// 📄 src/pages/prodashboard/pages/ProDashboardMissions.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { CheckCircle, Clock, XCircle, Star, Eye } from "lucide-react";
+
 import CalendarView from "@/components/CalendarView";
 import Toast from "@/components/ui/Toast";
+
 import ProProposalModal from "@/components/modals/ProProposalModal";
 import ProMissionDetailsModal from "@/components/modals/ProMissionDetailsModal";
 import ProEvaluationModal from "@/components/modals/ProEvaluationModal";
-import ProBookingDetailsModal from "@/components/modals/ProBookingDetailsModal"; // ✅ nouveau import
+import ProBookingDetailsModal from "@/components/modals/ProBookingDetailsModal";
 
-const formatTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
+const formatTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : "");
 
 export default function ProDashboardMissions() {
   const { session, setProBadge } = useUser();
+  const { notifications } = useNotifications();
+
   const [missions, setMissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDayMissions, setSelectedDayMissions] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const [selectedView, setSelectedView] = useState(null); // ✅ nouveau
-  const [proposalTarget, setProposalTarget] = useState(null); // ✅ pour ouvrir ProProposalModal
+  const [selectedView, setSelectedView] = useState(null);
+  const [proposalTarget, setProposalTarget] = useState(null);
   const [selectedMission, setSelectedMission] = useState(null);
   const [selectedEvaluation, setSelectedEvaluation] = useState(null);
 
-  // ---------------------------------------------------------
-  // 🔁 Charger toutes les missions liées à ce pro
-  // ---------------------------------------------------------
+  /* ------------------------------------------------------------------
+     📌 Fonction principale : charger toutes les missions liées au pro
+  ------------------------------------------------------------------ */
   const fetchMissions = async () => {
     setLoading(true);
     try {
       const proId = session.user.id;
 
-      // 1️⃣ Bookings directs (jamais proposés)
-      const { data: directBookings, error: directErr } = await supabase
+      // BOOKINGS directs reçus
+      const { data: directBookings } = await supabase
         .from("bookings")
         .select("*")
         .eq("pro_id", proId)
         .order("date", { ascending: true });
-      if (directErr) throw directErr;
 
-      // 2️⃣ Notifications reçues
-      const { data: notifData, error: notifErr } = await supabase
+      // Notifications reçues
+      const { data: notifData } = await supabase
         .from("booking_notifications")
         .select("booking_id")
         .eq("pro_id", proId);
-      if (notifErr) throw notifErr;
 
       let notifiedBookings = [];
       if (notifData?.length) {
         const bookingIds = notifData.map((n) => n.booking_id);
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from("bookings")
           .select("*")
           .in("id", bookingIds)
           .eq("status", "pending")
           .order("date", { ascending: true });
-        if (error) throw error;
         notifiedBookings = data || [];
       }
 
-      // 3️⃣ Missions du pro
-      const { data: proMissions, error: missionsErr } = await supabase
+      // Missions
+      const { data: proMissions } = await supabase
         .from("missions")
         .select("*")
         .eq("pro_id", proId)
         .order("date", { ascending: true });
-      if (missionsErr) throw missionsErr;
 
-      // 🧮 Ajouter le montant net reçu (90 %)
       const missionsWithNet = (proMissions || []).map((m) => ({
         ...m,
-        net_amount: Math.round(m.price * 0.9 * 100) / 100, // 10% fee for Glossed
+        net_amount: Math.round(m.price * 0.9 * 100) / 100,
       }));
 
-      // ✅ Filtrer doublons : ne pas montrer les bookings déjà confirmés
-      const confirmedIds = missionsWithNet
+      // Nettoyer doublons : bookings déjà confirmés
+      const confirmedBookingIds = missionsWithNet
         .filter((m) => m.status === "confirmed")
         .map((m) => m.booking_id);
-      const cleanedBookings = directBookings.filter((b) => !confirmedIds.includes(b.id));
 
-      const merged = [...cleanedBookings, ...notifiedBookings, ...missionsWithNet];
-      setMissions(merged);
+      const cleanedBookings = directBookings.filter((b) => !confirmedBookingIds.includes(b.id));
+
+      // Fusion finalisée
+      const finalList = [...cleanedBookings, ...notifiedBookings, ...missionsWithNet];
+
+      setMissions(finalList);
+      setProBadge(notifications.proBookings || 0);
     } catch (err) {
       console.error("❌ fetchMissions error:", err);
       setToast({ message: `❌ ${err.message}`, type: "error" });
@@ -89,67 +94,28 @@ export default function ProDashboardMissions() {
     }
   };
 
-  // ---------------------------------------------------------
-  // 🔂 Initialisation + écoute Realtime (missions & bookings)
-  // ---------------------------------------------------------
+  /* ------------------------------------------------------------------
+     🔁 Initialisation + Réaction aux events globaux
+  ------------------------------------------------------------------ */
   useEffect(() => {
     if (!session?.user?.id) return;
     fetchMissions();
 
-    const channel = supabase
-      .channel(`missions_pro_${session.user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "missions",
-          filter: `pro_id=eq.${session.user.id}`,
-        },
-        (payload) => {
-          console.log("🔁 Mission change:", payload);
-          fetchMissions();
-        }
-      )
-      .subscribe();
+    // Écoute globale du NotificationContext
+    const handler = () => {
+      fetchMissions();
+    };
 
-    const notifChannel = supabase
-      .channel(`booking_notifications_pro_${session.user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "booking_notifications",
-          filter: `pro_id=eq.${session.user.id}`,
-        },
-        async (payload) => {
-          const { booking_id } = payload.new;
-          const { data: booking } = await supabase
-            .from("bookings")
-            .select("*")
-            .eq("id", booking_id)
-            .single();
-
-          if (booking) {
-            console.log("📩 New booking received:", booking);
-            setMissions((prev) => [booking, ...prev]);
-            setProBadge((n) => (n || 0) + 1);
-            setToast({ message: "📩 New booking request in your area!", type: "success" });
-          }
-        }
-      )
-      .subscribe();
+    window.addEventListener("supabase-update", handler);
 
     return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(notifChannel);
+      window.removeEventListener("supabase-update", handler);
     };
   }, [session?.user?.id]);
 
-  // ---------------------------------------------------------
-  // ❌ Supprimer une demande
-  // ---------------------------------------------------------
+  /* ------------------------------------------------------------------
+     ❌ Supprimer une demande
+  ------------------------------------------------------------------ */
   const handleDelete = async (booking) => {
     try {
       await supabase
@@ -158,17 +124,18 @@ export default function ProDashboardMissions() {
         .eq("booking_id", booking.id)
         .eq("pro_id", session.user.id);
 
-      setMissions((prev) => prev.filter((m) => m.id !== booking.id));
       setToast({ message: "❌ Request deleted", type: "info" });
+      fetchMissions();
     } catch (err) {
       setToast({ message: `❌ ${err.message}`, type: "error" });
     }
   };
 
-  // ---------------------------------------------------------
-  // 🎨 Regroupement par statut
-  // ---------------------------------------------------------
+  /* ------------------------------------------------------------------
+     🧮 Regroupement propre
+  ------------------------------------------------------------------ */
   const displayMissions = selectedDayMissions ? selectedDayMissions.dayMissions : missions;
+
   const grouped = {
     pending: displayMissions.filter((m) => m.status === "pending"),
     proposed: displayMissions.filter((m) => m.status === "proposed"),
@@ -180,9 +147,9 @@ export default function ProDashboardMissions() {
   if (loading)
     return <div className="flex justify-center items-center h-48 text-gray-600">Loading...</div>;
 
-  // ---------------------------------------------------------
-  // 🧱 Rendu principal
-  // ---------------------------------------------------------
+  /* ------------------------------------------------------------------
+     🎨 Rendu
+  ------------------------------------------------------------------ */
   return (
     <section className="mt-10 max-w-4xl mx-auto p-4 space-y-10 overflow-x-hidden">
       <h1 className="text-2xl font-bold text-gray-800 text-center mb-4">My Missions</h1>
@@ -192,7 +159,7 @@ export default function ProDashboardMissions() {
         onSelectDay={(date, dayMissions) => setSelectedDayMissions({ date, dayMissions })}
       />
 
-      {/* 🧭 NEW: modal pour voir la demande */}
+      {/* VIEW modal */}
       {selectedView && (
         <ProBookingDetailsModal
           booking={selectedView}
@@ -205,13 +172,13 @@ export default function ProDashboardMissions() {
         />
       )}
 
-      {/* 💌 Envoi de proposition */}
+      {/* PROPOSAL modal */}
       {proposalTarget && (
         <ProProposalModal
           booking={proposalTarget}
           session={session}
           onClose={() => setProposalTarget(null)}
-          onSuccess={(createdMission) => {
+          onSuccess={() => {
             setProposalTarget(null);
             setToast({ message: "Proposal sent!", type: "success" });
             fetchMissions();
@@ -219,16 +186,16 @@ export default function ProDashboardMissions() {
         />
       )}
 
-      {/* 🌸 Modals existants */}
+      {/* MISSION DETAILS modal */}
       {selectedMission && (
         <ProMissionDetailsModal
           booking={selectedMission}
           onClose={() => setSelectedMission(null)}
-          onChat={(b) => console.log("💬 Chat with client:", b.client_id)}
           onEvaluate={(b) => setSelectedEvaluation(b)}
         />
       )}
 
+      {/* EVALUATE modal */}
       {selectedEvaluation && (
         <ProEvaluationModal
           booking={selectedEvaluation}
@@ -240,14 +207,14 @@ export default function ProDashboardMissions() {
         />
       )}
 
-      {/* ✅ Panneaux par statut */}
+      {/* SECTIONS */}
       <MissionSection
         title="Pending Requests"
         icon={<Clock size={20} className="text-amber-500" />}
         color="text-amber-600"
         data={grouped.pending}
         empty="No pending requests."
-        onView={(b) => setSelectedView(b)} // ✅ view modal
+        onView={(b) => setSelectedView(b)}
       />
 
       <MissionSection
@@ -291,9 +258,9 @@ export default function ProDashboardMissions() {
   );
 }
 
-/* ---------------------------------------------------------
-   🔸 MissionSection
---------------------------------------------------------- */
+/* ------------------------------------------------------------------
+   🔹 MissionSection (inchangé mais optimisé)
+------------------------------------------------------------------ */
 function MissionSection({ title, icon, data, color, empty, onView, setSelectedMission }) {
   return (
     <section className="bg-white rounded-2xl shadow p-6 border border-gray-100">
@@ -325,7 +292,6 @@ function MissionSection({ title, icon, data, color, empty, onView, setSelectedMi
                   {m.status}
                 </span>
 
-                {/* 🔹 Pending → View/Delete */}
                 {m.status === "pending" ? (
                   <button
                     onClick={() => onView?.(m)}

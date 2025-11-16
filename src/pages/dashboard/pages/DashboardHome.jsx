@@ -1,6 +1,7 @@
-// src/pages/dashboard/pages/DashboardHome.jsx
+// 📄 src/pages/dashboard/pages/DashboardHome.jsx
 import { useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { supabase } from "@/lib/supabaseClient";
 import { Calendar, Clock, CheckCircle, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -8,106 +9,86 @@ import Toast from "@/components/ui/Toast";
 
 export default function DashboardHome() {
   const { user } = useUser();
+  const { notifications } = useNotifications();
   const navigate = useNavigate();
 
-  const [counts, setCounts] = useState({ pending: 0, offers: 0, confirmed: 0 });
+  const [counts, setCounts] = useState({
+    pending: 0,
+    offers: 0,
+    confirmed: 0,
+  });
+
   const [loading, setLoading] = useState(true);
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [toast, setToast] = useState(null);
 
-  /* ------------------------------------ 📊 Charger stats (corrigé) ------------------------------------ */
+  /* --------------------------------------------------------------
+     📌 fetchStats() – le cœur du dashboard client
+     (Fusion bookings + missions identique à Reservations.jsx)
+  -------------------------------------------------------------- */
   const fetchStats = async () => {
-    if (!user?.id) return;
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    // Bookings du client
-    const { data: bookings, error: bErr } = await supabase
-      .from("bookings")
-      .select("id, status")
-      .eq("client_id", user.id);
+      const clientId = user.id;
 
-    if (bErr) {
-      console.error("❌ Bookings fetch error:", bErr.message);
+      const { data: bookings } = await supabase
+        .from("bookings")
+        .select("id, status")
+        .eq("client_id", clientId);
+
+      const { data: missions } = await supabase
+        .from("missions")
+        .select("status, booking_id")
+        .eq("client_id", clientId);
+
+      // pending = bookings non transformés en missions.confirmed
+      const confirmedIds =
+        missions?.filter((m) => m.status === "confirmed").map((m) => m.booking_id) || [];
+
+      const pending =
+        bookings?.filter((b) => b.status === "pending" && !confirmedIds.includes(b.id)).length || 0;
+
+      const offers = missions?.filter((m) => m.status === "proposed").length || 0;
+
+      const confirmed = missions?.filter((m) => m.status === "confirmed").length || 0;
+
+      setCounts({ pending, offers, confirmed });
+    } catch (err) {
+      console.error("❌ fetchStats error:", err);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Missions du client
-    const { data: missions, error: mErr } = await supabase
-      .from("missions")
-      .select("id, status, booking_id")
-      .eq("client_id", user.id);
-
-    if (mErr) {
-      console.error("❌ Missions fetch error:", mErr.message);
-      setLoading(false);
-      return;
-    }
-
-    const pendingBookings = bookings.filter((b) => b.status === "pending");
-    const pending = pendingBookings.filter(
-      (b) => !missions.some((m) => m.booking_id === b.id)
-    ).length;
-
-    const offers = missions.filter((m) => m.status === "proposed").length;
-    const confirmed = missions.filter((m) => m.status === "confirmed").length;
-
-    setCounts({ pending, offers, confirmed });
-    setLoading(false);
   };
 
-  /* ------------------------------------ 🔁 Realtime notifications ------------------------------------ */
+  /* --------------------------------------------------------------
+     🔁 Sync avec NotificationContext (réaltime)
+  -------------------------------------------------------------- */
   useEffect(() => {
     if (!user?.id) return;
     fetchStats();
 
-    const clientId = user.id;
-    const channel = supabase
-      .channel(`client_realtime_${clientId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "missions",
-          filter: `client_id=eq.${clientId}`,
-        },
-        (payload) => {
-          if (payload.new.status === "proposed") {
-            setToast({ type: "success", message: "💌 New offer received from a professional!" });
-            fetchStats();
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "missions",
-          filter: `client_id=eq.${clientId}`,
-        },
-        (payload) => {
-          if (payload.new.status === "confirmed") {
-            setToast({ type: "success", message: "✅ Your booking has been confirmed and paid!" });
-            fetchStats();
-          }
-        }
-      )
-      .subscribe();
+    const handler = () => fetchStats();
+    window.addEventListener("supabase-update", handler);
 
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener("supabase-update", handler);
     };
   }, [user?.id]);
 
-  /* ------------------------------------ 📸 Photo profil ------------------------------------ */
+  /* --------------------------------------------------------------
+     📸 Load profile picture (cache local)
+  -------------------------------------------------------------- */
   useEffect(() => {
     if (!user?.id) return;
 
     const KEY = "glossed_client_photo";
     const cached = localStorage.getItem(KEY);
-    if (cached) return setProfilePhoto(cached);
+
+    if (cached) {
+      setProfilePhoto(cached);
+      return;
+    }
 
     supabase
       .from("users")
@@ -124,7 +105,9 @@ export default function DashboardHome() {
 
   const firstName = user?.first_name || "there";
 
-  /* ------------------------------------ 🎨 UI ------------------------------------ */
+  /* --------------------------------------------------------------
+     🎨 Rendu UI
+  -------------------------------------------------------------- */
   return (
     <div className="mt-8 max-w-4xl mx-auto px-4 text-center space-y-10">
       {/* Header */}
@@ -137,7 +120,7 @@ export default function DashboardHome() {
           />
         ) : (
           <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-3xl font-semibold shadow-lg">
-            {firstName?.[0]?.toUpperCase() || "?"}
+            {firstName?.[0]?.toUpperCase()}
           </div>
         )}
 
@@ -203,7 +186,9 @@ export default function DashboardHome() {
   );
 }
 
-/* --- Card --- */
+/* --------------------------------------------
+   🧱 Component Card
+-------------------------------------------- */
 function DashboardCard({ title, value, icon, color, onClick, cta = false }) {
   return (
     <div
@@ -214,6 +199,7 @@ function DashboardCard({ title, value, icon, color, onClick, cta = false }) {
         {icon}
         <h3 className="font-semibold text-lg">{title}</h3>
       </div>
+
       {cta ? (
         <span className="text-sm opacity-90 mt-1">Click to book now</span>
       ) : (
