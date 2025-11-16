@@ -2,29 +2,45 @@ import { useState, useEffect } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 export default function Toast({ message, type = "success", onClose }) {
-  const [visible, setVisible] = useState(true);
+  const [render, setRender] = useState(true);
+  const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
+    // Durée visible
     const timer = setTimeout(() => {
-      setVisible(false);
-      setTimeout(onClose, 300); // délai pour l’animation
+      setFadeOut(true);
+      // délai animation fade-out
+      setTimeout(() => {
+        setRender(false);
+        onClose?.();
+      }, 250);
     }, 3000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
 
-  if (!visible) return null;
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!render) return null;
 
   const isSuccess = type === "success";
 
   return (
     <div
-      onClick={() => setVisible(false)}
-      className={`fixed z-[10000]
-      bottom-20 left-1/2 -translate-x-1/2 w-[92%]
-      sm:bottom-6 sm:left-auto sm:right-6 sm:translate-x-0 sm:w-auto
-      flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl text-white text-sm font-semibold
-      transition-all duration-300
-      ${isSuccess ? "bg-gradient-to-r from-rose-600 to-red-600" : "bg-gray-800"}`}
+      onClick={() => {
+        setFadeOut(true);
+        setTimeout(() => {
+          setRender(false);
+          onClose?.();
+        }, 250);
+      }}
+      className={`
+        fixed z-[10000]
+        bottom-20 left-1/2 -translate-x-1/2 w-[92%]
+        sm:bottom-6 sm:left-auto sm:right-6 sm:translate-x-0 sm:w-auto
+        flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl text-white text-sm font-semibold
+        transition-all duration-300
+        ${fadeOut ? "opacity-0 translate-y-3" : "opacity-100 translate-y-0"}
+        ${isSuccess ? "bg-gradient-to-r from-rose-600 to-red-600" : "bg-gray-800"}
+      `}
     >
       {isSuccess ? (
         <CheckCircle2 size={20} className="text-white" />

@@ -1,5 +1,5 @@
 // 📄 src/context/NotificationContext.jsx
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import Toast from "@/components/ui/Toast";
@@ -9,14 +9,23 @@ export const useNotifications = () => useContext(NotificationContext);
 
 export function NotificationProvider({ children }) {
   const { user } = useUser();
+
   const [notifications, setNotifications] = useState({
-    clientOffers: 0, // offres reçues par le client
-    proBookings: 0, // nouvelles demandes pour le pro
-    payments: 0, // paiements confirmés
+    clientOffers: 0,
+    proBookings: 0,
+    payments: 0,
   });
+
   const [toast, setToast] = useState(null);
 
-  // 🔊 Petite fonction utilitaire : broadcast global
+  // 🔐 Prevent duplicated subscriptions
+  const channelsRef = useRef([]);
+
+  const pushNotification = (message, type = "info") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const broadcast = (table, action, payload) => {
     window.dispatchEvent(
       new CustomEvent("supabase-update", {
@@ -25,49 +34,86 @@ export function NotificationProvider({ children }) {
     );
   };
 
-  // 🔔 Fonction pratique pour afficher un toast
-  const pushNotification = (message, type = "info") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
+  // 🔁 Reset badges
+  const resetNotification = (type) => {
+    setNotifications((prev) => ({ ...prev, [type]: 0 }));
   };
 
-  // 🔁 Abonnements Supabase unifiés
   useEffect(() => {
     if (!user?.id) return;
+
     const userId = user.id;
 
-    console.log("✅ Notifications active pour l'utilisateur:", userId);
+    // 🔥 Clear previous channels
+    channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
+    channelsRef.current = [];
 
-    // --- Client side events ---
+    // ------------------------------------------------------
+    // CLIENT — listens missions + payments
+    // ------------------------------------------------------
     const clientChannel = supabase
-      .channel(`client_global_${userId}`)
+      .channel(`client_realtime_${userId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "missions", filter: `client_id=eq.${userId}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "missions",
+          filter: `client_id=eq.${userId}`,
+        },
         (payload) => {
           if (payload.new.status === "proposed") {
-            setNotifications((prev) => ({ ...prev, clientOffers: prev.clientOffers + 1 }));
-            pushNotification("💌 New offer received from a professional!", "success");
+            setNotifications((prev) => ({
+              ...prev,
+              clientOffers: prev.clientOffers + 1,
+            }));
+            pushNotification("💌 New offer received!", "success");
             broadcast("missions", "INSERT", payload);
           }
         }
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "missions", filter: `client_id=eq.${userId}` },
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "missions",
+          filter: `client_id=eq.${userId}`,
+        },
         (payload) => {
           if (payload.new.status === "confirmed") {
-            setNotifications((prev) => ({ ...prev, payments: prev.payments + 1 }));
-            pushNotification("✅ Your booking has been confirmed and paid!", "success");
+            pushNotification("💳 Your booking was confirmed!", "success");
             broadcast("missions", "UPDATE", payload);
           }
         }
       )
+      // 🔥 NEW : payments realtime for client
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "payments",
+          filter: `client_id=eq.${userId}`,
+        },
+        (payload) => {
+          setNotifications((prev) => ({
+            ...prev,
+            payments: prev.payments + 1,
+          }));
+          pushNotification("💰 Payment received!", "success");
+          broadcast("payments", "INSERT", payload);
+        }
+      )
       .subscribe();
 
-    // --- Pro side events ---
+    channelsRef.current.push(clientChannel);
+
+    // ------------------------------------------------------
+    // PRO — listens booking_notifications + missions + payments
+    // ------------------------------------------------------
     const proChannel = supabase
-      .channel(`pro_global_${userId}`)
+      .channel(`pro_realtime_${userId}`)
       .on(
         "postgres_changes",
         {
@@ -78,45 +124,62 @@ export function NotificationProvider({ children }) {
         },
         async (payload) => {
           const { booking_id } = payload.new;
-          const { data: booking } = await supabase
+          const { data: b } = await supabase
             .from("bookings")
             .select("service")
             .eq("id", booking_id)
             .single();
 
-          setNotifications((prev) => ({ ...prev, proBookings: prev.proBookings + 1 }));
-          pushNotification(
-            `📩 New booking request: ${booking?.service || "New request"}`,
-            "success"
-          );
+          setNotifications((prev) => ({
+            ...prev,
+            proBookings: prev.proBookings + 1,
+          }));
+
+          pushNotification(`📩 New booking request: ${b?.service || ""}`, "success");
           broadcast("booking_notifications", "INSERT", payload);
         }
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "missions", filter: `pro_id=eq.${userId}` },
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "missions",
+          filter: `pro_id=eq.${userId}`,
+        },
         (payload) => {
           if (payload.new.status === "confirmed") {
             pushNotification(
-              `💰 Your offer for "${payload.new.service}" has been confirmed and paid!`,
+              `💰 Your offer for "${payload.new.service}" has been paid!`,
               "success"
             );
             broadcast("missions", "UPDATE", payload);
           }
         }
       )
+      // 🔥 NEW : payments realtime for the PRO too
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "payments",
+          filter: `pro_id=eq.${userId}`,
+        },
+        (payload) => {
+          pushNotification("💸 New payout received!", "success");
+          broadcast("payments", "INSERT", payload);
+        }
+      )
       .subscribe();
 
+    channelsRef.current.push(proChannel);
+
     return () => {
-      supabase.removeChannel(clientChannel);
-      supabase.removeChannel(proChannel);
+      channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
+      channelsRef.current = [];
     };
   }, [user?.id]);
-
-  // ✅ Reset function — utile pour effacer une notif lue
-  const resetNotification = (type) => {
-    setNotifications((prev) => ({ ...prev, [type]: 0 }));
-  };
 
   return (
     <NotificationContext.Provider value={{ notifications, resetNotification }}>

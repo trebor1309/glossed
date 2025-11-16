@@ -11,90 +11,50 @@ const supabase = createClient(
 );
 
 Deno.serve(async (req) => {
-  const signature = req.headers.get("stripe-signature") || "";
-  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET")!;
-
-  let event;
-
-  try {
-    const rawBody = await req.text();
-    event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-  } catch (err) {
-    console.error("❌ Invalid signature:", err.message);
-    return new Response(JSON.stringify({ error: err.message }), { status: 400 });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "*",
+      },
+    });
   }
 
+  let event;
   try {
-    const data = event.data.object;
-    const metadata = data.metadata ?? {};
+    const body = await req.text();
+    event = JSON.parse(body);
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 400,
+    });
+  }
 
-    const missionId = metadata.mission_id;
-    const clientId = metadata.client_id;
-    const proId = metadata.pro_id;
-    const fee = Number(metadata.fee || 0); // % Glossed
+  const type = event.type;
+  const data = event.data.object;
 
-    // We will fill these values depending on the event type
-    let stripe_payment_id = null;
-    let stripe_session_id = null;
-    let stripe_charge_id = null;
-    let amount_gross = null;
-    let currency = "eur";
-    let stripe_fee = 0;
+  const metadata = data.metadata || data.session?.metadata || data.payment_intent?.metadata || {};
 
-    /* ---------------------------------------------------------------------
-       🔔 EVENT: checkout.session.completed
-       --------------------------------------------------------------------- */
-    if (event.type === "checkout.session.completed") {
-      console.log("💳 Checkout session completed");
+  const missionId = metadata.mission_id;
+  const clientId = metadata.client_id;
+  const proId = metadata.pro_id;
+  const fee = Number(metadata.fee || "0");
 
-      stripe_session_id = data.id;
-      stripe_payment_id = data.payment_intent;
+  try {
+    switch (type) {
+      case "payment_intent.succeeded":
+      case "checkout.session.completed": {
+        if (!missionId) {
+          console.warn("No mission_id provided in metadata");
+          break;
+        }
 
-      const intent = await stripe.paymentIntents.retrieve(stripe_payment_id);
-      amount_gross = intent.amount_received / 100;
-      currency = intent.currency;
+        // ➤ Convert Stripe cents → euros
+        const gross = (data.amount_total ?? data.amount ?? 0) / 100;
+        const appFee = fee / 100;
+        const net = gross - appFee;
 
-      // Retrieve charges to get Stripe fees
-      const charge = intent.charges.data[0];
-      if (charge) {
-        stripe_fee = (charge.balance_transaction?.fee || 0) / 100;
-        stripe_charge_id = charge.id;
-      }
-    }
-
-    /* ---------------------------------------------------------------------
-       🔔 EVENT: payment_intent.succeeded
-       --------------------------------------------------------------------- */
-    if (event.type === "payment_intent.succeeded") {
-      console.log("💰 PaymentIntent succeeded");
-
-      stripe_payment_id = data.id;
-      amount_gross = data.amount_received / 100;
-      currency = data.currency;
-
-      const charge = data.charges?.data?.[0];
-      if (charge) {
-        stripe_fee = (charge.balance_transaction?.fee || 0) / 100;
-        stripe_charge_id = charge.id;
-      }
-    }
-
-    /* ---------------------------------------------------------------------
-       🔔 EVENT: charge.succeeded (in case needed)
-       --------------------------------------------------------------------- */
-    if (event.type === "charge.succeeded") {
-      console.log("🧾 Charge succeeded");
-    }
-
-    /* ---------------------------------------------------------------------
-       🧮 COMPUTATIONS (always executed)
-       --------------------------------------------------------------------- */
-    if (amount_gross) {
-      const platform_fee = Number((amount_gross * fee).toFixed(2)); // Glossed fee
-      const amount_net = Number((amount_gross - platform_fee - stripe_fee).toFixed(2));
-
-      // === Update mission ===
-      if (missionId) {
+        // 1️⃣ Mission → confirmed
         await supabase
           .from("missions")
           .update({
@@ -103,34 +63,44 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", missionId);
+
+        // 2️⃣ Enregistrer paiement
+        await supabase.from("payments").insert({
+          mission_id: missionId,
+          client_id: clientId,
+          pro_id: proId,
+          amount: net,
+          gross_amount: gross,
+          application_fee: appFee,
+          currency: data.currency ?? "eur",
+          stripe_payment_id: data.payment_intent ?? data.id,
+          stripe_session_id: data.id,
+          status: "paid",
+        });
+
+        break;
       }
 
-      // === Insert payment ===
-      await supabase.from("payments").insert({
-        mission_id: missionId,
-        client_id: clientId,
-        pro_id: proId,
+      case "payment_intent.payment_failed":
+        console.warn("❌ Payment failed:", data.id);
+        break;
 
-        stripe_payment_id,
-        stripe_session_id,
-        stripe_charge_id,
-
-        currency,
-        amount_gross,
-        stripe_fee,
-        platform_fee,
-        amount_net,
-
-        status: "paid",
-        paid_at: new Date().toISOString(),
-      });
-
-      console.log("💾 Payment stored:", { missionId, amount_gross });
+      default:
+        console.log("ℹ️ Event ignored:", type);
     }
 
-    return new Response(JSON.stringify({ success: true }), { status: 200 });
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   } catch (err) {
-    console.error("❌ Webhook internal error:", err);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   }
 });
