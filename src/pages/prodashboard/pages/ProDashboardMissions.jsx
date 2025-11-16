@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
-
 import { CheckCircle, Clock, XCircle, Star, Eye } from "lucide-react";
 
 import CalendarView from "@/components/CalendarView";
@@ -16,13 +15,25 @@ import ProBookingDetailsModal from "@/components/modals/ProBookingDetailsModal";
 
 const formatTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : "");
 
+// Petit helper pour trier
+const buildDate = (item) => {
+  if (!item?.date) return null;
+  const d = new Date(item.date);
+  if (Number.isNaN(d.getTime())) return null;
+  // Si jamais on veut affiner avec heure plus tard, on pourra ici
+  return d;
+};
+
 export default function ProDashboardMissions() {
   const { session, setProBadge } = useUser();
   const { notifications } = useNotifications();
 
   const [missions, setMissions] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [selectedDayMissions, setSelectedDayMissions] = useState(null);
+  const [sortBy, setSortBy] = useState("date_upcoming"); // "date_upcoming" | "created_newest"
+
   const [toast, setToast] = useState(null);
 
   const [selectedView, setSelectedView] = useState(null);
@@ -30,23 +41,8 @@ export default function ProDashboardMissions() {
   const [selectedMission, setSelectedMission] = useState(null);
   const [selectedEvaluation, setSelectedEvaluation] = useState(null);
 
-  // 🔽 tri
-  const [sortMode, setSortMode] = useState("closest");
-
-  const sortMissions = (arr) => {
-    switch (sortMode) {
-      case "newest":
-        return [...arr].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      case "oldest":
-        return [...arr].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-      case "closest":
-        return [...arr].sort((a, b) => new Date(a.date) - new Date(b.date));
-      case "farthest":
-        return [...arr].sort((a, b) => new Date(b.date) - new Date(a.date));
-      default:
-        return arr;
-    }
-  };
+  // NEW badges pour nouvelles demandes (booking_notifications)
+  const [newItems, setNewItems] = useState(() => new Set());
 
   /* ------------------------------------------------------------------
      📌 Charger toutes les missions liées au pro
@@ -56,53 +52,79 @@ export default function ProDashboardMissions() {
     try {
       const proId = session.user.id;
 
-      // bookings directs reçus
-      const { data: directBookings } = await supabase
+      // 1️⃣ BOOKINGS directs (quand un client choisit le pro directement)
+      const { data: directBookings, error: directErr } = await supabase
         .from("bookings")
         .select("*")
         .eq("pro_id", proId)
         .order("date", { ascending: true });
 
-      // notifications
-      const { data: notifData } = await supabase
+      if (directErr) throw directErr;
+
+      // 2️⃣ Notifications envoyées à ce pro (zone / rayon)
+      const { data: notifData, error: notifErr } = await supabase
         .from("booking_notifications")
         .select("booking_id")
         .eq("pro_id", proId);
 
+      if (notifErr) throw notifErr;
+
       let notifiedBookings = [];
       if (notifData?.length) {
-        const ids = notifData.map((n) => n.booking_id);
-        const { data } = await supabase
+        const bookingIds = notifData.map((n) => n.booking_id);
+        const { data, error } = await supabase
           .from("bookings")
           .select("*")
-          .in("id", ids)
+          .in("id", bookingIds)
           .eq("status", "pending")
           .order("date", { ascending: true });
 
+        if (error) throw error;
         notifiedBookings = data || [];
       }
 
-      // missions existantes
-      const { data: proMissions } = await supabase
+      // 3️⃣ Missions (proposals, confirmed, completed…)
+      const { data: proMissions, error: missionsErr } = await supabase
         .from("missions")
         .select("*")
         .eq("pro_id", proId)
         .order("date", { ascending: true });
 
+      if (missionsErr) throw missionsErr;
+
       const missionsWithNet = (proMissions || []).map((m) => ({
         ...m,
-        net_amount: Math.round(m.price * 0.9 * 100) / 100,
+        net_amount: Math.round(m.price * 0.9 * 100) / 100, // 10% fee Glossed
       }));
 
-      // retirer booking déjà confirmés
-      const confirmedIds = missionsWithNet
+      // 4️⃣ Ne pas montrer de bookings déjà confirmés
+      const confirmedBookingIds = missionsWithNet
         .filter((m) => m.status === "confirmed")
         .map((m) => m.booking_id);
 
-      const cleaned = directBookings.filter((b) => !confirmedIds.includes(b.id));
+      const cleanedBookings = (directBookings || []).filter(
+        (b) => !confirmedBookingIds.includes(b.id)
+      );
 
-      // fusion
-      setMissions([...cleaned, ...notifiedBookings, ...missionsWithNet]);
+      // 5️⃣ Taguer les sources pour clé + NEW propre
+      const taggedDirect = (cleanedBookings || []).map((b) => ({
+        ...b,
+        type: "booking",
+      }));
+
+      const taggedNotified = (notifiedBookings || []).map((b) => ({
+        ...b,
+        type: "booking",
+      }));
+
+      const taggedMissions = (missionsWithNet || []).map((m) => ({
+        ...m,
+        type: "mission",
+      }));
+
+      const finalList = [...taggedDirect, ...taggedNotified, ...taggedMissions];
+
+      setMissions(finalList);
       setProBadge(notifications.proBookings || 0);
     } catch (err) {
       console.error("❌ fetchMissions error:", err);
@@ -113,22 +135,46 @@ export default function ProDashboardMissions() {
   };
 
   /* ------------------------------------------------------------------
-     🔁 Realtime (via NotificationContext)
+     🔁 Initialisation + écoute des events globaux (NotificationContext)
   ------------------------------------------------------------------ */
   useEffect(() => {
     if (!session?.user?.id) return;
+
     fetchMissions();
 
-    const handler = () => {
+    const handler = (event) => {
+      const detail = event?.detail || {};
+      const { table, action, payload } = detail;
+
+      // 📩 Nouvelle demande via booking_notifications → badge NEW
+      if (
+        table === "booking_notifications" &&
+        action === "INSERT" &&
+        payload?.new?.pro_id === session.user.id
+      ) {
+        const bookingId = payload.new.booking_id;
+        if (bookingId) {
+          setNewItems((prev) => {
+            const next = new Set(prev);
+            next.add(`booking_${bookingId}`);
+            return next;
+          });
+        }
+      }
+
+      // On rafraîchit dans tous les cas (offer confirmée, completed, etc.)
       fetchMissions();
     };
+
     window.addEventListener("supabase-update", handler);
 
-    return () => window.removeEventListener("supabase-update", handler);
+    return () => {
+      window.removeEventListener("supabase-update", handler);
+    };
   }, [session?.user?.id]);
 
   /* ------------------------------------------------------------------
-     ❌ Supprimer une demande
+     ❌ Supprimer une demande (pas utilisée sur toutes les sections)
   ------------------------------------------------------------------ */
   const handleDelete = async (booking) => {
     try {
@@ -146,51 +192,70 @@ export default function ProDashboardMissions() {
   };
 
   /* ------------------------------------------------------------------
-     🧮 Regroupement + tri
+     🧮 Tri + Regroupement par statut
   ------------------------------------------------------------------ */
-  const displayMissions = selectedDayMissions ? selectedDayMissions.dayMissions : missions;
+  const sortMissions = (list) => {
+    const arr = [...list];
 
-  const grouped = {
-    pending: sortMissions(displayMissions.filter((m) => m.status === "pending")),
-    proposed: sortMissions(displayMissions.filter((m) => m.status === "proposed")),
-    confirmed: sortMissions(displayMissions.filter((m) => m.status === "confirmed")),
-    completed: sortMissions(displayMissions.filter((m) => m.status === "completed")),
-    cancelled: sortMissions(displayMissions.filter((m) => m.status === "cancelled")),
+    return arr.sort((a, b) => {
+      if (sortBy === "created_newest") {
+        const da = new Date(a.created_at || a.inserted_at || a.date || 0);
+        const db = new Date(b.created_at || b.inserted_at || b.date || 0);
+        return db.getTime() - da.getTime(); // plus récent en premier
+      }
+
+      // "date_upcoming" (par défaut) → date la plus proche
+      const da = buildDate(a) || new Date(0);
+      const db = buildDate(b) || new Date(0);
+      return da.getTime() - db.getTime();
+    });
   };
 
-  if (loading)
+  const sourceList = selectedDayMissions ? selectedDayMissions.dayMissions : missions;
+
+  const grouped = {
+    pending: sortMissions(sourceList.filter((m) => m.status === "pending")),
+    proposed: sortMissions(sourceList.filter((m) => m.status === "proposed")),
+    confirmed: sortMissions(sourceList.filter((m) => m.status === "confirmed")),
+    completed: sortMissions(sourceList.filter((m) => m.status === "completed")),
+    cancelled: sortMissions(sourceList.filter((m) => m.status === "cancelled")),
+  };
+
+  if (loading) {
     return <div className="flex justify-center items-center h-48 text-gray-600">Loading...</div>;
+  }
 
   /* ------------------------------------------------------------------
-     🎨 UI rendu
+     🎨 Rendu
   ------------------------------------------------------------------ */
   return (
-    <section className="mt-10 max-w-4xl mx-auto p-4 space-y-10 overflow-x-hidden">
-      <h1 className="text-2xl font-bold text-gray-800 text-center mb-2">My Missions</h1>
+    <section className="mt-10 max-w-4xl mx-auto p-4 space-y-8 overflow-x-hidden">
+      {/* Header + Sort */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-gray-800 text-center sm:text-left">My Missions</h1>
 
-      {/* Sort menu */}
-      <div className="flex justify-end mb-4">
-        <select
-          value={sortMode}
-          onChange={(e) => setSortMode(e.target.value)}
-          className="px-3 py-2 border rounded-xl text-sm bg-white shadow-sm"
-        >
-          <option value="closest">Closest date</option>
-          <option value="farthest">Farthest date</option>
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-        </select>
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-gray-500">Sort by</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="border border-gray-200 rounded-full px-3 py-1.5 text-sm text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-200"
+          >
+            <option value="date_upcoming">Date – upcoming first</option>
+            <option value="created_newest">Most recent requests</option>
+          </select>
+        </div>
       </div>
 
-      {/* Calendar */}
+      {/* Calendrier */}
       <CalendarView
         bookings={missions}
         onSelectDay={(date, dayMissions) => setSelectedDayMissions({ date, dayMissions })}
       />
 
-      {/* Filter banner */}
+      {/* Info sur le jour sélectionné */}
       {selectedDayMissions && (
-        <div className="text-center text-gray-600 mb-4">
+        <div className="text-center text-gray-600 mb-2">
           <p className="text-sm">
             Showing missions for{" "}
             <span className="font-semibold text-gray-800">{selectedDayMissions.date}</span> (
@@ -260,7 +325,16 @@ export default function ProDashboardMissions() {
         color="text-amber-600"
         data={grouped.pending}
         empty="No pending requests."
-        onView={(b) => setSelectedView(b)}
+        onView={(b) => {
+          setSelectedView(b);
+          // On marque comme "vu"
+          setNewItems((prev) => {
+            const next = new Set(prev);
+            next.delete(`booking_${b.id}`);
+            return next;
+          });
+        }}
+        newItems={newItems} // 🔔 NEW visible ici
       />
 
       <MissionSection
@@ -307,7 +381,7 @@ export default function ProDashboardMissions() {
 /* ------------------------------------------------------------------
    🔹 MissionSection
 ------------------------------------------------------------------ */
-function MissionSection({ title, icon, data, color, empty, onView, setSelectedMission }) {
+function MissionSection({ title, icon, data, color, empty, onView, setSelectedMission, newItems }) {
   return (
     <section className="bg-white rounded-2xl shadow p-6 border border-gray-100">
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
@@ -316,47 +390,59 @@ function MissionSection({ title, icon, data, color, empty, onView, setSelectedMi
 
       {data.length ? (
         <ul className="divide-y divide-gray-100">
-          {data.map((m) => (
-            <li
-              key={m.id}
-              className="py-3 flex justify-between items-start hover:bg-gray-50 px-2 rounded-lg transition"
-            >
-              <div className="flex-1">
-                <p className="font-medium text-gray-800">{m.service}</p>
-                <p className="text-sm text-gray-500">
-                  {m.date} — {m.time_slot || formatTime(m.time) || ""}
-                </p>
-                {m.address && (
+          {data.map((m) => {
+            const isNew = newItems?.has(`booking_${m.id}`) && m.status === "pending";
+
+            return (
+              <li
+                key={`${m.type || "item"}-${m.id}`}
+                className="py-3 flex justify-between items-start hover:bg-gray-50 px-2 rounded-lg transition relative"
+              >
+                {/* Badge NEW */}
+                {isNew && (
+                  <span className="absolute top-2 right-2 bg-rose-100 text-rose-600 text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                    NEW
+                  </span>
+                )}
+
+                <div className="flex-1">
+                  <p className="font-medium text-gray-800">{m.service}</p>
                   <p className="text-sm text-gray-500">
-                    <span className="font-medium">Address:</span> {m.address}
+                    {m.date} — {m.time_slot || formatTime(m.time) || ""}
                   </p>
-                )}
-              </div>
+                  {m.address && (
+                    <p className="text-sm text-gray-500">
+                      <span className="font-medium">Address:</span> {m.address}
+                    </p>
+                  )}
+                </div>
 
-              <div className="flex flex-col items-end gap-2">
-                <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>
-                  {m.status}
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                  <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>
+                    {m.status}
+                  </span>
 
-                {m.status === "pending" ? (
-                  <button
-                    onClick={() => onView?.(m)}
-                    className="px-3 py-1.5 text-sm bg-rose-600 text-white rounded-full hover:bg-rose-700 transition"
-                  >
-                    View
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setSelectedMission?.(m)}
-                    className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
-                    title="View details"
-                  >
-                    <Eye size={16} />
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
+                  {/* Pending → bouton "View" (détails + delete/proposal) */}
+                  {m.status === "pending" && onView ? (
+                    <button
+                      onClick={() => onView(m)}
+                      className="px-3 py-1.5 text-sm bg-rose-600 text-white rounded-full hover:bg-rose-700 transition"
+                    >
+                      View
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setSelectedMission?.(m)}
+                      className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
+                      title="View details"
+                    >
+                      <Eye size={16} />
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className="text-gray-500 text-sm italic">{empty}</p>

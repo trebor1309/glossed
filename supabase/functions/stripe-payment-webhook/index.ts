@@ -11,6 +11,7 @@ const supabase = createClient(
 );
 
 Deno.serve(async (req) => {
+  // CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", {
       headers: {
@@ -20,39 +21,42 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Lecture brute
   let event;
   try {
-    const body = await req.text();
-    event = JSON.parse(body);
+    const raw = await req.text();
+    event = JSON.parse(raw);
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 400,
-    });
+    return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
   }
 
   const type = event.type;
-  const data = event.data.object;
+  const data = event.data?.object || {};
 
+  // Metadata flexible
   const metadata = data.metadata || data.session?.metadata || data.payment_intent?.metadata || {};
 
   const missionId = metadata.mission_id;
   const clientId = metadata.client_id;
   const proId = metadata.pro_id;
-  const fee = Number(metadata.fee || "0");
+
+  const feeCents = Number(metadata.fee || 0);
 
   try {
     switch (type) {
       case "payment_intent.succeeded":
       case "checkout.session.completed": {
         if (!missionId) {
-          console.warn("No mission_id provided in metadata");
+          console.warn("⚠ Missing mission_id");
           break;
         }
 
-        // ➤ Convert Stripe cents → euros
+        // Stripe values (cent → €)
         const gross = (data.amount_total ?? data.amount ?? 0) / 100;
-        const appFee = fee / 100;
-        const net = gross - appFee;
+        const applicationFee = feeCents / 100;
+        const net = gross - applicationFee;
+
+        console.log(`💰 Payment received: gross=${gross}, net=${net}`);
 
         // 1️⃣ Mission → confirmed
         await supabase
@@ -64,17 +68,20 @@ Deno.serve(async (req) => {
           })
           .eq("id", missionId);
 
-        // 2️⃣ Enregistrer paiement
+        // 2️⃣ Enregistrer payment
         await supabase.from("payments").insert({
           mission_id: missionId,
           client_id: clientId,
           pro_id: proId,
+
           amount: net,
           gross_amount: gross,
-          application_fee: appFee,
+          application_fee: applicationFee,
+
           currency: data.currency ?? "eur",
           stripe_payment_id: data.payment_intent ?? data.id,
           stripe_session_id: data.id,
+
           status: "paid",
         });
 
@@ -86,21 +93,18 @@ Deno.serve(async (req) => {
         break;
 
       default:
-        console.log("ℹ️ Event ignored:", type);
+        console.log(`ℹ️ Skipped event: ${type}`);
     }
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Access-Control-Allow-Origin": "*" },
     });
   } catch (err) {
+    console.error("❌ Webhook error:", err);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Access-Control-Allow-Origin": "*" },
     });
   }
 });

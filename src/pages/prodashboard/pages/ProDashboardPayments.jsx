@@ -1,7 +1,10 @@
+// 📄 src/pages/prodashboard/pages/ProDashboardPayments.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
-import { Download, FileText, CheckCircle, XCircle, Clock } from "lucide-react";
+
+import { Download, FileText, CheckCircle, XCircle, Clock, TrendingUp, Wallet } from "lucide-react";
+
 import dayjs from "dayjs";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -9,16 +12,16 @@ import autoTable from "jspdf-autotable";
 export default function ProDashboardPayments() {
   const { session } = useUser();
   const proId = session?.user?.id;
-  const proName = session?.user?.user_metadata?.name || "Professional";
+
   const [payments, setPayments] = useState([]);
   const [filter, setFilter] = useState("month");
   const [total, setTotal] = useState(0);
 
-  useEffect(() => {
-    if (!proId) return;
-    fetchPayments();
-  }, [proId, filter]);
+  const [view, setView] = useState("payments"); // payments | payouts
 
+  /* ------------------------------------------------------------------
+     🔁 Charger paiements
+  ------------------------------------------------------------------ */
   const fetchPayments = async () => {
     const { data, error } = await supabase
       .from("payments")
@@ -26,232 +29,243 @@ export default function ProDashboardPayments() {
       .eq("pro_id", proId)
       .order("created_at", { ascending: false });
 
-    if (error) return console.error(error);
+    if (error) {
+      console.error("❌ Payments fetch error:", error);
+      return;
+    }
 
+    // Filtre date
     const now = dayjs();
-    const filtered = data.filter((p) => {
-      const date = dayjs(p.created_at);
-      if (filter === "week") return date.isAfter(now.subtract(7, "day"));
-      if (filter === "month") return date.isAfter(now.startOf("month"));
-      if (filter === "year") return date.isAfter(now.startOf("year"));
+    const filtered = (data || []).filter((p) => {
+      const d = dayjs(p.created_at);
+      if (filter === "week") return d.isAfter(now.subtract(7, "day"));
+      if (filter === "month") return d.isAfter(now.startOf("month"));
+      if (filter === "year") return d.isAfter(now.startOf("year"));
       return true;
     });
 
     setPayments(filtered);
-    setTotal(filtered.reduce((acc, p) => acc + (p.amount || 0), 0));
+
+    // Total NET reçu (90 %)
+    const totalEuros = filtered.reduce((acc, p) => acc + (p.amount || 0), 0);
+    setTotal(totalEuros);
   };
 
-  /* ----------------------------- 🎨 Glossed Branding Helpers ----------------------------- */
-  const glossedHeader = (doc, title) => {
-    // Logo text
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(24);
-    doc.setTextColor(225, 29, 72); // rose-600
-    doc.text("Glossed", 14, 20);
+  /* ------------------------------------------------------------------
+     📡 Realtime
+  ------------------------------------------------------------------ */
+  useEffect(() => {
+    if (!proId) return;
 
-    // Title
-    doc.setFontSize(16);
-    doc.setTextColor(30, 30, 30);
-    doc.text(title, 14, 30);
+    fetchPayments();
 
-    // Gradient line (simulation)
-    doc.setDrawColor(225, 29, 72);
-    doc.line(14, 34, 196, 34);
-  };
+    const channel = supabase
+      .channel(`payments_pro_${proId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "payments", filter: `pro_id=eq.${proId}` },
+        (payload) => {
+          console.log("💸 New payment:", payload.new);
+          fetchPayments();
+        }
+      )
+      .subscribe();
 
-  const glossedFooter = (doc) => {
-    doc.setFontSize(9);
-    doc.setTextColor(120);
-    doc.text("This document was generated automatically by Glossed – www.glossed.app", 14, 285);
-  };
+    return () => supabase.removeChannel(channel);
+  }, [proId, filter]);
 
-  /* ----------------------------- 🧾 Rapport PDF Global ----------------------------- */
-  /* ----------------------------- 🧾 Rapport PDF Global ----------------------------- */
+  /* ------------------------------------------------------------------
+     🧾 PDF rapport global
+  ------------------------------------------------------------------ */
   const handleDownloadReport = () => {
     const doc = new jsPDF();
 
-    // --- En-tête stylé Glossed ---
-    glossedHeader(doc, "Payments Report");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.setTextColor(225, 29, 72);
+    doc.text("Glossed", 14, 20);
+
+    doc.setFontSize(16);
+    doc.setTextColor(20, 20, 20);
+    doc.text("Payments Report", 14, 30);
 
     doc.setFontSize(12);
     doc.text(
-      `Period: ${filter.toUpperCase()} | Generated: ${dayjs().format("DD/MM/YYYY HH:mm")}`,
+      `Period: ${filter.toUpperCase()} — Generated ${dayjs().format("DD/MM/YYYY HH:mm")}`,
       14,
       42
     );
 
-    // --- Cas 1 : paiements trouvés ---
-    if (payments.length > 0) {
-      const tableData = payments.map((p) => [
-        p.id.slice(0, 8),
-        `${p.amount.toFixed(2)} €`,
-        p.status,
-        p.mission_id || "—",
-        dayjs(p.created_at).format("DD/MM/YYYY"),
-      ]);
+    const tableData = payments.map((p) => [
+      p.id.slice(0, 8),
+      p.amount.toFixed(2) + " €",
+      p.application_fee ? p.application_fee.toFixed(2) + " €" : "—",
+      p.status,
+      p.mission_id || "—",
+      dayjs(p.created_at).format("DD/MM/YYYY"),
+    ]);
 
-      autoTable(doc, {
-        startY: 50,
-        head: [["Payment ID", "Amount", "Status", "Mission", "Date"]],
-        body: tableData,
-        styles: { fontSize: 10 },
-        headStyles: {
-          fillColor: [225, 29, 72],
-          textColor: [255, 255, 255],
-        },
-        alternateRowStyles: { fillColor: [255, 240, 245] },
-      });
+    autoTable(doc, {
+      startY: 50,
+      head: [["ID", "Amount", "Fee", "Status", "Mission", "Date"]],
+      body: tableData,
+      headStyles: { fillColor: [225, 29, 72], textColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [255, 240, 245] },
+    });
 
-      // --- Total ---
-      doc.setFontSize(14);
-      doc.setTextColor(30, 30, 30);
-      doc.text(`Total: ${total.toFixed(2)} €`, 14, doc.lastAutoTable.finalY + 12);
-    }
-
-    // --- Cas 2 : aucun paiement ---
-    else {
-      doc.setFontSize(13);
-      doc.setTextColor(120);
-      doc.text("No payments found for this period.", 14, 60);
-
-      doc.setFontSize(11);
-      doc.setTextColor(150);
-      doc.text(
-        "Try adjusting your filter (week, month, year) or verify your account activity.",
-        14,
-        70
-      );
-    }
-
-    // --- Pied de page ---
-    glossedFooter(doc);
-
-    // --- Téléchargement ---
-    doc.save(`Glossed_Payments_${filter}_${dayjs().format("YYYYMMDD")}.pdf`);
+    doc.save(`Glossed_Payments_${filter}.pdf`);
   };
 
-  /* ----------------------------- 🧾 Facture PDF Individuelle ----------------------------- */
+  /* ------------------------------------------------------------------
+     🧾 Facture PDF individuelle
+  ------------------------------------------------------------------ */
   const handleDownloadInvoice = (p) => {
     const doc = new jsPDF();
 
-    glossedHeader(doc, "Invoice");
-
-    doc.setFontSize(11);
-    doc.text(`Invoice ID: ${p.id}`, 14, 45);
-    doc.text(`Date: ${dayjs(p.created_at).format("DD/MM/YYYY")}`, 14, 52);
-    doc.text(`Professional: ${proName}`, 14, 59);
-    doc.text(`Mission ID: ${p.mission_id || "—"}`, 14, 66);
-
-    // Montant encadré
-    doc.setFillColor(255, 235, 240);
-    doc.roundedRect(14, 78, 70, 20, 3, 3, "F");
-    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
     doc.setTextColor(225, 29, 72);
-    doc.text(`${p.amount.toFixed(2)} €`, 24, 91);
+    doc.setFontSize(24);
+    doc.text("Glossed Invoice", 14, 20);
 
-    // Statut
-    doc.setTextColor(30, 30, 30);
-    doc.setFontSize(11);
-    doc.text(`Status: ${p.status}`, 14, 110);
+    doc.setFontSize(12);
+    doc.setTextColor(50, 50, 50);
 
-    glossedFooter(doc);
-    doc.save(`Glossed_Invoice_${p.id.slice(0, 8)}.pdf`);
+    doc.text(`Invoice ID: ${p.id}`, 14, 40);
+    doc.text(`Date: ${dayjs(p.created_at).format("DD/MM/YYYY")}`, 14, 48);
+    doc.text(`Mission: ${p.mission_id}`, 14, 56);
+
+    doc.text(`Amount: ${p.amount.toFixed(2)} €`, 14, 70);
+    if (p.application_fee) doc.text(`Platform fee: ${p.application_fee} €`, 14, 78);
+
+    doc.save(`Invoice_${p.id}.pdf`);
   };
 
-  /* ----------------------------- Icons ----------------------------- */
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case "paid":
-        return <CheckCircle className="text-green-500" size={18} />;
-      case "pending":
-        return <Clock className="text-amber-500" size={18} />;
-      default:
-        return <XCircle className="text-gray-400" size={18} />;
-    }
-  };
-
-  /* ----------------------------- Rendu ----------------------------- */
+  /* ------------------------------------------------------------------
+     🧱 UI
+  ------------------------------------------------------------------ */
   return (
-    <section className="mt-10 max-w-4xl mx-auto px-4 sm:px-6 md:px-8 space-y-10">
-      <h1 className="text-2xl font-bold text-gray-800 text-center mb-2">Payments Overview</h1>
+    <section className="mt-10 max-w-4xl mx-auto px-4 space-y-10">
+      <h1 className="text-2xl font-bold text-center text-gray-800">Payments & Payouts</h1>
 
-      {/* Filtres */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white shadow-sm rounded-xl p-4 border border-gray-100">
-        <div className="flex items-center gap-3">
-          {["week", "month", "year", "total"].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                filter === f
-                  ? "bg-gradient-to-r from-rose-600 to-red-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-        </div>
-        <div className="text-right">
-          <p className="text-gray-500 text-sm">Total</p>
-          <p className="text-2xl font-bold text-gray-800">{total.toFixed(2)} €</p>
-        </div>
-      </div>
-
-      {/* Liste */}
-      <div className="bg-white shadow-sm rounded-xl p-6 border border-gray-100">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Payments</h2>
-
-        {payments.length ? (
-          <ul className="divide-y divide-gray-100">
-            {payments.map((p) => (
-              <li
-                key={p.id}
-                className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-              >
-                <div>
-                  <p className="font-medium text-gray-800">{p.amount.toFixed(2)} €</p>
-                  <p className="text-sm text-gray-500">
-                    {dayjs(p.created_at).format("DD MMM YYYY")}
-                  </p>
-                  <p className="text-xs text-gray-400 italic">
-                    Linked to mission: {p.mission_id || "—"}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1 text-sm font-medium text-gray-600">
-                    {getStatusIcon(p.status)}
-                    {p.status}
-                  </span>
-
-                  <button
-                    onClick={() => handleDownloadInvoice(p)}
-                    className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition"
-                    title="Download invoice"
-                  >
-                    <FileText size={18} className="text-gray-700" />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-gray-500 text-sm text-center italic">
-            No payments found for this period.
-          </p>
-        )}
-      </div>
-
-      {/* Rapport PDF */}
-      <div className="text-center">
+      {/* TABS */}
+      <div className="flex gap-3 justify-center">
         <button
-          onClick={handleDownloadReport}
-          className="px-6 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-medium shadow hover:shadow-md hover:scale-[1.02] transition-transform flex items-center gap-2 mx-auto"
+          onClick={() => setView("payments")}
+          className={`px-4 py-2 rounded-full font-medium ${
+            view === "payments"
+              ? "bg-gradient-to-r from-rose-600 to-red-600 text-white"
+              : "bg-gray-100 text-gray-700"
+          }`}
         >
-          <Download size={18} /> Download PDF Report
+          Payments
+        </button>
+
+        <button
+          onClick={() => setView("payouts")}
+          className={`px-4 py-2 rounded-full font-medium ${
+            view === "payouts"
+              ? "bg-gradient-to-r from-rose-600 to-red-600 text-white"
+              : "bg-gray-100 text-gray-700"
+          }`}
+        >
+          Payouts
         </button>
       </div>
+
+      {/* ---------------------------- PAYMENTS VIEW ---------------------------- */}
+      {view === "payments" && (
+        <>
+          {/* FILTERS */}
+          <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border">
+            <div className="flex gap-2">
+              {["week", "month", "year", "total"].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                    filter === f
+                      ? "bg-gradient-to-r from-rose-600 to-red-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {f.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            <div className="text-right">
+              <p className="text-gray-500 text-sm">Total received</p>
+              <p className="text-2xl font-bold">{total.toFixed(2)} €</p>
+            </div>
+          </div>
+
+          {/* LIST */}
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <h2 className="text-lg font-semibold mb-4">Recent Payments</h2>
+
+            {payments.length === 0 ? (
+              <p className="text-gray-500 italic text-center">No payments found.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {payments.map((p) => (
+                  <li key={p.id} className="py-4 flex justify-between items-center">
+                    <div>
+                      <p className="font-semibold text-gray-800">{p.amount.toFixed(2)} €</p>
+                      <p className="text-sm text-gray-500">
+                        {dayjs(p.created_at).format("DD MMM YYYY")}
+                      </p>
+                      {p.application_fee && (
+                        <p className="text-xs text-gray-400">
+                          Fee: {p.application_fee.toFixed(2)} €
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {p.status === "paid" ? (
+                        <CheckCircle className="text-green-500" size={18} />
+                      ) : (
+                        <Clock className="text-amber-500" size={18} />
+                      )}
+
+                      <button
+                        onClick={() => handleDownloadInvoice(p)}
+                        className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition"
+                      >
+                        <FileText size={18} />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* PDF EXPORT */}
+          <div className="text-center">
+            <button
+              onClick={handleDownloadReport}
+              className="px-6 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-medium shadow-md hover:scale-[1.03] transition"
+            >
+              <Download size={18} className="inline-block mr-2" />
+              Download Report
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ---------------------------- PAYOUTS VIEW ---------------------------- */}
+      {view === "payouts" && (
+        <div className="bg-white p-6 rounded-xl shadow border space-y-3 text-center">
+          <Wallet size={42} className="mx-auto text-rose-600" />
+          <h2 className="text-xl font-bold text-gray-800">Stripe Payouts</h2>
+          <p className="text-gray-500">Your payouts are handled automatically by Stripe Express.</p>
+
+          <p className="text-sm text-gray-400">
+            (In v2, you pourrez afficher l’historique complet des virements.)
+          </p>
+        </div>
+      )}
     </section>
   );
 }

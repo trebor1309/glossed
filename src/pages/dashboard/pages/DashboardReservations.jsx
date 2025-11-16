@@ -12,13 +12,22 @@ import CalendarView from "@/components/CalendarView";
 import Toast from "@/components/ui/Toast";
 import { AnimatePresence } from "framer-motion";
 
+// Petit helper pour trier par date
+const buildDate = (item) => {
+  if (!item?.date) return null;
+  const d = new Date(item.date);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
 export default function DashboardReservations() {
   const { session } = useUser();
   const { notifications } = useNotifications();
 
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [selectedDayBookings, setSelectedDayBookings] = useState(null);
+  const [sortBy, setSortBy] = useState("date_upcoming"); // "date_upcoming" | "created_newest"
 
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showOffersModal, setShowOffersModal] = useState(false);
@@ -26,37 +35,26 @@ export default function DashboardReservations() {
 
   const [toast, setToast] = useState(null);
 
-  // --- NEW: sort mode
-  const [sortMode, setSortMode] = useState("closest");
-
-  const sortItems = (arr) => {
-    switch (sortMode) {
-      case "newest":
-        return [...arr].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      case "oldest":
-        return [...arr].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-      case "farthest":
-        return [...arr].sort((a, b) => new Date(b.date) - new Date(a.date));
-      case "closest":
-      default:
-        return [...arr].sort((a, b) => new Date(a.date) - new Date(b.date));
-    }
-  };
+  // NEW badges sur nouvelles offres (missions status="proposed")
+  const [newItems, setNewItems] = useState(() => new Set());
 
   /* ----------------------------------------------------------------------
-     📌 fetchBookings() – fusion bookings + missions
+     📌 fetchBookings()
+     Fusionne bookings + missions proprement
   ---------------------------------------------------------------------- */
   const fetchBookings = async () => {
     try {
       setLoading(true);
       const clientId = session.user.id;
 
+      // 1️⃣ Bookings bruts
       const { data: bookingsData } = await supabase
         .from("bookings")
         .select("*")
         .eq("client_id", clientId)
         .order("date", { ascending: true });
 
+      // 2️⃣ Missions (offers / confirmed / completed)
       const { data: missionsData } = await supabase
         .from("missions")
         .select("*")
@@ -64,17 +62,28 @@ export default function DashboardReservations() {
         .in("status", ["proposed", "offers", "confirmed", "completed", "cancelled"])
         .order("date", { ascending: true });
 
-      // éviter d'afficher une "pending" si mission confirmed existe
+      // 3️⃣ Nettoyage : si mission confirmée → enlever le booking d’origine
       const confirmedBookingIds = (missionsData || [])
         .filter((m) => m.status === "confirmed")
         .map((m) => m.booking_id);
 
-      const cleaned = (bookingsData || []).filter((b) => !confirmedBookingIds.includes(b.id));
+      const cleanedBookings = (bookingsData || []).filter(
+        (b) => !confirmedBookingIds.includes(b.id)
+      );
 
-      const bookingsTagged = cleaned.map((b) => ({ ...b, type: "booking" }));
-      const missionsTagged = (missionsData || []).map((m) => ({ ...m, type: "mission" }));
+      const bookingsTagged = cleanedBookings.map((b) => ({
+        ...b,
+        type: "booking",
+      }));
 
-      setBookings([...bookingsTagged, ...missionsTagged]);
+      const missionsTagged = (missionsData || []).map((m) => ({
+        ...m,
+        type: "mission",
+      }));
+
+      const merged = [...bookingsTagged, ...missionsTagged];
+
+      setBookings(merged);
     } catch (err) {
       console.error("❌ fetchBookings error:", err);
     } finally {
@@ -83,28 +92,62 @@ export default function DashboardReservations() {
   };
 
   /* ----------------------------------------------------------------------
-     🔁 realtime via NotificationContext (supabase-update)
+     🔁 Initialisation + realtime via NotificationContext
   ---------------------------------------------------------------------- */
   useEffect(() => {
     if (!session?.user?.id) return;
 
     fetchBookings();
 
-    const handler = () => fetchBookings();
+    const handler = (event) => {
+      const { table, action, payload } = event.detail || {};
+
+      // 🎯 Nouvelle offre du pro = NEW
+      if (
+        table === "missions" &&
+        action === "INSERT" &&
+        payload?.new?.client_id === session.user.id &&
+        payload?.new?.status === "proposed"
+      ) {
+        setNewItems((prev) => {
+          const next = new Set(prev);
+          next.add(`mission_${payload.new.id}`);
+          return next;
+        });
+      }
+
+      if (
+        table === "missions" &&
+        action === "UPDATE" &&
+        payload?.new?.client_id === session.user.id &&
+        payload?.new?.status === "proposed"
+      ) {
+        setNewItems((prev) => {
+          const next = new Set(prev);
+          next.add(`mission_${payload.new.id}`);
+          return next;
+        });
+      }
+
+      fetchBookings();
+    };
+
     window.addEventListener("supabase-update", handler);
 
-    return () => window.removeEventListener("supabase-update", handler);
+    return () => {
+      window.removeEventListener("supabase-update", handler);
+    };
   }, [session?.user?.id]);
 
   /* ----------------------------------------------------------------------
-     🗑️ delete booking
+     🗑️ Delete booking
   ---------------------------------------------------------------------- */
   const handleDelete = async (id) => {
     if (!confirm("Are you sure?")) return;
 
     const { error } = await supabase.from("bookings").delete().eq("id", id);
     if (error) {
-      setToast({ message: "Failed to delete", type: "error" });
+      setToast({ message: "Failed to delete.", type: "error" });
       return;
     }
 
@@ -113,23 +156,48 @@ export default function DashboardReservations() {
   };
 
   /* ----------------------------------------------------------------------
-     🎨 grouping + tri
+     🔍 Tri
   ---------------------------------------------------------------------- */
-  const displayBookings = selectedDayBookings ? selectedDayBookings.dayBookings : bookings;
+  const sortList = (list) => {
+    const arr = [...list];
 
-  const grouped = {
-    pending: sortItems(displayBookings.filter((b) => b.status === "pending")),
-    offers: sortItems(displayBookings.filter((b) => ["offers", "proposed"].includes(b.status))),
-    confirmed: sortItems(displayBookings.filter((b) => b.status === "confirmed")),
-    completed: sortItems(displayBookings.filter((b) => b.status === "completed")),
-    cancelled: sortItems(displayBookings.filter((b) => b.status === "cancelled")),
+    if (sortBy === "created_newest") {
+      return arr.sort((a, b) => {
+        const da = new Date(a.created_at || a.inserted_at || a.date || 0);
+        const db = new Date(b.created_at || b.inserted_at || b.date || 0);
+        return db - da;
+      });
+    }
+
+    // default: "date_upcoming"
+    return arr.sort((a, b) => {
+      const da = buildDate(a) || new Date(0);
+      const db = buildDate(b) || new Date(0);
+      return da - db;
+    });
   };
 
-  // Nettoyage: pending doublons
+  /* ----------------------------------------------------------------------
+     🎨 Groupement par statut
+  ---------------------------------------------------------------------- */
+  const display = selectedDayBookings ? selectedDayBookings.dayBookings : bookings;
+
+  const grouped = {
+    pending: sortList(display.filter((b) => b.status === "pending")),
+    offers: sortList(display.filter((b) => ["offers", "proposed"].includes(b.status))),
+    confirmed: sortList(display.filter((b) => b.status === "confirmed")),
+    completed: sortList(display.filter((b) => b.status === "completed")),
+    cancelled: sortList(display.filter((b) => b.status === "cancelled")),
+  };
+
+  // Pending propres
   grouped.pending = grouped.pending.filter(
     (b) => !grouped.confirmed.some((c) => c.booking_id === b.id)
   );
 
+  /* ----------------------------------------------------------------------
+     🌀 Loading
+  ---------------------------------------------------------------------- */
   if (loading)
     return (
       <div className="flex justify-center items-center h-48 text-gray-600">
@@ -138,33 +206,36 @@ export default function DashboardReservations() {
     );
 
   /* ----------------------------------------------------------------------
-     UI
+     🎨 Rendu
   ---------------------------------------------------------------------- */
   return (
     <section className="mt-10 max-w-4xl mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800 text-center mb-2">My Reservations</h1>
+      {/* HEADER + SORT */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-gray-800 text-center sm:text-left">
+          My Reservations
+        </h1>
 
-      {/* Sort dropdown */}
-      <div className="flex justify-end mb-2">
-        <select
-          value={sortMode}
-          onChange={(e) => setSortMode(e.target.value)}
-          className="px-3 py-2 border rounded-xl text-sm bg-white shadow-sm"
-        >
-          <option value="closest">Closest date</option>
-          <option value="farthest">Farthest date</option>
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-        </select>
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-gray-500">Sort by</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="border border-gray-200 rounded-full px-3 py-1.5 text-sm text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-rose-200"
+          >
+            <option value="date_upcoming">Date – upcoming first</option>
+            <option value="created_newest">Most recent first</option>
+          </select>
+        </div>
       </div>
 
-      {/* Calendar */}
+      {/* CALENDAR */}
       <CalendarView
         bookings={bookings}
         onSelectDay={(date, dayBookings) => setSelectedDayBookings({ date, dayBookings })}
       />
 
-      {/* Filter banner */}
+      {/* SELECTED DAY banner */}
       {selectedDayBookings && (
         <div className="text-center text-gray-600 mb-4">
           <p className="text-sm">
@@ -181,7 +252,7 @@ export default function DashboardReservations() {
         </div>
       )}
 
-      {/* ──────────────── Sections ──────────────── */}
+      {/* SECTIONS */}
       <ReservationSection
         title="Pending Requests"
         icon={<Clock size={20} className="text-amber-500" />}
@@ -203,9 +274,16 @@ export default function DashboardReservations() {
         data={grouped.offers}
         actions={{ view: true }}
         empty="No offers to review yet."
+        newItems={newItems}
         onView={(b) => {
           setSelectedBooking(b);
           setShowOffersModal(true);
+          // remove NEW tag once viewed
+          setNewItems((prev) => {
+            const next = new Set(prev);
+            next.delete(`mission_${b.id}`);
+            return next;
+          });
         }}
       />
 
@@ -233,7 +311,7 @@ export default function DashboardReservations() {
         empty="No cancelled reservations."
       />
 
-      {/* Modals */}
+      {/* MODALS */}
       <AnimatePresence>
         {showOffersModal && selectedBooking && (
           <ClientOffersModal
@@ -242,7 +320,10 @@ export default function DashboardReservations() {
             onPay={() => {
               setShowOffersModal(false);
               fetchBookings();
-              setToast({ message: "Payment confirmed!", type: "success" });
+              setToast({
+                message: "Payment confirmed!",
+                type: "success",
+              });
             }}
           />
         )}
@@ -256,7 +337,10 @@ export default function DashboardReservations() {
           onSuccess={() => {
             setShowEditModal(false);
             fetchBookings();
-            setToast({ message: "Booking updated!", type: "success" });
+            setToast({
+              message: "Booking updated!",
+              type: "success",
+            });
           }}
         />
       )}
@@ -267,7 +351,7 @@ export default function DashboardReservations() {
 }
 
 /* ----------------------------------------------------------------------
-   🔸 ReservationSection – inchangé sauf petits ajustements
+   🔸 ReservationSection (client)
 ---------------------------------------------------------------------- */
 function ReservationSection({
   title,
@@ -279,6 +363,7 @@ function ReservationSection({
   onDelete,
   onView,
   onEdit,
+  newItems,
 }) {
   return (
     <section className="bg-white rounded-2xl shadow p-6 border border-gray-100">
@@ -288,56 +373,68 @@ function ReservationSection({
 
       {data.length ? (
         <ul className="divide-y divide-gray-100">
-          {data.map((b) => (
-            <li
-              key={`${b.type}-${b.id}`}
-              className="py-3 flex justify-between items-start hover:bg-gray-50 px-2 rounded-lg transition"
-            >
-              <div className="flex-1">
-                <p className="font-medium text-gray-800">{b.service}</p>
-                <p className="text-sm text-gray-500">
-                  {b.date} — {b.time_slot || b.time || ""}
-                </p>
-                <p className="text-sm text-gray-500">{b.address || "(No address)"}</p>
-                {b.notes && <p className="text-xs text-gray-400 italic mt-1">“{b.notes}”</p>}
-              </div>
+          {data.map((b) => {
+            const isNew =
+              newItems?.has(`mission_${b.id}`) && ["proposed", "offers"].includes(b.status);
 
-              <div className="flex flex-col items-end gap-2">
-                <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>
-                  {b.status}
-                </span>
+            return (
+              <li
+                key={`${b.type}-${b.id}`}
+                className="py-3 flex justify-between items-start hover:bg-gray-50 px-2 rounded-lg transition relative"
+              >
+                {/* NEW badge */}
+                {isNew && (
+                  <span className="absolute top-2 right-2 bg-rose-100 text-rose-600 text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                    NEW
+                  </span>
+                )}
 
-                <div className="flex gap-2">
-                  {actions.view && (
-                    <button
-                      onClick={() => onView?.(b)}
-                      className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
-                    >
-                      <Eye size={16} />
-                    </button>
-                  )}
-
-                  {actions.edit && (
-                    <button
-                      onClick={() => onEdit?.(b)}
-                      className="p-2 rounded-full hover:bg-gray-100"
-                    >
-                      <Edit3 size={16} />
-                    </button>
-                  )}
-
-                  {actions.delete && (
-                    <button
-                      onClick={() => onDelete?.(b.id)}
-                      className="p-2 rounded-full hover:bg-gray-100 text-rose-500"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
+                <div className="flex-1">
+                  <p className="font-medium text-gray-800">{b.service}</p>
+                  <p className="text-sm text-gray-500">
+                    {b.date} — {b.time_slot || b.time || ""}
+                  </p>
+                  <p className="text-sm text-gray-500">{b.address || "(No address)"}</p>
+                  {b.notes && <p className="text-xs text-gray-400 italic mt-1">“{b.notes}”</p>}
                 </div>
-              </div>
-            </li>
-          ))}
+
+                <div className="flex flex-col items-end gap-2">
+                  <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>
+                    {b.status}
+                  </span>
+
+                  <div className="flex gap-2">
+                    {actions.view && (
+                      <button
+                        onClick={() => onView?.(b)}
+                        className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
+                      >
+                        <Eye size={16} />
+                      </button>
+                    )}
+
+                    {actions.edit && (
+                      <button
+                        onClick={() => onEdit?.(b)}
+                        className="p-2 rounded-full hover:bg-gray-100"
+                      >
+                        <Edit3 size={16} />
+                      </button>
+                    )}
+
+                    {actions.delete && (
+                      <button
+                        onClick={() => onDelete?.(b.id)}
+                        className="p-2 rounded-full hover:bg-gray-100 text-rose-500"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className="text-gray-500 text-sm italic">{empty}</p>
