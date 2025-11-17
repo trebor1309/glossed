@@ -1,11 +1,20 @@
-// src/pages/dashboard/Sidebar.jsx
-import { Home, CalendarDays, User, Settings, LogOut, Repeat, Plus } from "lucide-react";
+// src/components/navigation/SidebarClient.jsx
+import {
+  Home,
+  CalendarDays,
+  User,
+  Settings,
+  LogOut,
+  Repeat,
+  Plus,
+  MessageSquare,
+} from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
 import NotificationBadge from "@/components/navigation/NotificationBadge";
 
-export default function Sidebar() {
+export default function SidebarClient() {
   const navigate = useNavigate();
   const { logout, switchRole, isPro } = useUser();
   const { notifications } = useNotifications();
@@ -18,6 +27,12 @@ export default function Sidebar() {
       icon: CalendarDays,
       hasBadge: notifications.clientOffers > 0,
       badgeCount: notifications.clientOffers,
+    },
+    {
+      to: "/chat",
+      label: "Messages",
+      icon: MessageSquare,
+      // plus tard on pourra utiliser notifications.clientMessages
     },
     { to: "/dashboard/account", label: "Account", icon: User },
     { to: "/dashboard/settings", label: "Settings", icon: Settings },
@@ -36,7 +51,7 @@ export default function Sidebar() {
       {/* New Booking CTA */}
       <button
         onClick={() => navigate("/dashboard/new")}
-        className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition"
+        className="flex items-center gap-3 px-4 py-2.5 mb-3 rounded-lg text-gray-700 hover:bg-gray-100 transition"
       >
         <Plus size={18} className="text-rose-600" />
         <span>New Booking</span>
@@ -48,6 +63,7 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
+            end={to === "/dashboard"} // 👈 empêche Dashboard d’être actif partout
             className={({ isActive }) =>
               `relative flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${
                 isActive ? "bg-rose-50 text-rose-600 shadow-sm" : "text-gray-700 hover:bg-gray-100"
@@ -56,7 +72,7 @@ export default function Sidebar() {
           >
             <div className="relative">
               <Icon size={20} />
-              {hasBadge && <NotificationBadge count={badgeCount} />}
+              {hasBadge && badgeCount > 0 && <NotificationBadge count={badgeCount} />}
             </div>
             {label}
           </NavLink>

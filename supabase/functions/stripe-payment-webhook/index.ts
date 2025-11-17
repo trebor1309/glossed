@@ -1,129 +1,120 @@
-// /supabase/functions/stripe-payment-webhook/index.ts
+// 🔥 Disable JWT requirement for Stripe webhook
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// ⚠️ IMPORTANT : crée un client sans validation JWT
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, // service role = bypass all RLS
+  {
+    global: {
+      headers: {
+        // 👇 Force bypass auth checks
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+    },
+  }
+);
+
+// Stripe client
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
   apiVersion: "2023-10-16",
 });
 
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-);
-
-const corsHeaders = {
+// CORS headers
+const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "*",
 };
 
-Deno.serve(async (req) => {
-  // CORS
+serve(async (req) => {
+  // Preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: cors });
   }
 
-  let event: any;
+  // Stripe does NOT sign with JWT, so skip all auth checks
+  console.log("📥 Webhook received");
+
+  const raw = await req.text();
+  let event;
+
   try {
-    const raw = await req.text();
     event = JSON.parse(raw);
-  } catch (err: any) {
-    console.error("❌ Webhook JSON parse error:", err?.message);
-    return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+  } catch {
+    return new Response(JSON.stringify({ error: "invalid JSON" }), {
       status: 400,
-      headers: corsHeaders,
+      headers: cors,
     });
   }
 
-  const type = event.type;
-  const data = event.data?.object || {};
+  const data = event.data?.object ?? {};
+  const meta = data.metadata || data.session?.metadata || data.payment_intent?.metadata || {};
+
+  const missionId = meta.mission_id;
+  const proId = meta.pro_id;
+  const clientId = meta.client_id;
+
+  if (!missionId) {
+    console.log("⚠️ No mission_id -> ignored");
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: cors,
+    });
+  }
 
   try {
-    switch (type) {
-      case "checkout.session.completed": {
-        console.log("💳 checkout.session.completed:", data.id);
-
-        const metadata = data.metadata || {};
-        const missionId = metadata.mission_id;
-        const clientId = metadata.client_id || null;
-        const proId = metadata.pro_id || null;
-        const feeCents = Number(metadata.fee_cents ?? metadata.fee ?? 0);
-
-        if (!missionId) {
-          console.warn("⚠ Missing mission_id in metadata");
-          break;
-        }
-
-        const grossCents = typeof data.amount_total === "number" ? data.amount_total : 0;
-        const gross = grossCents / 100;
-        const applicationFee = feeCents / 100;
-        const net = gross - applicationFee;
-
-        console.log(
-          `💰 Payment received for mission ${missionId}: gross=${gross}, fee=${applicationFee}, net=${net}`
-        );
-
-        // 1️⃣ Mission → confirmed
-        const { error: missionError } = await supabase
-          .from("missions")
-          .update({
-            status: "confirmed",
-            paid_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", missionId);
-
-        if (missionError) {
-          console.error("❌ Mission update error:", missionError.message);
-        }
-
-        // 2️⃣ Enregistrer le paiement (UNE seule ligne)
-        const paymentRow = {
-          mission_id: missionId,
-          client_id: clientId,
-          pro_id: proId,
-          amount: net, // net pour le pro
-          amount_gross: gross, // total client
-          amount_net: net,
-          platform_fee: applicationFee,
-          application_fee: applicationFee,
-          currency: data.currency ?? "eur",
-          stripe_session_id: data.id,
-          stripe_payment_id: data.payment_intent ?? null,
-          status: "paid",
-          paid_at: new Date().toISOString(),
-        };
-
-        const { error: paymentError } = await supabase.from("payments").insert(paymentRow);
-
-        if (paymentError) {
-          console.error("❌ Payment insert error:", paymentError.message);
-        } else {
-          console.log("✅ Payment row inserted for mission", missionId);
-        }
-
-        break;
-      }
-
-      case "payment_intent.payment_failed": {
-        const metadata = data.metadata || {};
-        console.warn("❌ Payment failed:", data.id, "for mission:", metadata.mission_id);
-        // Ici tu pourrais mettre à jour un éventuel paiement "pending" en "failed"
-        break;
-      }
-
-      default:
-        console.log("ℹ️ Webhook event ignored:", type);
+    // ❗ Filter ONLY the event we want
+    if (event.type !== "checkout.session.completed") {
+      console.log("⏭️ Ignoring event:", event.type);
+      return new Response(JSON.stringify({ skipped: true }), {
+        status: 200,
+        headers: cors,
+      });
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: corsHeaders,
+    // Stripe amounts
+    const gross = (data.amount_total ?? data.amount ?? 0) / 100;
+    const applicationFee = meta.fee_cents ? Number(meta.fee_cents) / 100 : 0;
+    const net = gross - applicationFee;
+
+    // ---- UPDATE MISSION ----
+    await supabase
+      .from("missions")
+      .update({
+        status: "confirmed",
+        paid_at: new Date().toISOString(),
+      })
+      .eq("id", missionId);
+
+    // ---- INSERT PAYMENT ----
+    await supabase.from("payments").insert({
+      mission_id: missionId,
+      client_id: clientId,
+      pro_id: proId,
+      amount: net,
+      amount_gross: gross,
+      amount_net: net,
+      application_fee: applicationFee,
+      currency: data.currency ?? "eur",
+      stripe_payment_id: data.payment_intent ?? data.id,
+      stripe_session_id: data.id,
+      status: "paid",
+      paid_at: new Date().toISOString(),
     });
-  } catch (err: any) {
-    console.error("❌ Webhook internal error:", err?.message || err);
-    return new Response(JSON.stringify({ error: err?.message || "Unknown error" }), {
+
+    console.log("✅ Mission updated + payment inserted");
+
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: cors,
+    });
+  } catch (err) {
+    console.error("❌ Webhook error:", err.message);
+    return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
-      headers: corsHeaders,
+      headers: cors,
     });
   }
 });

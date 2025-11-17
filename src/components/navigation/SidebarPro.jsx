@@ -1,8 +1,17 @@
-// src/pages/prodashboard/components/SidebarPro.jsx
+// src/components/navigation/SidebarPro.jsx
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
-import { Home, Calendar, CreditCard, User, Settings, Repeat, LogOut } from "lucide-react";
+import {
+  Home,
+  Calendar,
+  CreditCard,
+  User,
+  Settings,
+  Repeat,
+  LogOut,
+  MessageSquare,
+} from "lucide-react";
 import NotificationBadge from "@/components/navigation/NotificationBadge";
 
 export default function SidebarPro() {
@@ -14,6 +23,7 @@ export default function SidebarPro() {
   const menuItems = [
     { name: "Home", icon: Home, path: "/prodashboard" },
     { name: "Missions", icon: Calendar, path: "/prodashboard/missions" },
+    { name: "Messages", icon: MessageSquare, path: "/chat" }, // 👈 nouveau
     { name: "Payments", icon: CreditCard, path: "/prodashboard/payments" },
     { name: "Account", icon: User, path: "/prodashboard/account" },
     { name: "Settings", icon: Settings, path: "/prodashboard/settings" },

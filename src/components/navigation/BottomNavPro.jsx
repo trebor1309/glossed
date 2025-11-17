@@ -1,5 +1,5 @@
-// src/pages/prodashboard/components/ProBottomNav.jsx
-import { Home, Calendar, DollarSign, Settings, MoreHorizontal } from "lucide-react";
+// src/components/navigation/BottomNavPro.jsx
+import { Home, Calendar, DollarSign, Settings, MoreHorizontal, MessageSquare } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useNotifications } from "@/context/NotificationContext";
 import NotificationBadge from "@/components/navigation/NotificationBadge";
@@ -47,16 +47,17 @@ export default function ProBottomNav() {
         <span className="mt-1">Payments</span>
       </NavLink>
 
+      {/* 👉 Messages à la place de Profile */}
       <NavLink
-        to="/prodashboard/settings"
+        to="/chat"
         className={({ isActive }) =>
           `flex flex-col items-center text-xs font-medium transition-colors ${
             isActive ? "text-rose-600" : "text-gray-500"
           }`
         }
       >
-        <Settings size={22} />
-        <span className="mt-1">Profile</span>
+        <MessageSquare size={22} />
+        <span className="mt-1">Messages</span>
       </NavLink>
 
       <NavLink

@@ -1,3 +1,4 @@
+// src/components/chat/ChatInput.jsx
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Send } from "lucide-react";
@@ -6,21 +7,51 @@ export default function ChatInput({ chatId, user }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
 
+  const isPro = user?.active_role === "pro";
+
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!text.trim()) return;
+    if (!text.trim() || !chatId || !user) return;
+
+    const messageText = text.trim();
     setSending(true);
 
-    await supabase.from("messages").insert([
-      {
-        chat_id: chatId,
-        sender_id: user.id,
-        content: text.trim(),
-      },
-    ]);
+    try {
+      // 1) insérer le message
+      const { error: msgError } = await supabase.from("chat_messages").insert([
+        {
+          chat_id: chatId,
+          sender_id: user.id,
+          message: messageText,
+          read_by_pro: isPro,
+          read_by_client: !isPro,
+        },
+      ]);
 
-    setText("");
-    setSending(false);
+      if (msgError) {
+        console.error("Error sending message:", msgError);
+        return;
+      }
+
+      // 2) mettre à jour last_message + updated_at
+      const { error: chatError } = await supabase
+        .from("chats")
+        .update({
+          last_message: messageText,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", chatId);
+
+      if (chatError) {
+        console.error("Error updating chat:", chatError);
+      }
+
+      setText("");
+    } catch (err) {
+      console.error("Unexpected error sending message:", err);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (

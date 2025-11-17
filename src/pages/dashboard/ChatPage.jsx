@@ -1,17 +1,33 @@
+// src/pages/dashboard/ChatPage.jsx
 import { useParams } from "react-router-dom";
-import ChatRoom from "@/components/chat/ChatRoom";
 import { useUser } from "@/context/UserContext";
 
+import ChatRoom from "@/components/chat/ChatRoom";
+import ChatList from "@/components/chat/ChatList";
+
 export default function ChatPage() {
-  const { mission_id } = useParams();
-  const { session } = useUser();
+  const { chatId } = useParams();
+  const { user } = useUser();
+
+  // Non connecté → rien
+  if (!user) return null;
 
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-semibold mb-4 text-gray-800">
-        💬 Conversation liée à la mission
-      </h2>
-      <ChatRoom chatId={mission_id} user={session.user} />
+    <div className="p-4 max-w-5xl mx-auto">
+      {/* MODE LISTE */}
+      {!chatId && (
+        <div>
+          <h2 className="text-2xl font-semibold mb-6 text-gray-800">💬 Messages</h2>
+          <ChatList user={user} />
+        </div>
+      )}
+
+      {/* MODE CHAT ROOM */}
+      {chatId && (
+        <div>
+          <ChatRoom chatId={chatId} user={user} />
+        </div>
+      )}
     </div>
   );
 }
