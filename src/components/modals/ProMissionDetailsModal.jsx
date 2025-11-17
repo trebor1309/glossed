@@ -15,7 +15,15 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 
-// ... fmtTime / fmtDate inchangés
+const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
+
+const fmtDate = (d) => {
+  try {
+    return new Date(d).toLocaleDateString();
+  } catch {
+    return d;
+  }
+};
 
 export default function ProMissionDetailsModal({ booking, onClose, onEvaluate }) {
   const [loading, setLoading] = useState(false);
