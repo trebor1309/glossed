@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "@/context/UserContext"; // ← ajouté
 import { supabase } from "@/lib/supabaseClient";
 
 const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
@@ -28,6 +29,8 @@ const fmtDate = (d) => {
 export default function ProMissionDetailsModal({ booking, onClose, onEvaluate }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { isPro } = useUser(); // ← ajouté
+
   if (!booking) return null;
 
   const isMission = typeof booking.price !== "undefined" || typeof booking.time !== "undefined";
@@ -41,21 +44,18 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
     if (!booking?.id) return;
 
     try {
-      // 1) Chercher un chat existant
-      const { data: existing, error: findError } = await supabase
+      let chatId;
+
+      // 1) Existing chat?
+      const { data: existing } = await supabase
         .from("chats")
         .select("id")
         .eq("mission_id", booking.id)
         .maybeSingle();
 
-      if (findError) {
-        console.error("Error finding chat:", findError);
-        return;
-      }
+      chatId = existing?.id;
 
-      let chatId = existing?.id;
-
-      // 2) Sinon créer un chat
+      // 2) Create chat if needed
       if (!chatId) {
         const { data: created, error: createError } = await supabase
           .from("chats")
@@ -77,8 +77,12 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
         chatId = created.id;
       }
 
-      // 3) Naviguer vers le chat
-      navigate(`/prodashboard/messages/${chatId}`);
+      // 3) Redirect based on role
+      if (isPro) {
+        navigate(`/prodashboard/messages/${chatId}`);
+      } else {
+        navigate(`/dashboard/messages/${chatId}`);
+      }
     } catch (err) {
       console.error("Unexpected error while opening chat:", err);
     }

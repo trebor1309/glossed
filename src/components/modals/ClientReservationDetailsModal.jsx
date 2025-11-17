@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { X, Calendar, Clock, MapPin, FileText, MessageSquare, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "@/context/UserContext"; // ← ajouté
 import { supabase } from "@/lib/supabaseClient";
 
 const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
@@ -18,6 +19,7 @@ const fmtDate = (d) => {
 export default function ClientReservationDetailsModal({ booking, onClose, onCancel, onEvaluate }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { isPro } = useUser(); // ← ajouté
 
   if (!booking) return null;
 
@@ -32,19 +34,16 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
     if (!booking?.id) return;
 
     try {
+      let chatId;
+
       // 1) Check for existing chat
-      const { data: existing, error: findError } = await supabase
+      const { data: existing } = await supabase
         .from("chats")
         .select("id")
         .eq("mission_id", booking.id)
         .maybeSingle();
 
-      if (findError) {
-        console.error("Error finding chat:", findError);
-        return;
-      }
-
-      let chatId = existing?.id;
+      chatId = existing?.id;
 
       // 2) Create chat if missing
       if (!chatId) {
@@ -68,8 +67,12 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
         chatId = created.id;
       }
 
-      // 3) Navigate to chat
-      navigate(`/dashboard/messages/${chatId}`);
+      // 3) Navigate depending on role
+      if (isPro) {
+        navigate(`/prodashboard/messages/${chatId}`);
+      } else {
+        navigate(`/dashboard/messages/${chatId}`);
+      }
     } catch (err) {
       console.error("Unexpected error while opening chat:", err);
     }
