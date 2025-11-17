@@ -16,7 +16,14 @@ import Legal from "./pages/Legal";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import FAQ from "./pages/FAQ";
-import ChatPage from "@/pages/dashboard/ChatPage";
+
+// 📄 Chat system (client)
+import DashboardMessages from "@/pages/dashboard/pages/DashboardMessages";
+import DashboardChat from "@/pages/dashboard/pages/DashboardChat";
+
+// 📄 Chat system (pro)
+import ProDashboardMessages from "@/pages/prodashboard/pages/ProDashboardMessages";
+import ProDashboardChat from "@/pages/prodashboard/pages/ProDashboardChat";
 
 import ScrollToTop from "./components/ScrollToTop";
 import Navbar from "@/components/navigation/NavbarMain";
@@ -158,6 +165,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
                 />
               }
             />
+
             <Route path="/about" element={<About />} />
             <Route path="/services" element={<Services />} />
             <Route path="/legal" element={<Legal />} />
@@ -172,9 +180,6 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
             <Route path="/contact" element={<Contact />} />
             <Route path="/safety" element={<Safety />} />
 
-            {/* 💬 Chat (utilisateur connecté) */}
-            <Route path="/chat/:mission_id" element={isAuthenticated ? <ChatPage /> : <Home />} />
-
             {/* 👤 Dashboard Client */}
             <Route path="/dashboard" element={isAuthenticated ? <DashboardLayout /> : <Home />}>
               <Route index element={<DashboardHome />} />
@@ -183,7 +188,12 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               <Route path="account" element={<DashboardAccount />} />
               <Route path="settings" element={<DashboardSettings />} />
               <Route path="more" element={<DashboardMore />} />
+
+              {/* ⭐ NEW: Inbox + Chat */}
+              <Route path="messages" element={<DashboardMessages />} />
+              <Route path="chat/:chat_id" element={<DashboardChat />} />
             </Route>
+
             <Route path="/dashboard/payment/success" element={<PaymentSuccess />} />
 
             {/* 💼 Dashboard Pro */}
@@ -203,7 +213,11 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               <Route path="settings" element={<ProDashboardSettings />} />
               <Route path="account" element={<ProDashboardAccount />} />
               <Route path="more" element={<ProDashboardMore />} />
-              {/* ⬇️ ⬇️ Corrigé : chemins relatifs dans le parent /prodashboard */}
+
+              {/* ⭐ NEW: Inbox + Chat */}
+              <Route path="messages" element={<ProDashboardMessages />} />
+              <Route path="chat/:chat_id" element={<ProDashboardChat />} />
+
               <Route path="stripe/success" element={<StripeSuccess />} />
               <Route path="stripe/refresh" element={<StripeRefresh />} />
             </Route>

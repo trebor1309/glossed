@@ -23,7 +23,7 @@ export default function SidebarPro() {
   const menuItems = [
     { name: "Home", icon: Home, path: "/prodashboard" },
     { name: "Missions", icon: Calendar, path: "/prodashboard/missions" },
-    { name: "Messages", icon: MessageSquare, path: "/chat" }, // 👈 nouveau
+    { name: "Messages", icon: MessageSquare, path: "/prodashboard/messages" },
     { name: "Payments", icon: CreditCard, path: "/prodashboard/payments" },
     { name: "Account", icon: User, path: "/prodashboard/account" },
     { name: "Settings", icon: Settings, path: "/prodashboard/settings" },

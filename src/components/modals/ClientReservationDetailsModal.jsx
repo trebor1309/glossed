@@ -1,21 +1,11 @@
 // src/components/modals/ClientReservationDetailsModal.jsx
 import { motion } from "framer-motion";
-import {
-  X,
-  Calendar,
-  Clock,
-  MapPin,
-  FileText,
-  MessageSquare,
-  Star,
-  Trash2,
-} from "lucide-react";
+import { X, Calendar, Clock, MapPin, FileText, MessageSquare, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 
-const fmtTime = (t) =>
-  typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t;
+const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
 
 const fmtDate = (d) => {
   try {
@@ -25,20 +15,13 @@ const fmtDate = (d) => {
   }
 };
 
-export default function ClientReservationDetailsModal({
-  booking,
-  onClose,
-  onCancel,
-  onEvaluate,
-}) {
+export default function ClientReservationDetailsModal({ booking, onClose, onCancel, onEvaluate }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   if (!booking) return null;
 
-  const isMission =
-    typeof booking.price !== "undefined" ||
-    typeof booking.time !== "undefined";
+  const isMission = typeof booking.price !== "undefined" || typeof booking.time !== "undefined";
   const status = booking.status;
   const showChat = status === "confirmed";
 
@@ -86,7 +69,7 @@ export default function ClientReservationDetailsModal({
       }
 
       // 3) Navigate to chat
-      navigate(`/chat/${chatId}`);
+      navigate(`/dashboard/messages/${chatId}`);
     } catch (err) {
       console.error("Unexpected error while opening chat:", err);
     }
@@ -150,11 +133,7 @@ export default function ClientReservationDetailsModal({
             </p>
           )}
 
-          {booking.notes && (
-            <p className="italic text-sm text-gray-500">
-              “{booking.notes}”
-            </p>
-          )}
+          {booking.notes && <p className="italic text-sm text-gray-500">“{booking.notes}”</p>}
 
           <div className="mt-4">
             <span
@@ -162,12 +141,12 @@ export default function ClientReservationDetailsModal({
                 status === "pending"
                   ? "bg-amber-100 text-amber-700"
                   : status === "proposed"
-                  ? "bg-blue-100 text-blue-700"
-                  : status === "confirmed"
-                  ? "bg-green-100 text-green-700"
-                  : status === "completed"
-                  ? "bg-rose-100 text-rose-700"
-                  : "bg-gray-100 text-gray-600"
+                    ? "bg-blue-100 text-blue-700"
+                    : status === "confirmed"
+                      ? "bg-green-100 text-green-700"
+                      : status === "completed"
+                        ? "bg-rose-100 text-rose-700"
+                        : "bg-gray-100 text-gray-600"
               }`}
             >
               {status}
@@ -177,7 +156,6 @@ export default function ClientReservationDetailsModal({
 
         {/* ACTION BUTTONS */}
         <div className="mt-8 flex flex-wrap justify-end gap-3">
-
           {/* Cancel booking (pendant pending / proposed) */}
           {(status === "pending" || status === "proposed") && (
             <button

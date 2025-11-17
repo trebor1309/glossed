@@ -49,7 +49,7 @@ export default function ProBottomNav() {
 
       {/* 👉 Messages à la place de Profile */}
       <NavLink
-        to="/chat"
+        to="/prodashboard/messages"
         className={({ isActive }) =>
           `flex flex-col items-center text-xs font-medium transition-colors ${
             isActive ? "text-rose-600" : "text-gray-500"

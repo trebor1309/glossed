@@ -78,7 +78,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
       }
 
       // 3) Naviguer vers le chat
-      navigate(`/chat/${chatId}`);
+      navigate(`/prodashboard/messages/${chatId}`);
     } catch (err) {
       console.error("Unexpected error while opening chat:", err);
     }

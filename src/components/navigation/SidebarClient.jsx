@@ -29,10 +29,9 @@ export default function SidebarClient() {
       badgeCount: notifications.clientOffers,
     },
     {
-      to: "/chat",
+      to: "/dashboard/messages",
       label: "Messages",
       icon: MessageSquare,
-      // plus tard on pourra utiliser notifications.clientMessages
     },
     { to: "/dashboard/account", label: "Account", icon: User },
     { to: "/dashboard/settings", label: "Settings", icon: Settings },

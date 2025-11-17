@@ -40,7 +40,7 @@ export default function Navbar({
 
           {isAuthenticated && (
             <a
-              href="/chat"
+              href={isPro ? "/prodashboard/messages" : "/dashboard/messages"}
               className="hover:text-rose-600 transition-all duration-300 hover:scale-105"
             >
               Messages
@@ -133,7 +133,7 @@ export default function Navbar({
 
         {isAuthenticated && (
           <a
-            href="/chat"
+            href={isPro ? "/prodashboard/messages" : "/dashboard/messages"}
             onClick={() => setIsOpen(false)}
             className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
           >

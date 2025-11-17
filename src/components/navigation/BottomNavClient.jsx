@@ -16,12 +16,7 @@ export default function BottomNavClient() {
       label: "Bookings",
       badge: notifications.clientOffers,
     },
-    {
-      to: "/chat",
-      icon: MessageSquare,
-      label: "Messages",
-      badge: 0, // plus tard: notifications.clientMessages
-    },
+    { to: "/dashboard/messages", icon: MessageSquare, label: "Messages" },
     { to: "/dashboard/more", icon: MoreHorizontal, label: "More" },
   ];
 
