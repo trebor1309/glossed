@@ -1,4 +1,5 @@
 // 📄 src/pages/dashboard/pages/DashboardReservations.jsx
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -7,12 +8,13 @@ import { useNotifications } from "@/context/NotificationContext";
 import { Clock, Bell, CheckCircle, Star, XCircle, Trash2, Edit3, Eye } from "lucide-react";
 
 import ClientOffersModal from "@/components/modals/ClientOffersModal";
+import ClientReservationDetailsModal from "@/components/modals/ClientReservationDetailsModal";
+
 import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 import CalendarView from "@/components/CalendarView";
 import Toast from "@/components/ui/Toast";
 import { AnimatePresence } from "framer-motion";
 
-// Petit helper pour trier par date
 const buildDate = (item) => {
   if (!item?.date) return null;
   const d = new Date(item.date);
@@ -27,34 +29,32 @@ export default function DashboardReservations() {
   const [loading, setLoading] = useState(true);
 
   const [selectedDayBookings, setSelectedDayBookings] = useState(null);
-  const [sortBy, setSortBy] = useState("date_upcoming"); // "date_upcoming" | "created_newest"
+  const [sortBy, setSortBy] = useState("date_upcoming");
 
-  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [selectedBooking, setSelectedBooking] = useState(null); // for Offers
+  const [selectedConfirmedBooking, setSelectedConfirmedBooking] = useState(null); // NEW ⭐
+
   const [showOffersModal, setShowOffersModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
   const [toast, setToast] = useState(null);
 
-  // NEW badges sur nouvelles offres (missions status="proposed")
   const [newItems, setNewItems] = useState(() => new Set());
 
-  /* ----------------------------------------------------------------------
-     📌 fetchBookings()
-     Fusionne bookings + missions proprement
-  ---------------------------------------------------------------------- */
+  /* -----------------------------------------------------------
+     📌 Fetch all bookings & missions (client)
+  ----------------------------------------------------------- */
   const fetchBookings = async () => {
     try {
       setLoading(true);
       const clientId = session.user.id;
 
-      // 1️⃣ Bookings bruts
       const { data: bookingsData } = await supabase
         .from("bookings")
         .select("*")
         .eq("client_id", clientId)
         .order("date", { ascending: true });
 
-      // 2️⃣ Missions (offers / confirmed / completed)
       const { data: missionsData } = await supabase
         .from("missions")
         .select("*")
@@ -62,7 +62,6 @@ export default function DashboardReservations() {
         .in("status", ["proposed", "offers", "confirmed", "completed", "cancelled"])
         .order("date", { ascending: true });
 
-      // 3️⃣ Nettoyage : si mission confirmée → enlever le booking d’origine
       const confirmedBookingIds = (missionsData || [])
         .filter((m) => m.status === "confirmed")
         .map((m) => m.booking_id);
@@ -81,9 +80,7 @@ export default function DashboardReservations() {
         type: "mission",
       }));
 
-      const merged = [...bookingsTagged, ...missionsTagged];
-
-      setBookings(merged);
+      setBookings([...bookingsTagged, ...missionsTagged]);
     } catch (err) {
       console.error("❌ fetchBookings error:", err);
     } finally {
@@ -91,34 +88,19 @@ export default function DashboardReservations() {
     }
   };
 
-  /* ----------------------------------------------------------------------
-     🔁 Initialisation + realtime via NotificationContext
-  ---------------------------------------------------------------------- */
+  /* -----------------------------------------------------------
+     🔁 Realtime events
+  ----------------------------------------------------------- */
   useEffect(() => {
     if (!session?.user?.id) return;
-
     fetchBookings();
 
     const handler = (event) => {
       const { table, action, payload } = event.detail || {};
 
-      // 🎯 Nouvelle offre du pro = NEW
       if (
         table === "missions" &&
-        action === "INSERT" &&
-        payload?.new?.client_id === session.user.id &&
-        payload?.new?.status === "proposed"
-      ) {
-        setNewItems((prev) => {
-          const next = new Set(prev);
-          next.add(`mission_${payload.new.id}`);
-          return next;
-        });
-      }
-
-      if (
-        table === "missions" &&
-        action === "UPDATE" &&
+        ["INSERT", "UPDATE"].includes(action) &&
         payload?.new?.client_id === session.user.id &&
         payload?.new?.status === "proposed"
       ) {
@@ -133,15 +115,12 @@ export default function DashboardReservations() {
     };
 
     window.addEventListener("supabase-update", handler);
-
-    return () => {
-      window.removeEventListener("supabase-update", handler);
-    };
+    return () => window.removeEventListener("supabase-update", handler);
   }, [session?.user?.id]);
 
-  /* ----------------------------------------------------------------------
-     🗑️ Delete booking
-  ---------------------------------------------------------------------- */
+  /* -----------------------------------------------------------
+     🗑 Delete booking
+  ----------------------------------------------------------- */
   const handleDelete = async (id) => {
     if (!confirm("Are you sure?")) return;
 
@@ -155,9 +134,9 @@ export default function DashboardReservations() {
     setToast({ message: "Booking deleted!", type: "success" });
   };
 
-  /* ----------------------------------------------------------------------
-     🔍 Tri
-  ---------------------------------------------------------------------- */
+  /* -----------------------------------------------------------
+     🔍 Sorting
+  ----------------------------------------------------------- */
   const sortList = (list) => {
     const arr = [...list];
 
@@ -169,7 +148,6 @@ export default function DashboardReservations() {
       });
     }
 
-    // default: "date_upcoming"
     return arr.sort((a, b) => {
       const da = buildDate(a) || new Date(0);
       const db = buildDate(b) || new Date(0);
@@ -177,27 +155,26 @@ export default function DashboardReservations() {
     });
   };
 
-  /* ----------------------------------------------------------------------
-     🎨 Groupement par statut
-  ---------------------------------------------------------------------- */
+  /* -----------------------------------------------------------
+     🎨 Group by status
+  ----------------------------------------------------------- */
   const display = selectedDayBookings ? selectedDayBookings.dayBookings : bookings;
 
   const grouped = {
     pending: sortList(display.filter((b) => b.status === "pending")),
-    offers: sortList(display.filter((b) => ["offers", "proposed"].includes(b.status))),
+    offers: sortList(display.filter((b) => ["proposed", "offers"].includes(b.status))),
     confirmed: sortList(display.filter((b) => b.status === "confirmed")),
     completed: sortList(display.filter((b) => b.status === "completed")),
     cancelled: sortList(display.filter((b) => b.status === "cancelled")),
   };
 
-  // Pending propres
   grouped.pending = grouped.pending.filter(
     (b) => !grouped.confirmed.some((c) => c.booking_id === b.id)
   );
 
-  /* ----------------------------------------------------------------------
+  /* -----------------------------------------------------------
      🌀 Loading
-  ---------------------------------------------------------------------- */
+  ----------------------------------------------------------- */
   if (loading)
     return (
       <div className="flex justify-center items-center h-48 text-gray-600">
@@ -205,12 +182,11 @@ export default function DashboardReservations() {
       </div>
     );
 
-  /* ----------------------------------------------------------------------
-     🎨 Rendu
-  ---------------------------------------------------------------------- */
+  /* -----------------------------------------------------------
+     🎨 RENDER
+  ----------------------------------------------------------- */
   return (
     <section className="mt-10 max-w-4xl mx-auto p-4 space-y-6">
-      {/* HEADER + SORT */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800 text-center sm:text-left">
           My Reservations
@@ -229,13 +205,11 @@ export default function DashboardReservations() {
         </div>
       </div>
 
-      {/* CALENDAR */}
       <CalendarView
         bookings={bookings}
         onSelectDay={(date, dayBookings) => setSelectedDayBookings({ date, dayBookings })}
       />
 
-      {/* SELECTED DAY banner */}
       {selectedDayBookings && (
         <div className="text-center text-gray-600 mb-4">
           <p className="text-sm">
@@ -252,7 +226,8 @@ export default function DashboardReservations() {
         </div>
       )}
 
-      {/* SECTIONS */}
+      {/* -------------------- SECTIONS -------------------- */}
+
       <ReservationSection
         title="Pending Requests"
         icon={<Clock size={20} className="text-amber-500" />}
@@ -278,7 +253,7 @@ export default function DashboardReservations() {
         onView={(b) => {
           setSelectedBooking(b);
           setShowOffersModal(true);
-          // remove NEW tag once viewed
+
           setNewItems((prev) => {
             const next = new Set(prev);
             next.delete(`mission_${b.id}`);
@@ -293,6 +268,7 @@ export default function DashboardReservations() {
         color="text-blue-600"
         data={grouped.confirmed}
         empty="You have no confirmed appointments."
+        onViewConfirmed={(b) => setSelectedConfirmedBooking(b)} // ⭐ NEW
       />
 
       <ReservationSection
@@ -311,7 +287,8 @@ export default function DashboardReservations() {
         empty="No cancelled reservations."
       />
 
-      {/* MODALS */}
+      {/* -------------------- MODALS -------------------- */}
+
       <AnimatePresence>
         {showOffersModal && selectedBooking && (
           <ClientOffersModal
@@ -337,11 +314,15 @@ export default function DashboardReservations() {
           onSuccess={() => {
             setShowEditModal(false);
             fetchBookings();
-            setToast({
-              message: "Booking updated!",
-              type: "success",
-            });
+            setToast({ message: "Booking updated!", type: "success" });
           }}
+        />
+      )}
+
+      {selectedConfirmedBooking && (
+        <ClientReservationDetailsModal
+          booking={selectedConfirmedBooking}
+          onClose={() => setSelectedConfirmedBooking(null)}
         />
       )}
 
@@ -350,9 +331,9 @@ export default function DashboardReservations() {
   );
 }
 
-/* ----------------------------------------------------------------------
-   🔸 ReservationSection (client)
----------------------------------------------------------------------- */
+/* -----------------------------------------------------------
+   🔹 ReservationSection (Client)
+----------------------------------------------------------- */
 function ReservationSection({
   title,
   icon,
@@ -363,6 +344,7 @@ function ReservationSection({
   onDelete,
   onView,
   onEdit,
+  onViewConfirmed,
   newItems,
 }) {
   return (
@@ -408,6 +390,17 @@ function ReservationSection({
                       <button
                         onClick={() => onView?.(b)}
                         className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
+                      >
+                        <Eye size={16} />
+                      </button>
+                    )}
+
+                    {/* NEW ⭐ œil sur Confirmed Appointments */}
+                    {title === "Confirmed Appointments" && (
+                      <button
+                        onClick={() => onViewConfirmed?.(b)}
+                        className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
+                        title="View details"
                       >
                         <Eye size={16} />
                       </button>

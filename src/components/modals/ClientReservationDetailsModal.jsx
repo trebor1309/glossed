@@ -1,4 +1,4 @@
-// src/components/modals/ProMissionDetailsModal.jsx
+// src/components/modals/ClientReservationDetailsModal.jsx
 import { motion } from "framer-motion";
 import {
   X,
@@ -8,14 +8,14 @@ import {
   FileText,
   MessageSquare,
   Star,
-  Pencil,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 
-const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
+const fmtTime = (t) =>
+  typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t;
 
 const fmtDate = (d) => {
   try {
@@ -25,12 +25,20 @@ const fmtDate = (d) => {
   }
 };
 
-export default function ProMissionDetailsModal({ booking, onClose, onEvaluate }) {
+export default function ClientReservationDetailsModal({
+  booking,
+  onClose,
+  onCancel,
+  onEvaluate,
+}) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
   if (!booking) return null;
 
-  const isMission = typeof booking.price !== "undefined" || typeof booking.time !== "undefined";
+  const isMission =
+    typeof booking.price !== "undefined" ||
+    typeof booking.time !== "undefined";
   const status = booking.status;
   const showChat = status === "confirmed";
 
@@ -41,7 +49,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
     if (!booking?.id) return;
 
     try {
-      // 1) Chercher un chat existant
+      // 1) Check for existing chat
       const { data: existing, error: findError } = await supabase
         .from("chats")
         .select("id")
@@ -55,7 +63,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
       let chatId = existing?.id;
 
-      // 2) Sinon créer un chat
+      // 2) Create chat if missing
       if (!chatId) {
         const { data: created, error: createError } = await supabase
           .from("chats")
@@ -77,7 +85,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
         chatId = created.id;
       }
 
-      // 3) Naviguer vers le chat
+      // 3) Navigate to chat
       navigate(`/chat/${chatId}`);
     } catch (err) {
       console.error("Unexpected error while opening chat:", err);
@@ -99,7 +107,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
       >
-        {/* Close button */}
+        {/* Close */}
         <button
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 transition"
@@ -108,7 +116,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
         </button>
 
         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <FileText size={20} /> Mission details
+          <FileText size={20} /> Booking details
         </h2>
 
         {/* CONTENT */}
@@ -142,7 +150,11 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
             </p>
           )}
 
-          {booking.notes && <p className="italic text-sm text-gray-500">“{booking.notes}”</p>}
+          {booking.notes && (
+            <p className="italic text-sm text-gray-500">
+              “{booking.notes}”
+            </p>
+          )}
 
           <div className="mt-4">
             <span
@@ -150,12 +162,12 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
                 status === "pending"
                   ? "bg-amber-100 text-amber-700"
                   : status === "proposed"
-                    ? "bg-blue-100 text-blue-700"
-                    : status === "confirmed"
-                      ? "bg-green-100 text-green-700"
-                      : status === "completed"
-                        ? "bg-rose-100 text-rose-700"
-                        : "bg-gray-100 text-gray-600"
+                  ? "bg-blue-100 text-blue-700"
+                  : status === "confirmed"
+                  ? "bg-green-100 text-green-700"
+                  : status === "completed"
+                  ? "bg-rose-100 text-rose-700"
+                  : "bg-gray-100 text-gray-600"
               }`}
             >
               {status}
@@ -163,22 +175,20 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
           </div>
         </div>
 
-        {/* ACTIONS */}
+        {/* ACTION BUTTONS */}
         <div className="mt-8 flex flex-wrap justify-end gap-3">
-          {/* Proposed: edit/cancel — unmodified */}
-          {status === "proposed" && (
-            <>
-              <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-full font-medium hover:bg-gray-100 transition flex items-center gap-2">
-                <Pencil size={16} /> Edit proposal
-              </button>
 
-              <button className="px-4 py-2 border border-red-200 text-red-600 rounded-full font-medium hover:bg-red-50 transition flex items-center gap-2">
-                <Trash2 size={16} /> Cancel proposal
-              </button>
-            </>
+          {/* Cancel booking (pendant pending / proposed) */}
+          {(status === "pending" || status === "proposed") && (
+            <button
+              onClick={() => onCancel?.(booking)}
+              className="px-4 py-2 border border-red-200 text-red-600 rounded-full font-medium hover:bg-red-50 transition flex items-center gap-2"
+            >
+              <Trash2 size={16} /> Cancel
+            </button>
           )}
 
-          {/* Chat */}
+          {/* CHAT BUTTON */}
           {showChat && (
             <button
               onClick={handleOpenChat}
@@ -188,14 +198,10 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
             </button>
           )}
 
-          {/* Evaluate */}
+          {/* Evaluate at end */}
           {status === "completed" && (
             <button
-              onClick={() => {
-                setLoading(true);
-                onEvaluate?.(booking);
-                setTimeout(() => setLoading(false), 300);
-              }}
+              onClick={() => onEvaluate?.(booking)}
               disabled={loading}
               className="px-4 py-2 bg-amber-500 text-white rounded-full font-semibold hover:bg-amber-600 transition disabled:opacity-60 flex items-center gap-2"
             >
