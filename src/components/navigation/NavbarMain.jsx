@@ -15,6 +15,7 @@ export default function Navbar({
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
+  // Cache la navbar sur mobile quand on est sur un dashboard
   if (isDashboard && isMobile) return null;
 
   return (
@@ -60,11 +61,60 @@ export default function Navbar({
           </a>
         </div>
 
-        {/* Auth & CTA */}
-        {/* ... (inchangé en dehors de ça) ... */}
+        {/* Auth & CTA (desktop) */}
+        <div className="hidden md:flex items-center gap-5">
+          {!isAuthenticated ? (
+            <>
+              <button
+                onClick={onOpenLogin}
+                className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:shadow-md hover:scale-105 transition-all duration-300"
+              >
+                Sign in
+              </button>
+
+              <button
+                onClick={onOpenProSignup}
+                className="text-rose-600 border border-rose-300 px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-rose-50 hover:border-rose-400 hover:text-rose-700 hover:shadow-md hover:scale-105 transition-all duration-300"
+              >
+                Pro Space
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-gray-700 font-medium">
+                Welcome, {user?.email?.split("@")[0] || "Guest"} 👋
+              </span>
+              <button
+                onClick={logout}
+                className="text-rose-600 border border-rose-300 px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-rose-50 hover:border-rose-400 hover:text-rose-700 hover:shadow-md hover:scale-105 transition-all duration-300"
+              >
+                Log out
+              </button>
+            </>
+          )}
+        </div>
 
         {/* Burger (mobile) */}
-        {/* ... */}
+        <button
+          className="md:hidden flex flex-col justify-between w-7 h-6 focus:outline-none"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          <span
+            className={`h-[2px] bg-rose-600 rounded transition-transform duration-300 ease-in-out ${
+              isOpen ? "rotate-45 translate-y-[10px]" : ""
+            }`}
+          ></span>
+          <span
+            className={`h-[2px] bg-rose-600 rounded transition-all duration-300 ease-in-out ${
+              isOpen ? "opacity-0" : "opacity-100"
+            }`}
+          ></span>
+          <span
+            className={`h-[2px] bg-rose-600 rounded transition-transform duration-300 ease-in-out ${
+              isOpen ? "-rotate-45 -translate-y-[10px]" : ""
+            }`}
+          ></span>
+        </button>
       </div>
 
       {/* Mobile Menu */}
@@ -74,11 +124,11 @@ export default function Navbar({
         }`}
       >
         <a
-          href="/"
+          href={isAuthenticated ? (isPro ? "/prodashboard" : "/dashboard") : "/"}
           onClick={() => setIsOpen(false)}
           className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
         >
-          Home
+          {isAuthenticated ? "Dashboard" : "Home"}
         </a>
 
         {isAuthenticated && (
@@ -106,7 +156,41 @@ export default function Navbar({
           Services
         </a>
 
-        {/* le reste (sign in / pro space / dashboard / logout) reste identique */}
+        {!isAuthenticated ? (
+          <>
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                onOpenLogin();
+              }}
+              className="bg-gradient-to-r from-rose-600 to-red-600 text-white px-6 py-3 rounded-full text-sm font-semibold hover:shadow-md hover:scale-105 transition-all duration-300 text-center mx-auto w-auto"
+            >
+              Sign in
+            </button>
+
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                onOpenProSignup();
+              }}
+              className="text-rose-600 border border-rose-300 px-5 py-2 rounded-full text-sm font-semibold hover:bg-rose-50 hover:border-rose-400 hover:text-rose-700 transition-all duration-300 text-center mx-auto w-fit"
+            >
+              Pro Space
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                logout();
+              }}
+              className="text-gray-700 border border-gray-200 px-5 py-2 rounded-full text-sm font-semibold hover:bg-gray-100 transition-all duration-300 text-center mx-auto w-fit"
+            >
+              Log out
+            </button>
+          </>
+        )}
       </div>
     </nav>
   );
