@@ -68,11 +68,7 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
       }
 
       // 3) Navigate depending on role
-      if (isPro) {
-        navigate(`/prodashboard/messages/${chatId}`);
-      } else {
-        navigate(`/dashboard/messages/${chatId}`);
-      }
+      navigate(`/dashboard/chat/${chatId}`);
     } catch (err) {
       console.error("Unexpected error while opening chat:", err);
     }

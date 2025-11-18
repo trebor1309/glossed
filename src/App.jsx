@@ -40,6 +40,8 @@ import UpgradeToProModal from "./components/modals/UpgradeToProModal";
 
 import { useUser } from "./context/UserContext";
 
+import ChatLayout from "@/components/chat/ChatLayout";
+
 // Client dashboard
 import DashboardLayout from "./pages/dashboard/DashboardLayout";
 import DashboardHome from "./pages/dashboard/pages/DashboardHome";
@@ -190,8 +192,9 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               <Route path="more" element={<DashboardMore />} />
 
               {/* ⭐ NEW: Inbox + Chat */}
-              <Route path="messages" element={<DashboardMessages />} />
-              <Route path="chat/:chat_id" element={<DashboardChat />} />
+              <Route path="messages" element={<ChatLayout leftPanel={<DashboardMessages />} />}>
+                <Route path=":chat_id" element={<DashboardChat />} />
+              </Route>
             </Route>
 
             <Route path="/dashboard/payment/success" element={<PaymentSuccess />} />
@@ -215,8 +218,9 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               <Route path="more" element={<ProDashboardMore />} />
 
               {/* ⭐ NEW: Inbox + Chat */}
-              <Route path="messages" element={<ProDashboardMessages />} />
-              <Route path="chat/:chat_id" element={<ProDashboardChat />} />
+              <Route path="messages" element={<ChatLayout leftPanel={<ProDashboardMessages />} />}>
+                <Route path=":chat_id" element={<ProDashboardChat />} />
+              </Route>
 
               <Route path="stripe/success" element={<StripeSuccess />} />
               <Route path="stripe/refresh" element={<StripeRefresh />} />

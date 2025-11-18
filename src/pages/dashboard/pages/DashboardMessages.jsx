@@ -35,8 +35,10 @@ export default function DashboardMessages() {
         pro:pro_id (
           first_name,
           last_name,
-          business_name
+          business_name,
+          profile_photo
         )
+
       `
       )
       .eq("client_id", userId)

@@ -79,9 +79,9 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
       // 3) Redirect based on role
       if (isPro) {
-        navigate(`/prodashboard/messages/${chatId}`);
+        navigate(`/prodashboard/chat/${chatId}`);
       } else {
-        navigate(`/dashboard/messages/${chatId}`);
+        navigate(`/dashboard/chat/${chatId}`);
       }
     } catch (err) {
       console.error("Unexpected error while opening chat:", err);

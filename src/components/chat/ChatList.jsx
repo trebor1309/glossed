@@ -6,12 +6,18 @@ export default function ChatList({ chats, onOpenChat, userRole }) {
     <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
       <ul className="divide-y divide-gray-100">
         {chats.map((chat) => {
-          const name =
-            userRole === "client"
-              ? chat.pro?.business_name ||
-                `${chat.pro?.first_name || ""} ${chat.pro?.last_name || ""}`
-              : `${chat.client?.first_name || ""} ${chat.client?.last_name || ""}`;
+          const isClient = userRole === "client";
 
+          // 📌 Nom affiché
+          const name = isClient
+            ? chat.pro?.business_name ||
+              `${chat.pro?.first_name || ""} ${chat.pro?.last_name || ""}`
+            : `${chat.client?.first_name || ""} ${chat.client?.last_name || ""}`;
+
+          // 📌 Avatar
+          const avatar = isClient ? chat.pro?.profile_photo : chat.client?.profile_photo;
+
+          // 📌 Service
           const service = chat.missions?.service || "Service";
 
           return (
@@ -23,9 +29,11 @@ export default function ChatList({ chats, onOpenChat, userRole }) {
               animate={{ opacity: 1 }}
             >
               {/* Avatar */}
-              <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center font-semibold uppercase">
-                {name?.charAt(0)}
-              </div>
+              <img
+                src={avatar || "/default-avatar.png"}
+                alt={name}
+                className="w-12 h-12 rounded-full object-cover bg-gray-100"
+              />
 
               {/* Infos */}
               <div className="flex-1">
