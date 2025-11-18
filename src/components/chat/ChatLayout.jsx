@@ -9,30 +9,33 @@ export default function ChatLayout({ leftPanel }) {
   const isChatPage = location.pathname.includes("/chat/");
 
   return (
-    <div className="w-full h-[calc(100vh-6rem)] flex overflow-hidden">
-      {/* DESKTOP SPLIT VIEW */}
+    <div className="w-full h-[calc(100vh-6rem)] flex overflow-hidden bg-white">
+      {/* --- DESKTOP (split view) --- */}
       {!isMobile && (
-        <>
-          {/* LEFT = inbox */}
-          <div className="w-1/3 border-r overflow-y-auto bg-white">{leftPanel}</div>
+        <div className="flex flex-1 overflow-hidden">
+          {/* LEFT PANEL (Inbox) */}
+          <div className="w-1/3 min-w-[280px] max-w-[380px] border-r overflow-y-auto">
+            {leftPanel}
+          </div>
 
-          {/* RIGHT = chat */}
-          <div className="flex-1 bg-white overflow-y-auto">
+          {/* RIGHT PANEL (Chat window) */}
+          <div className="flex-1 overflow-y-auto">
             <Outlet />
           </div>
-        </>
+        </div>
       )}
 
-      {/* MOBILE VIEW */}
+      {/* --- MOBILE (single view) --- */}
       {isMobile && (
         <>
-          {/* Only inbox OR chat */}
-          {isChatPage ? (
+          {!isChatPage ? (
+            // Inbox
+            <div className="flex-1 overflow-y-auto">{leftPanel}</div>
+          ) : (
+            // Chat only
             <div className="flex-1 overflow-y-auto">
               <Outlet />
             </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto">{leftPanel}</div>
           )}
         </>
       )}
