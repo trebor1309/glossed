@@ -44,14 +44,14 @@ export default function ChatRoom({ chatId, user }) {
     return () => supabase.removeChannel(channel);
   }, [chatId]);
 
-  // 📌 Scroll auto vers le bas
+  // 📌 Auto scroll bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   return (
     <div className="relative flex flex-col w-full h-full bg-white overflow-hidden">
-      {/* ZONE MESSAGES — with header & input fixed */}
+      {/* ZONE MESSAGES */}
       <div className="flex-1 overflow-y-auto px-4 py-20 space-y-3">
         {messages.map((msg) => (
           <ChatBubble
@@ -64,12 +64,12 @@ export default function ChatRoom({ chatId, user }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* INPUT FIXÉ EN BAS */}
+      {/* INPUT FIXÉ */}
       <div className="absolute bottom-0 left-0 w-full bg-white border-t z-10">
         <ChatInput chatId={chatId} user={user} />
       </div>
 
-      {/* VIEWER IMAGE FULLSCREEN */}
+      {/* IMAGE VIEWER */}
       {viewerUrl && <ImageViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />}
     </div>
   );

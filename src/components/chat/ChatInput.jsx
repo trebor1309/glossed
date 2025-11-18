@@ -45,7 +45,7 @@ export default function ChatInput({ chatId, user }) {
     return publicUrl.publicUrl;
   };
 
-  // 📌 Envoyer message (texte OU image)
+  // 📌 Envoyer message
   const sendMessage = async (content, attachment_url = null) => {
     const { error } = await supabase.from("messages").insert({
       chat_id: chatId,
@@ -65,7 +65,7 @@ export default function ChatInput({ chatId, user }) {
     }
   };
 
-  // 📌 ENVOI TEXTE
+  // 📌 Envoi texte
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!text.trim() || sending) return;
@@ -76,7 +76,7 @@ export default function ChatInput({ chatId, user }) {
     setSending(false);
   };
 
-  // 📌 ENVOI IMAGE
+  // 📌 Envoi image
   const onImageSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -90,11 +90,11 @@ export default function ChatInput({ chatId, user }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="flex items-center gap-2 bg-white p-3 border-t"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.25rem)" }}
+      className="flex items-center gap-2 bg-white p-3 border-t overflow-hidden"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.3rem)" }}
     >
       {/* IMAGE BUTTON */}
-      <label className="p-2 cursor-pointer rounded-full hover:bg-gray-100">
+      <label className="p-2 cursor-pointer rounded-full hover:bg-gray-100 flex-shrink-0">
         <ImageIcon size={22} className="text-gray-600" />
         <input type="file" accept="image/*" className="hidden" onChange={onImageSelect} />
       </label>
@@ -104,7 +104,8 @@ export default function ChatInput({ chatId, user }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Write a message..."
-        className="flex-1 border rounded-xl px-4 py-2 focus:ring-2 focus:ring-rose-400 outline-none text-gray-700 resize-none max-h-24"
+        className="flex-1 min-w-0 border rounded-xl px-4 py-2 focus:ring-2 focus:ring-rose-400 
+                   outline-none text-gray-700 resize-none max-h-24"
         rows={1}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
@@ -118,7 +119,8 @@ export default function ChatInput({ chatId, user }) {
       <button
         type="submit"
         disabled={sending}
-        className="p-3 rounded-full bg-gradient-to-r from-rose-600 to-red-600 text-white hover:scale-[1.05] transition disabled:opacity-50"
+        className="flex-shrink-0 p-3 rounded-full bg-gradient-to-r from-rose-600 to-red-600 text-white 
+                   hover:scale-[1.05] transition disabled:opacity-50"
       >
         <Send size={18} />
       </button>
