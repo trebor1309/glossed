@@ -24,8 +24,7 @@ export default function ChatInput({ chatId, user }) {
 
   // 📌 Upload d'image
   const uploadImage = async (file) => {
-    const ext = "jpg";
-    const filename = `${Date.now()}_${user.id}.${ext}`;
+    const filename = `${Date.now()}_${user.id}.jpg`;
     const path = `${chatId}/${filename}`;
 
     const compressed = await compressImage(file);
@@ -46,7 +45,7 @@ export default function ChatInput({ chatId, user }) {
     return publicUrl.publicUrl;
   };
 
-  // 📌 Envoyer message
+  // 📌 Envoyer message (texte OU image)
   const sendMessage = async (content, attachment_url = null) => {
     const { error } = await supabase.from("messages").insert({
       chat_id: chatId,
@@ -70,8 +69,8 @@ export default function ChatInput({ chatId, user }) {
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!text.trim() || sending) return;
-    setSending(true);
 
+    setSending(true);
     await sendMessage(text.trim());
     setText("");
     setSending(false);
@@ -89,7 +88,11 @@ export default function ChatInput({ chatId, user }) {
   };
 
   return (
-    <form onSubmit={onSubmit} className="flex items-center gap-2 border-t bg-white p-3">
+    <form
+      onSubmit={onSubmit}
+      className="flex items-center gap-2 bg-white p-3 border-t"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.25rem)" }}
+    >
       {/* IMAGE BUTTON */}
       <label className="p-2 cursor-pointer rounded-full hover:bg-gray-100">
         <ImageIcon size={22} className="text-gray-600" />
@@ -101,7 +104,8 @@ export default function ChatInput({ chatId, user }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Write a message..."
-        className="flex-1 border rounded-xl px-4 py-2 focus:ring-2 focus:ring-rose-400 outline-none text-gray-700 resize-none h-12"
+        className="flex-1 border rounded-xl px-4 py-2 focus:ring-2 focus:ring-rose-400 outline-none text-gray-700 resize-none max-h-24"
+        rows={1}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();

@@ -50,9 +50,9 @@ export default function ChatRoom({ chatId, user }) {
   }, [messages]);
 
   return (
-    <div className="flex flex-col flex-1 bg-white h-full overflow-hidden">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+    <div className="relative flex flex-col w-full h-full bg-white overflow-hidden">
+      {/* ZONE MESSAGES — with header & input fixed */}
+      <div className="flex-1 overflow-y-auto px-4 py-20 space-y-3">
         {messages.map((msg) => (
           <ChatBubble
             key={msg.id}
@@ -64,10 +64,12 @@ export default function ChatRoom({ chatId, user }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <ChatInput chatId={chatId} user={user} />
+      {/* INPUT FIXÉ EN BAS */}
+      <div className="absolute bottom-0 left-0 w-full bg-white border-t z-10">
+        <ChatInput chatId={chatId} user={user} />
+      </div>
 
-      {/* Fullscreen image viewer */}
+      {/* VIEWER IMAGE FULLSCREEN */}
       {viewerUrl && <ImageViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />}
     </div>
   );

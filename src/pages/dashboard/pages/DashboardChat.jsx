@@ -34,7 +34,8 @@ export default function DashboardChat() {
         partner:pro_id (
           first_name,
           last_name,
-          business_name
+          business_name,
+          profile_photo
         )
       `
       )
