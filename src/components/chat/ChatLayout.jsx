@@ -1,4 +1,3 @@
-// 📄 src/components/chat/ChatLayout.jsx
 import { Outlet, useLocation } from "react-router-dom";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
@@ -6,34 +5,37 @@ export default function ChatLayout({ leftPanel }) {
   const isMobile = useIsMobile(768);
   const location = useLocation();
 
-  const isChatPage = location.pathname.includes("/chat/");
+  // Detect chat route correctly
+  const isChatPage =
+    location.pathname.match(/\/dashboard\/messages\/[^/]+$/) ||
+    location.pathname.match(/\/prodashboard\/messages\/[^/]+$/);
 
   return (
-    <div className="w-full h-[calc(100vh-6rem)] flex bg-white overflow-hidden">
-      {/* --- DESKTOP (split view) --- */}
+    <div className="w-full h-[calc(100vh-6rem)] flex overflow-hidden bg-white">
+      {/* --- DESKTOP SPLIT VIEW --- */}
       {!isMobile && (
-        <div className="flex flex-1 min-h-0 overflow-hidden">
-          {/* LEFT PANEL (Inbox) */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Inbox */}
           <div className="w-1/3 min-w-[280px] max-w-[380px] border-r overflow-y-auto">
             {leftPanel}
           </div>
 
-          {/* RIGHT PANEL (Chat window) */}
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          {/* Chat */}
+          <div className="flex-1 overflow-y-auto">
             <Outlet />
           </div>
         </div>
       )}
 
-      {/* --- MOBILE (single view) --- */}
+      {/* --- MOBILE VIEW --- */}
       {isMobile && (
         <>
           {!isChatPage ? (
-            // Inbox
-            <div className="flex-1 min-h-0 overflow-y-auto">{leftPanel}</div>
+            // Inbox only
+            <div className="flex-1 overflow-y-auto">{leftPanel}</div>
           ) : (
             // Chat only
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto">
               <Outlet />
             </div>
           )}
