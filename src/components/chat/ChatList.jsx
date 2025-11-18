@@ -1,4 +1,3 @@
-// 📄 src/components/chat/ChatList.jsx
 import { motion } from "framer-motion";
 
 export default function ChatList({ chats, onOpenChat, userRole }) {
@@ -8,17 +7,34 @@ export default function ChatList({ chats, onOpenChat, userRole }) {
     <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
       <ul className="divide-y divide-gray-100">
         {chats.map((chat) => {
-          // 📌 Nom affiché
+          // Nom
           const name = isClient
             ? chat.pro?.business_name ||
               `${chat.pro?.first_name || ""} ${chat.pro?.last_name || ""}`
             : `${chat.client?.first_name || ""} ${chat.client?.last_name || ""}`;
 
-          // 📌 Avatar
+          // Avatar
           const avatar = isClient ? chat.pro?.profile_photo : chat.client?.profile_photo;
 
-          // 📌 Service (uniquement pour client)
-          const service = chat.missions?.service || null;
+          // Service
+          const service = isClient ? chat.missions?.service : null;
+
+          // 📌 DÉTERMINATION DU DERNIER MESSAGE
+          const last = chat.messages?.[0]; // notre SELECT renvoie un tableau avec 1 élément
+
+          const preview = last
+            ? last.attachment_url
+              ? "📷 Image"
+              : last.content
+            : "No messages yet";
+
+          // 📌 Date/heure du dernier message
+          const timestamp = last
+            ? new Date(last.created_at).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "";
 
           return (
             <motion.li
@@ -28,30 +44,21 @@ export default function ChatList({ chats, onOpenChat, userRole }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              {/* Avatar */}
               <img
                 src={avatar || "/default-avatar.png"}
                 alt={name}
                 className="w-12 h-12 rounded-full object-cover bg-gray-100"
               />
 
-              {/* Infos */}
               <div className="flex-1">
                 <p className="font-semibold text-gray-800">{name}</p>
 
-                {/* Afficher le service UNIQUEMENT côté client */}
-                {isClient && service && <p className="text-sm text-gray-500">{service}</p>}
+                {service && <p className="text-sm text-gray-500">{service}</p>}
 
-                {/* Dernier message */}
-                <p className="text-xs text-gray-400 truncate mt-1">
-                  {chat.last_message || "No messages yet"}
-                </p>
+                <p className="text-xs text-gray-400 truncate mt-1">{preview}</p>
               </div>
 
-              {/* Timestamp */}
-              <div className="text-xs text-gray-400">
-                {new Date(chat.updated_at).toLocaleDateString()}
-              </div>
+              <div className="text-xs text-gray-400">{timestamp}</div>
             </motion.li>
           );
         })}

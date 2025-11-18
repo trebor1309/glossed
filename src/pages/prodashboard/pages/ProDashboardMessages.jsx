@@ -23,22 +23,24 @@ export default function ProDashboardMessages() {
       .from("chats")
       .select(
         `
-        id,
-        mission_id,
-        pro_id,
-        client_id,
-        last_message,
-        updated_at,
-        missions:mission_id (
-          service
-        ),
-        client:client_id (
-          first_name,
-          last_name,
-          profile_photo
-        )
-
-      `
+    id,
+    mission_id,
+    pro_id,
+    client_id,
+    missions:mission_id (
+      service
+    ),
+    client:client_id (
+      first_name,
+      last_name,
+      profile_photo
+    ),
+    messages!last_message_id (
+      content,
+      attachment_url,
+      created_at
+    )
+  `
       )
       .eq("pro_id", proId)
       .order("updated_at", { ascending: false });

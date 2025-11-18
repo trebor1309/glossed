@@ -1,13 +1,31 @@
 // 📄 src/components/chat/ChatInput.jsx
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Send, Image as ImageIcon } from "lucide-react";
 
 export default function ChatInput({ chatId, user }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const typingTimer = useRef(null);
 
-  // 📌 Compression d'image avant upload
+  // --- TYPING BROADCAST ---
+  const sendTyping = () => {
+    supabase.channel(`typing:${chatId}`).send({
+      type: "broadcast",
+      event: "typing",
+      payload: {
+        user_id: user.id,
+        name: user.first_name || "Someone",
+      },
+    });
+  };
+
+  const triggerTyping = () => {
+    clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(sendTyping, 10); // léger debounce
+  };
+
+  // --- COMPRESSION IMAGE ---
   async function compressImage(file, quality = 0.7) {
     const bmp = await createImageBitmap(file);
     const canvas = document.createElement("canvas");
@@ -22,7 +40,7 @@ export default function ChatInput({ chatId, user }) {
     });
   }
 
-  // 📌 Upload d'image
+  // --- UPLOAD IMAGE ---
   const uploadImage = async (file) => {
     const filename = `${Date.now()}_${user.id}.jpg`;
     const path = `${chatId}/${filename}`;
@@ -41,11 +59,10 @@ export default function ChatInput({ chatId, user }) {
     }
 
     const { data: publicUrl } = supabase.storage.from("chat_attachments").getPublicUrl(path);
-
     return publicUrl.publicUrl;
   };
 
-  // 📌 Envoyer message
+  // --- SEND MESSAGE ---
   const sendMessage = async (content, attachment_url = null) => {
     const { error } = await supabase.from("messages").insert({
       chat_id: chatId,
@@ -65,7 +82,7 @@ export default function ChatInput({ chatId, user }) {
     }
   };
 
-  // 📌 Envoi texte
+  // --- SUBMIT TEXT ---
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!text.trim() || sending) return;
@@ -76,7 +93,7 @@ export default function ChatInput({ chatId, user }) {
     setSending(false);
   };
 
-  // 📌 Envoi image
+  // --- SUBMIT IMAGE ---
   const onImageSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -102,7 +119,10 @@ export default function ChatInput({ chatId, user }) {
       {/* TEXTAREA */}
       <textarea
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          triggerTyping();
+        }}
         placeholder="Write a message..."
         className="flex-1 min-w-0 border rounded-xl px-4 py-2 focus:ring-2 focus:ring-rose-400 
                    outline-none text-gray-700 resize-none max-h-24"
