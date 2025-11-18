@@ -15,7 +15,6 @@ export default function ProDashboardMessages() {
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 📌 Charger toutes les conversations du pro
   const fetchChats = async () => {
     setLoading(true);
 
@@ -23,32 +22,20 @@ export default function ProDashboardMessages() {
       .from("chats")
       .select(
         `
-    id,
-    mission_id,
-    pro_id,
-    client_id,
-    missions:mission_id (
-      service
-    ),
-    client:client_id (
-      first_name,
-      last_name,
-      profile_photo
-    ),
-    messages!last_message_id (
-      content,
-      attachment_url,
-      created_at
-    )
-  `
+        id,
+        mission_id,
+        pro_id,
+        client_id,
+        last_message,
+        updated_at,
+        missions:mission_id(service),
+        client:client_id(first_name,last_name,profile_photo)
+      `
       )
       .eq("pro_id", proId)
       .order("updated_at", { ascending: false });
 
-    if (!error) {
-      setChats(data || []);
-    }
-
+    if (!error) setChats(data || []);
     setLoading(false);
   };
 
@@ -56,23 +43,19 @@ export default function ProDashboardMessages() {
     if (!proId) return;
     fetchChats();
 
-    // 🟢 Supabase realtime
     const channel = supabase
       .channel("realtime:chats_pro")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "chats", filter: `pro_id=eq.${proId}` },
-        () => fetchChats()
+        fetchChats
       )
       .subscribe();
 
     return () => supabase.removeChannel(channel);
   }, [proId]);
 
-  // 📌 Ouvrir le chat
-  const openChat = (chat) => {
-    navigate(`/prodashboard/messages/${chat.id}`);
-  };
+  const openChat = (chat) => navigate(`/prodashboard/messages/${chat.id}`);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
