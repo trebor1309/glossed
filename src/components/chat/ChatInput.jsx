@@ -9,26 +9,59 @@ export default function ChatInput({ chatId, user }) {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!text.trim()) return;
+    if (!text.trim() || sending) return;
+
     setSending(true);
 
-    await supabase.from("messages").insert({
+    const cleanText = text.trim();
+
+    // 1) Insert message
+    const { error: insertError } = await supabase.from("messages").insert({
       chat_id: chatId,
       sender_id: user.id,
-      content: text.trim(),
+      content: cleanText,
     });
+
+    if (insertError) {
+      console.error("Message insert error:", insertError);
+      setSending(false);
+      return;
+    }
+
+    // 2) Update chat metadata
+    const { error: updateError } = await supabase
+      .from("chats")
+      .update({
+        last_message: cleanText,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", chatId);
+
+    if (updateError) {
+      console.error("Chat update error:", updateError);
+    }
 
     setText("");
     setSending(false);
   };
 
   return (
-    <form onSubmit={sendMessage} className="flex items-center gap-2 border-t bg-white p-3">
+    <form
+      onSubmit={sendMessage}
+      className="flex items-center gap-2 bg-white"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Write a message..."
-        className="flex-1 border rounded-xl px-4 py-2 focus:ring-2 focus:ring-rose-400 outline-none text-gray-700 resize-none h-12"
+        className="flex-1 border rounded-xl px-4 py-2 focus:ring-2 focus:ring-rose-400 outline-none text-gray-700 resize-none max-h-32"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage(e);
+          }
+        }}
       />
 
       <button

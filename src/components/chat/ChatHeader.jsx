@@ -13,7 +13,7 @@ export default function ChatHeader({ onBack, partner, service }) {
   const avatar = partner?.profile_photo || "/default-avatar.png";
 
   return (
-    <div className="flex items-center gap-4 p-4 border-b bg-white shadow-sm">
+    <div className="flex items-center gap-4 p-4 border-b bg-white shadow-sm sticky top-0 z-20">
       {/* Back only on mobile */}
       {isMobile && (
         <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-100 text-gray-600">
@@ -31,7 +31,7 @@ export default function ChatHeader({ onBack, partner, service }) {
       <div className="flex flex-col">
         <span className="font-semibold text-gray-800">{displayName}</span>
 
-        {/* Show service ONLY for client dashboard */}
+        {/* Client sees service, Pro ne devrait pas */}
         {service && <span className="text-xs text-gray-500">{service}</span>}
       </div>
     </div>
