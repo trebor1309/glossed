@@ -69,7 +69,7 @@ export default function ProDashboardMessages() {
 
   // 📌 Ouvrir le chat
   const openChat = (chat) => {
-    navigate(`/prodashboard/chat/${chat.id}`);
+    navigate(`/prodashboard/messages/${chat.id}`);
   };
 
   return (

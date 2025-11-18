@@ -72,7 +72,7 @@ export default function DashboardMessages() {
 
   // 📌 Open chat
   const openChat = (chat) => {
-    navigate(`/dashboard/chat/${chat.id}`);
+    navigate(`/dashboard/messages/${chat.id}`);
   };
 
   return (
