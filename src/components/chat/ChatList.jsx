@@ -2,12 +2,12 @@
 import { motion } from "framer-motion";
 
 export default function ChatList({ chats, onOpenChat, userRole }) {
+  const isClient = userRole === "client";
+
   return (
     <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
       <ul className="divide-y divide-gray-100">
         {chats.map((chat) => {
-          const isClient = userRole === "client";
-
           // 📌 Nom affiché
           const name = isClient
             ? chat.pro?.business_name ||
@@ -17,8 +17,8 @@ export default function ChatList({ chats, onOpenChat, userRole }) {
           // 📌 Avatar
           const avatar = isClient ? chat.pro?.profile_photo : chat.client?.profile_photo;
 
-          // 📌 Service
-          const service = chat.missions?.service || "Service";
+          // 📌 Service (uniquement pour client)
+          const service = chat.missions?.service || null;
 
           return (
             <motion.li
@@ -38,8 +38,11 @@ export default function ChatList({ chats, onOpenChat, userRole }) {
               {/* Infos */}
               <div className="flex-1">
                 <p className="font-semibold text-gray-800">{name}</p>
-                <p className="text-sm text-gray-500">{service}</p>
 
+                {/* Afficher le service UNIQUEMENT côté client */}
+                {isClient && service && <p className="text-sm text-gray-500">{service}</p>}
+
+                {/* Dernier message */}
                 <p className="text-xs text-gray-400 truncate mt-1">
                   {chat.last_message || "No messages yet"}
                 </p>
