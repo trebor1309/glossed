@@ -8,8 +8,22 @@ import ImageViewer from "./ImageViewer";
 export default function ChatRoom({ chatId, user }) {
   const [messages, setMessages] = useState([]);
   const [viewerUrl, setViewerUrl] = useState(null);
-  const [typingUser, setTypingUser] = useState(null); // << NEW
+  const [typingUser, setTypingUser] = useState(null);
   const bottomRef = useRef(null);
+
+  // 🔥 MARK AS READ
+  const markAsRead = async () => {
+    try {
+      await supabase
+        .from("messages")
+        .update({ read_at: new Date().toISOString() })
+        .eq("chat_id", chatId)
+        .neq("sender_id", user.id)
+        .is("read_at", null);
+    } catch (e) {
+      console.error("Failed to mark as read", e);
+    }
+  };
 
   // 📌 Charger messages
   const loadMessages = async () => {
@@ -24,6 +38,7 @@ export default function ChatRoom({ chatId, user }) {
 
   useEffect(() => {
     loadMessages();
+    markAsRead(); // Lire tout à l’ouverture
 
     // --- REALTIME : Nouveaux messages ---
     const msgChannel = supabase
@@ -38,6 +53,11 @@ export default function ChatRoom({ chatId, user }) {
         },
         (payload) => {
           setMessages((prev) => [...prev, payload.new]);
+
+          // Si message reçu de l'autre → le marquer comme lu
+          if (payload.new.sender_id !== user.id) {
+            markAsRead();
+          }
         }
       )
       .subscribe();
@@ -48,8 +68,6 @@ export default function ChatRoom({ chatId, user }) {
       .on("broadcast", { event: "typing" }, ({ payload }) => {
         if (payload.user_id !== user.id) {
           setTypingUser(payload.name);
-
-          // clear automatique après 3 s
           setTimeout(() => setTypingUser(null), 3000);
         }
       })

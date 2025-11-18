@@ -27,12 +27,15 @@ export default function ChatBubble({ msg, isOwn, onImageClick }) {
         {/* TEXT */}
         {msg.content && <p className="whitespace-pre-line">{msg.content}</p>}
 
-        <p className="text-[10px] mt-1 opacity-80 text-right">
+        {/* TIME + READ INDICATOR */}
+        <div className="text-[10px] mt-1 opacity-80 flex items-center justify-end gap-1">
           {new Date(msg.created_at).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           })}
-        </p>
+
+          {isOwn && <span className="text-xs">{msg.read_at ? "✓✓" : "✓"}</span>}
+        </div>
       </div>
     </div>
   );
