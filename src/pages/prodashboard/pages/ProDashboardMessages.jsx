@@ -13,12 +13,40 @@ export default function ProDashboardMessages() {
   const navigate = useNavigate();
 
   const [chats, setChats] = useState([]);
+  const [unreadMap, setUnreadMap] = useState({});
   const [loading, setLoading] = useState(true);
 
+  // 🔢 Non lus côté pro
+  const fetchUnreadMap = async (chatRows) => {
+    const ids = chatRows.map((c) => c.id);
+    if (!ids.length || !proId) {
+      setUnreadMap({});
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("messages")
+      .select("chat_id")
+      .in("chat_id", ids)
+      .neq("sender_id", proId)
+      .is("read_at", null);
+
+    if (error) {
+      console.error("Unread fetch error (pro):", error);
+      return;
+    }
+
+    const map = {};
+    for (const row of data || []) {
+      map[row.chat_id] = true;
+    }
+    setUnreadMap(map);
+  };
+
+  // 📌 Charger toutes les conversations du pro
   const fetchChats = async () => {
     setLoading(true);
 
-    // --- Charger chats + info client
     const { data, error } = await supabase
       .from("chats")
       .select(
@@ -29,36 +57,27 @@ export default function ProDashboardMessages() {
         client_id,
         last_message,
         updated_at,
-        missions:mission_id(service),
-        client:client_id(first_name,last_name,profile_photo)
+        missions:mission_id ( service ),
+        client:client_id (
+          first_name,
+          last_name,
+          profile_photo
+        )
       `
       )
       .eq("pro_id", proId)
       .order("updated_at", { ascending: false });
 
-    if (error) {
+    if (!error) {
+      const rows = data || [];
+      setChats(rows);
+      await fetchUnreadMap(rows);
+    } else {
+      console.error("Chats fetch error (pro):", error);
       setChats([]);
-      setLoading(false);
-      return;
+      setUnreadMap({});
     }
 
-    const chatList = data || [];
-
-    // --- Ajouter unread_count
-    const chatsWithUnread = await Promise.all(
-      chatList.map(async (chat) => {
-        const { count } = await supabase
-          .from("messages")
-          .select("id", { count: "exact", head: true })
-          .eq("chat_id", chat.id)
-          .is("read_at", null)
-          .eq("sender_id", chat.client_id); // non-lu = messages venant du client
-
-        return { ...chat, unread_count: count };
-      })
-    );
-
-    setChats(chatsWithUnread);
     setLoading(false);
   };
 
@@ -71,14 +90,20 @@ export default function ProDashboardMessages() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "chats", filter: `pro_id=eq.${proId}` },
-        fetchChats
+        () => fetchChats()
       )
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proId]);
 
-  const openChat = (chat) => navigate(`/prodashboard/messages/${chat.id}`);
+  // 📌 Ouvrir le chat
+  const openChat = (chat) => {
+    navigate(`/prodashboard/messages/${chat.id}`);
+  };
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
@@ -89,7 +114,7 @@ export default function ProDashboardMessages() {
       {!loading && chats.length === 0 && <ChatEmptyState />}
 
       {!loading && chats.length > 0 && (
-        <ChatList chats={chats} onOpenChat={openChat} userRole="pro" />
+        <ChatList chats={chats} onOpenChat={openChat} userRole="pro" unreadMap={unreadMap} />
       )}
     </div>
   );

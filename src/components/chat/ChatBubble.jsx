@@ -1,6 +1,13 @@
 // 📄 src/components/chat/ChatBubble.jsx
 export default function ChatBubble({ msg, isOwn, onImageClick }) {
   const isImage = !!msg.attachment_url;
+  const createdAt = msg.created_at ? new Date(msg.created_at) : null;
+
+  const timeLabel = createdAt
+    ? createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "";
+
+  const isRead = !!msg.read_at;
 
   return (
     <div className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
@@ -19,23 +26,24 @@ export default function ChatBubble({ msg, isOwn, onImageClick }) {
           <img
             src={msg.attachment_url}
             alt="Attachment"
-            onClick={() => onImageClick(msg.attachment_url)}
+            onClick={() => onImageClick?.(msg.attachment_url)}
             className="rounded-xl shadow-md max-h-64 mb-2 object-cover cursor-pointer hover:opacity-90 transition"
           />
         )}
 
-        {/* TEXT */}
+        {/* TEXTE */}
         {msg.content && <p className="whitespace-pre-line">{msg.content}</p>}
 
-        {/* TIME + READ INDICATOR */}
-        <div className="text-[10px] mt-1 opacity-80 flex items-center justify-end gap-1">
-          {new Date(msg.created_at).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
+        {/* Heure + statut */}
+        <p className="text-[10px] mt-1 opacity-80 flex items-center justify-end gap-1">
+          {timeLabel && <span>{timeLabel}</span>}
 
-          {isOwn && <span className="text-xs">{msg.read_at ? "✓✓" : "✓"}</span>}
-        </div>
+          {isOwn && (
+            <span className={isRead ? "text-rose-200" : "text-gray-300"}>
+              {isRead ? "✓✓" : "✓"}
+            </span>
+          )}
+        </p>
       </div>
     </div>
   );

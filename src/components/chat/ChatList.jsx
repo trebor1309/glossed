@@ -1,25 +1,45 @@
+// 📄 src/components/chat/ChatList.jsx
 import { motion } from "framer-motion";
 
-export default function ChatList({ chats, onOpenChat, userRole }) {
+export default function ChatList({ chats, onOpenChat, userRole, unreadMap }) {
   const isClient = userRole === "client";
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
       <ul className="divide-y divide-gray-100">
         {chats.map((chat) => {
+          // 📌 Nom affiché
           const name = isClient
             ? chat.pro?.business_name ||
-              `${chat.pro?.first_name || ""} ${chat.pro?.last_name || ""}`
-            : `${chat.client?.first_name || ""} ${chat.client?.last_name || ""}`;
+              `${chat.pro?.first_name || ""} ${chat.pro?.last_name || ""}`.trim()
+            : `${chat.client?.first_name || ""} ${chat.client?.last_name || ""}`.trim();
 
+          // 📌 Avatar
           const avatar = isClient ? chat.pro?.profile_photo : chat.client?.profile_photo;
+
+          // 📌 Service (uniquement côté client)
           const service = isClient ? chat.missions?.service : null;
 
-          // Dernier message
-          const lastMessage = chat.last_message || "Image";
+          // 📌 Preview du dernier message
+          let previewText = "No messages yet";
+          if (chat.last_message) {
+            previewText = chat.last_message.startsWith("📷")
+              ? "📷 Photo"
+              : chat.last_message;
+          }
 
-          // Non lu
-          const unread = chat.unread_count > 0;
+          // 📌 Date / heure du dernier update
+          let timestamp = "";
+          if (chat.updated_at) {
+            const d = new Date(chat.updated_at);
+            timestamp = d.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          }
+
+          // 📌 Non-lu ?
+          const hasUnread = !!unreadMap?.[chat.id];
 
           return (
             <motion.li
@@ -32,38 +52,32 @@ export default function ChatList({ chats, onOpenChat, userRole }) {
               {/* Avatar */}
               <img
                 src={avatar || "/default-avatar.png"}
-                alt={name}
-                className="w-12 h-12 rounded-full object-cover bg-gray-100"
+                alt={name || "User"}
+                className="w-12 h-12 rounded-full object-cover bg-gray-100 flex-shrink-0"
               />
 
-              {/* Infos */}
-              <div className="flex-1">
-                <p
-                  className={`font-semibold text-gray-800 ${unread ? "font-bold" : "font-medium"}`}
-                >
-                  {name}
-                </p>
+              {/* Infos principales */}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-800 truncate">{name || "Unknown user"}</p>
 
-                {service && <p className="text-sm text-gray-500">{service}</p>}
+                {/* Service seulement côté client */}
+                {isClient && service && (
+                  <p className="text-sm text-gray-500 truncate">{service}</p>
+                )}
 
-                <p
-                  className={`text-xs truncate mt-1 ${
-                    unread ? "text-gray-900 font-semibold" : "text-gray-400"
-                  }`}
-                >
-                  {lastMessage}
-                </p>
+                {/* Dernier message */}
+                <p className="text-xs text-gray-400 truncate mt-1">{previewText}</p>
               </div>
 
-              {/* Badge non lu */}
-              {unread && <div className="w-3 h-3 rounded-full bg-rose-500"></div>}
+              {/* Colonne droite : horaire + badge non lu */}
+              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                {timestamp && (
+                  <span className="text-xs text-gray-400 whitespace-nowrap">{timestamp}</span>
+                )}
 
-              {/* Timestamp */}
-              <div className="text-xs text-gray-400 whitespace-nowrap ml-2">
-                {new Date(chat.updated_at).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                {hasUnread && (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" aria-hidden />
+                )}
               </div>
             </motion.li>
           );
