@@ -21,8 +21,10 @@ export default function ChatLayout({ leftPanel }) {
           </div>
 
           {/* Chat */}
-          <div className="flex-1 overflow-y-auto">
-            <Outlet />
+          <div className="flex-1 overflow-y-auto flex justify-center">
+            <div className="w-full max-w-3xl">
+              <Outlet />
+            </div>
           </div>
         </div>
       )}
