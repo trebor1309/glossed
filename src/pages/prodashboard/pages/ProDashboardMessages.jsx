@@ -16,7 +16,9 @@ export default function ProDashboardMessages() {
   const [unreadMap, setUnreadMap] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // 🔢 Non lus côté pro
+  // --------------------------------------------------------------------
+  // 🔢 Charger les messages non-lus pour les conversations du pro
+  // --------------------------------------------------------------------
   const fetchUnreadMap = async (chatRows) => {
     const ids = chatRows.map((c) => c.id);
     if (!ids.length || !proId) {
@@ -43,67 +45,83 @@ export default function ProDashboardMessages() {
     setUnreadMap(map);
   };
 
-  // 📌 Charger toutes les conversations du pro
+  // --------------------------------------------------------------------
+  // 📌 Charger les chats AVEC leur vrai dernier message
+  // --------------------------------------------------------------------
   const fetchChats = async () => {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("chats")
-      .select(
-        `
+      .select(`
         id,
         mission_id,
         pro_id,
         client_id,
-        last_message,
         updated_at,
         missions:mission_id ( service ),
         client:client_id (
           first_name,
           last_name,
           profile_photo
+        ),
+        last_msg:messages!messages_chat_id_fkey (
+          content,
+          attachment_url,
+          created_at
         )
-      `
-      )
+      `)
       .eq("pro_id", proId)
       .order("updated_at", { ascending: false });
 
-    if (!error) {
-      const rows = data || [];
-      setChats(rows);
-      await fetchUnreadMap(rows);
-    } else {
+    if (error) {
       console.error("Chats fetch error (pro):", error);
       setChats([]);
       setUnreadMap({});
+      setLoading(false);
+      return;
     }
 
+    // ⚠️ last_msg est un tableau — on en extrait le dernier message
+    const normalized = data.map((chat) => {
+      const msgs = chat.last_msg || [];
+      const lastMessage = msgs.length ? msgs[msgs.length - 1] : null;
+
+      return {
+        ...chat,
+        last_message_obj: lastMessage,
+      };
+    });
+
+    setChats(normalized);
+    await fetchUnreadMap(normalized);
     setLoading(false);
   };
 
+  // --------------------------------------------------------------------
+  // 📡 Realtime basé sur les messages (et non sur chats)
+  // --------------------------------------------------------------------
   useEffect(() => {
     if (!proId) return;
+
     fetchChats();
 
     const channel = supabase
-      .channel("realtime:chats_pro")
+      .channel("realtime:messages_pro")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "chats", filter: `pro_id=eq.${proId}` },
+        { event: "*", schema: "public", table: "messages" },
         () => fetchChats()
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => supabase.removeChannel(channel);
   }, [proId]);
 
-  // 📌 Ouvrir le chat
-  const openChat = (chat) => {
-    navigate(`/prodashboard/messages/${chat.id}`);
-  };
+  // --------------------------------------------------------------------
+  // 🔗 Ouvrir un chat
+  // --------------------------------------------------------------------
+  const openChat = (chat) => navigate(`/prodashboard/messages/${chat.id}`);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
@@ -114,7 +132,12 @@ export default function ProDashboardMessages() {
       {!loading && chats.length === 0 && <ChatEmptyState />}
 
       {!loading && chats.length > 0 && (
-        <ChatList chats={chats} onOpenChat={openChat} userRole="pro" unreadMap={unreadMap} />
+        <ChatList
+          chats={chats}
+          onOpenChat={openChat}
+          userRole="pro"
+          unreadMap={unreadMap}
+        />
       )}
     </div>
   );

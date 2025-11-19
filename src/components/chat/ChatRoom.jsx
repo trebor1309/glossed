@@ -9,10 +9,11 @@ export default function ChatRoom({ chatId, user }) {
   const [messages, setMessages] = useState([]);
   const [viewerUrl, setViewerUrl] = useState(null);
   const [typingUser, setTypingUser] = useState(null);
+
   const bottomRef = useRef(null);
 
   // ------------------------------------------------------
-  // 🔥 FONCTION : Marquer messages comme lus
+  // 🔥 Mark messages as read
   // ------------------------------------------------------
   const markAsRead = async () => {
     try {
@@ -28,7 +29,7 @@ export default function ChatRoom({ chatId, user }) {
   };
 
   // ------------------------------------------------------
-  // 📌 Charger messages
+  // 📌 Load messages
   // ------------------------------------------------------
   const loadMessages = async () => {
     const { data } = await supabase
@@ -41,13 +42,12 @@ export default function ChatRoom({ chatId, user }) {
   };
 
   // ------------------------------------------------------
-  // 📌 Initialisation + realtime
+  // 📌 Init + realtime
   // ------------------------------------------------------
   useEffect(() => {
-    loadMessages();
-    markAsRead(); // marquer comme lu directement
+    loadMessages().then(() => markAsRead());
 
-    // --- REALTIME : nouveaux messages ---
+    // --- REALTIME : New messages ---
     const msgChannel = supabase
       .channel(`realtime:messages:${chatId}`)
       .on(
@@ -61,10 +61,8 @@ export default function ChatRoom({ chatId, user }) {
         (payload) => {
           setMessages((prev) => [...prev, payload.new]);
 
-          // Si c’est un message reçu → marqué comme lu
-          if (payload.new.sender_id !== user.id) {
-            markAsRead();
-          }
+          // Only mark as read if received message
+          if (payload.new.sender_id !== user.id) markAsRead();
         }
       )
       .subscribe();
@@ -75,7 +73,7 @@ export default function ChatRoom({ chatId, user }) {
       .on("broadcast", { event: "typing" }, ({ payload }) => {
         if (payload.user_id !== user.id) {
           setTypingUser(payload.name);
-          setTimeout(() => setTypingUser(null), 3000);
+          setTimeout(() => setTypingUser(null), 2500);
         }
       })
       .subscribe();
@@ -87,16 +85,7 @@ export default function ChatRoom({ chatId, user }) {
   }, [chatId]);
 
   // ------------------------------------------------------
-  // 📌 Marquer comme lus dès que la liste change
-  // ------------------------------------------------------
-  useEffect(() => {
-    if (messages.length > 0) {
-      markAsRead();
-    }
-  }, [messages]);
-
-  // ------------------------------------------------------
-  // 📌 Auto scroll vers le bas
+  // 📌 Scroll down when messages or typing change
   // ------------------------------------------------------
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -104,7 +93,8 @@ export default function ChatRoom({ chatId, user }) {
 
   return (
     <div className="relative flex flex-col w-full h-full bg-white overflow-hidden">
-      {/* Zone messages */}
+
+      {/* ZONE MESSAGES */}
       <div className="flex-1 overflow-y-auto px-4 py-20 space-y-3">
         {messages.map((msg) => (
           <ChatBubble
@@ -115,20 +105,22 @@ export default function ChatRoom({ chatId, user }) {
           />
         ))}
 
-        {/* Typing indicator */}
-        {typingUser && (
-          <div className="text-sm text-gray-500 italic px-2">{typingUser} is typing…</div>
-        )}
-
         <div ref={bottomRef} />
       </div>
 
-      {/* Input fixé */}
+      {/* TYPING INDICATOR — fixé au-dessus de l'input */}
+      {typingUser && (
+        <div className="absolute bottom-16 left-4 text-sm italic text-gray-500 z-20 bg-white/80 px-2 py-1 rounded-md">
+          {typingUser} is typing…
+        </div>
+      )}
+
+      {/* INPUT FIXÉ */}
       <div className="absolute bottom-0 left-0 w-full bg-white border-t z-10">
         <ChatInput chatId={chatId} user={user} />
       </div>
 
-      {/* Viewer image */}
+      {/* IMAGE VIEWER */}
       {viewerUrl && <ImageViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />}
     </div>
   );

@@ -16,7 +16,9 @@ export default function DashboardMessages() {
   const [unreadMap, setUnreadMap] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // 🔢 Calcul des non lus pour ces chats
+  // -------------------------------------------------------------
+  // 🔍 Charger les messages non lus (compte par chat)
+  // -------------------------------------------------------------
   const fetchUnreadMap = async (chatRows) => {
     const ids = chatRows.map((c) => c.id);
     if (!ids.length || !userId) {
@@ -43,19 +45,19 @@ export default function DashboardMessages() {
     setUnreadMap(map);
   };
 
-  // 📌 Charger toutes les conversations du client
+  // -------------------------------------------------------------
+  // 📌 Charger les conversations AVEC leur vrai dernier message
+  // -------------------------------------------------------------
   const fetchChats = async () => {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("chats")
-      .select(
-        `
+      .select(`
         id,
         mission_id,
         pro_id,
         client_id,
-        last_message,
         updated_at,
         missions:mission_id ( service ),
         pro:pro_id (
@@ -63,49 +65,63 @@ export default function DashboardMessages() {
           last_name,
           business_name,
           profile_photo
+        ),
+        last_msg:messages!messages_chat_id_fkey (
+          content,
+          attachment_url,
+          created_at
         )
-      `
-      )
+      `)
       .eq("client_id", userId)
       .order("updated_at", { ascending: false });
 
-    if (!error) {
-      const rows = data || [];
-      setChats(rows);
-      await fetchUnreadMap(rows);
-    } else {
+    if (error) {
       console.error("Chats fetch error (client):", error);
       setChats([]);
       setUnreadMap({});
+      setLoading(false);
+      return;
     }
 
+    // ⚠️ Supabase renvoie last_msg comme un TABLEAU → prendre le dernier seulement
+    const normalized = data.map((chat) => {
+      const msgs = chat.last_msg || [];
+      const lastMessage = msgs.length ? msgs[msgs.length - 1] : null;
+      return {
+        ...chat,
+        last_message_obj: lastMessage,
+      };
+    });
+
+    setChats(normalized);
+    await fetchUnreadMap(normalized);
     setLoading(false);
   };
 
+  // -------------------------------------------------------------
+  // 📡 Realtime
+  // -------------------------------------------------------------
   useEffect(() => {
     if (!userId) return;
+
     fetchChats();
 
-    // 🟢 Realtime sur la table chats (nouveaux messages = update last_message / updated_at)
     const channel = supabase
       .channel("realtime:chats_client")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "chats", filter: `client_id=eq.${userId}` },
+        { event: "*", schema: "public", table: "messages" },
         () => fetchChats()
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => supabase.removeChannel(channel);
   }, [userId]);
 
-  // 📌 Ouvrir un chat
-  const openChat = (chat) => {
-    navigate(`/dashboard/messages/${chat.id}`);
-  };
+  // -------------------------------------------------------------
+  // 🔗 Ouvrir un chat
+  // -------------------------------------------------------------
+  const openChat = (chat) => navigate(`/dashboard/messages/${chat.id}`);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
