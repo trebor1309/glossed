@@ -56,17 +56,24 @@ export default function ChatRoom({ chatId, user }) {
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "messages",
           filter: `chat_id=eq.${chatId}`,
         },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
+          // INSERT → nouveau message
+          if (payload.eventType === "INSERT") {
+            setMessages((prev) => [...prev, payload.new]);
 
-          if (payload.new.sender_id !== user.id) {
-            // message reçu → on le marque lu
-            markAsRead();
+            if (payload.new.sender_id !== user.id) {
+              markAsRead(); // le lecteur marque directement comme lu
+            }
+          }
+
+          // UPDATE → read_at vient d’être modifié
+          if (payload.eventType === "UPDATE") {
+            setMessages((prev) => prev.map((m) => (m.id === payload.new.id ? payload.new : m)));
           }
         }
       )
