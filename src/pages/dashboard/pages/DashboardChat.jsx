@@ -1,4 +1,3 @@
-// 📄 src/pages/dashboard/pages/DashboardChat.jsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
@@ -9,14 +8,12 @@ import ChatRoom from "@/components/chat/ChatRoom";
 
 export default function DashboardChat() {
   const { chat_id } = useParams();
-  const { session } = useUser();
-  const userId = session?.user?.id;
+  const { user } = useUser(); // ✅ on prend l'utilisateur complet
   const navigate = useNavigate();
 
   const [chatInfo, setChatInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 📌 Charger les infos du chat pour le header
   const fetchChatInfo = async () => {
     setLoading(true);
 
@@ -28,9 +25,7 @@ export default function DashboardChat() {
         mission_id,
         pro_id,
         client_id,
-        missions:mission_id (
-          service
-        ),
+        missions:mission_id ( service ),
         partner:pro_id (
           first_name,
           last_name,
@@ -43,13 +38,11 @@ export default function DashboardChat() {
       .single();
 
     if (!error) setChatInfo(data);
-
     setLoading(false);
   };
 
   useEffect(() => {
-    if (!chat_id) return;
-    fetchChatInfo();
+    if (chat_id) fetchChatInfo();
   }, [chat_id]);
 
   if (loading) return <p className="p-6 text-gray-500">Loading chat...</p>;
@@ -75,8 +68,7 @@ export default function DashboardChat() {
         partner={chatInfo.partner}
         service={chatInfo.missions?.service}
       />
-
-      <ChatRoom chatId={chat_id} user={session.user} />
+      <ChatRoom chatId={chat_id} user={user} /> {/* ✅ FIX */}
     </div>
   );
 }
