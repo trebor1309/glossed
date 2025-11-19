@@ -104,7 +104,7 @@ export default function ChatInput({ chatId, user }) {
       event: "typing",
       payload: {
         user_id: user.id,
-        name: typingName,
+        name: user.first_name || user.email,
       },
     });
   };
