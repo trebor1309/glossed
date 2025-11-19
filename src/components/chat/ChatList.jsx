@@ -8,48 +8,44 @@ export default function ChatList({ chats, onOpenChat, userRole, unreadMap }) {
     <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
       <ul className="divide-y divide-gray-100">
         {chats.map((chat) => {
+          // Nom
           const name = isClient
             ? chat.pro?.business_name ||
               `${chat.pro?.first_name || ""} ${chat.pro?.last_name || ""}`.trim()
             : `${chat.client?.first_name || ""} ${chat.client?.last_name || ""}`.trim();
 
+          // Avatar
           const avatar = isClient ? chat.pro?.profile_photo : chat.client?.profile_photo;
+
+          // Service seulement côté client
           const service = isClient ? chat.missions?.service : null;
 
-          // --- PREVIEW MESSAGE ---
+          // Dernier message objet
+          const last = chat.last_message_obj || null;
+
           let previewText = "No messages yet";
-
-          if (chat.last_message) {
-            if (chat.last_message.startsWith("📷")) previewText = "📷 Photo";
-            else previewText = chat.last_message;
-          }
-
-          // --- TIMESTAMP FORMAT ---
-          let timestamp = "";
-          if (chat.updated_at) {
-            const d = new Date(chat.updated_at);
-
-            const now = new Date();
-            const isToday = d.toDateString() === now.toDateString();
-
-            const yesterday = new Date();
-            yesterday.setDate(now.getDate() - 1);
-            const isYesterday = d.toDateString() === yesterday.toDateString();
-
-            if (isToday) {
-              timestamp = d.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              });
-            } else if (isYesterday) {
-              timestamp = "Yesterday";
-            } else {
-              timestamp = d.toLocaleDateString();
+          if (last) {
+            if (last.attachment_url && !last.content) {
+              previewText = "📷 Photo";
+            } else if (last.content && last.content.trim().length > 0) {
+              previewText = last.content;
+            } else if (last.attachment_url) {
+              previewText = "📷 Photo";
             }
           }
 
-          // --- UNREAD LOGIC ---
-          const hasUnread = unreadMap?.[chat.id] === true;
+          // Heure = celle du dernier message, fallback sur updated_at
+          let timestamp = "";
+          const tsSource = last?.created_at || chat.updated_at;
+          if (tsSource) {
+            const d = new Date(tsSource);
+            timestamp = d.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          }
+
+          const hasUnread = !!unreadMap?.[chat.id];
 
           return (
             <motion.li
@@ -66,7 +62,9 @@ export default function ChatList({ chats, onOpenChat, userRole, unreadMap }) {
               />
 
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-800 truncate">{name || "Unknown user"}</p>
+                <p className="font-semibold text-gray-800 truncate">
+                  {name || "Unknown user"}
+                </p>
 
                 {isClient && service && (
                   <p className="text-sm text-gray-500 truncate">{service}</p>
@@ -77,11 +75,13 @@ export default function ChatList({ chats, onOpenChat, userRole, unreadMap }) {
 
               <div className="flex flex-col items-end gap-1 flex-shrink-0">
                 {timestamp && (
-                  <span className="text-xs text-gray-400 whitespace-nowrap">{timestamp}</span>
+                  <span className="text-xs text-gray-400 whitespace-nowrap">
+                    {timestamp}
+                  </span>
                 )}
 
                 {hasUnread && (
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+                  <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
                 )}
               </div>
             </motion.li>

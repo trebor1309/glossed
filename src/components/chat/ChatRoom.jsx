@@ -12,9 +12,7 @@ export default function ChatRoom({ chatId, user }) {
 
   const bottomRef = useRef(null);
 
-  // ------------------------------------------------------
-  // 🔥 Mark messages as read
-  // ------------------------------------------------------
+  // 🔥 Marquer comme lus
   const markAsRead = async () => {
     try {
       await supabase
@@ -28,26 +26,31 @@ export default function ChatRoom({ chatId, user }) {
     }
   };
 
-  // ------------------------------------------------------
-  // 📌 Load messages
-  // ------------------------------------------------------
+  // 📌 Charger les messages
   const loadMessages = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("messages")
       .select("*")
       .eq("chat_id", chatId)
       .order("created_at", { ascending: true });
 
+    if (error) {
+      console.error("Messages fetch error:", error);
+      setMessages([]);
+      return;
+    }
+
     setMessages(data || []);
   };
 
-  // ------------------------------------------------------
   // 📌 Init + realtime
-  // ------------------------------------------------------
   useEffect(() => {
+    if (!chatId || !user?.id) return;
+
+    // 1. initial
     loadMessages().then(() => markAsRead());
 
-    // --- REALTIME : New messages ---
+    // 2. realtime messages
     const msgChannel = supabase
       .channel(`realtime:messages:${chatId}`)
       .on(
@@ -61,18 +64,20 @@ export default function ChatRoom({ chatId, user }) {
         (payload) => {
           setMessages((prev) => [...prev, payload.new]);
 
-          // Only mark as read if received message
-          if (payload.new.sender_id !== user.id) markAsRead();
+          if (payload.new.sender_id !== user.id) {
+            // message reçu → on le marque lu
+            markAsRead();
+          }
         }
       )
       .subscribe();
 
-    // --- REALTIME : typing indicator ---
+    // 3. typing indicator
     const typingChannel = supabase
       .channel(`typing:${chatId}`)
       .on("broadcast", { event: "typing" }, ({ payload }) => {
         if (payload.user_id !== user.id) {
-          setTypingUser(payload.name);
+          setTypingUser(payload.name || "Someone");
           setTimeout(() => setTypingUser(null), 2500);
         }
       })
@@ -82,18 +87,15 @@ export default function ChatRoom({ chatId, user }) {
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(typingChannel);
     };
-  }, [chatId]);
+  }, [chatId, user?.id]);
 
-  // ------------------------------------------------------
-  // 📌 Scroll down when messages or typing change
-  // ------------------------------------------------------
+  // 📌 Scroll auto
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUser]);
 
   return (
     <div className="relative flex flex-col w-full h-full bg-white overflow-hidden">
-
       {/* ZONE MESSAGES */}
       <div className="flex-1 overflow-y-auto px-4 py-20 space-y-3">
         {messages.map((msg) => (
@@ -108,19 +110,19 @@ export default function ChatRoom({ chatId, user }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* TYPING INDICATOR — fixé au-dessus de l'input */}
+      {/* TYPING FIXÉ AU-DESSUS DE L’INPUT */}
       {typingUser && (
         <div className="absolute bottom-16 left-4 text-sm italic text-gray-500 z-20 bg-white/80 px-2 py-1 rounded-md">
           {typingUser} is typing…
         </div>
       )}
 
-      {/* INPUT FIXÉ */}
+      {/* INPUT FIXÉ EN BAS */}
       <div className="absolute bottom-0 left-0 w-full bg-white border-t z-10">
         <ChatInput chatId={chatId} user={user} />
       </div>
 
-      {/* IMAGE VIEWER */}
+      {/* VIEWER IMAGE */}
       {viewerUrl && <ImageViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />}
     </div>
   );

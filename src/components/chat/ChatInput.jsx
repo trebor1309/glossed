@@ -6,26 +6,16 @@ import { Send, Image as ImageIcon } from "lucide-react";
 export default function ChatInput({ chatId, user }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const typingTimer = useRef(null);
+  const lastTypingSent = useRef(0);
 
-  // --- TYPING BROADCAST ---
-  const sendTyping = () => {
-    supabase.channel(`typing:${chatId}`).send({
-      type: "broadcast",
-      event: "typing",
-      payload: {
-        user_id: user.id,
-        name: user.first_name || "Someone",
-      },
-    });
-  };
+  // Nom à afficher dans "is typing"
+  const typingName =
+    user?.user_metadata?.business_name ||
+    user?.user_metadata?.first_name ||
+    user?.email ||
+    "Someone";
 
-  const triggerTyping = () => {
-    clearTimeout(typingTimer.current);
-    typingTimer.current = setTimeout(sendTyping, 10); // léger debounce
-  };
-
-  // --- COMPRESSION IMAGE ---
+  // --- Compression image ---
   async function compressImage(file, quality = 0.7) {
     const bmp = await createImageBitmap(file);
     const canvas = document.createElement("canvas");
@@ -40,7 +30,7 @@ export default function ChatInput({ chatId, user }) {
     });
   }
 
-  // --- UPLOAD IMAGE ---
+  // --- Upload image ---
   const uploadImage = async (file) => {
     const filename = `${Date.now()}_${user.id}.jpg`;
     const path = `${chatId}/${filename}`;
@@ -62,7 +52,7 @@ export default function ChatInput({ chatId, user }) {
     return publicUrl.publicUrl;
   };
 
-  // --- SEND MESSAGE ---
+  // --- Envoyer message (texte / image) ---
   const sendMessage = async (content, attachment_url = null) => {
     const { error } = await supabase.from("messages").insert({
       chat_id: chatId,
@@ -75,25 +65,24 @@ export default function ChatInput({ chatId, user }) {
       await supabase
         .from("chats")
         .update({
-          last_message: content || "📷 Image",
           updated_at: new Date().toISOString(),
         })
         .eq("id", chatId);
     }
   };
 
-  // --- SUBMIT TEXT ---
+  // --- Submit texte ---
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!text.trim() || sending) return;
 
     setSending(true);
-    await sendMessage(text.trim());
+    await sendMessage(text.trim(), null);
     setText("");
     setSending(false);
   };
 
-  // --- SUBMIT IMAGE ---
+  // --- Envoi image ---
   const onImageSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -102,6 +91,22 @@ export default function ChatInput({ chatId, user }) {
     const url = await uploadImage(file);
     if (url) await sendMessage(null, url);
     setSending(false);
+  };
+
+  // --- Typing broadcast ---
+  const sendTyping = () => {
+    const now = Date.now();
+    if (now - lastTypingSent.current < 1000) return; // throttle 1s
+    lastTypingSent.current = now;
+
+    supabase.channel(`typing:${chatId}`).send({
+      type: "broadcast",
+      event: "typing",
+      payload: {
+        user_id: user.id,
+        name: typingName,
+      },
+    });
   };
 
   return (
@@ -121,7 +126,7 @@ export default function ChatInput({ chatId, user }) {
         value={text}
         onChange={(e) => {
           setText(e.target.value);
-          triggerTyping();
+          sendTyping();
         }}
         placeholder="Write a message..."
         className="flex-1 min-w-0 border rounded-xl px-4 py-2 focus:ring-2 focus:ring-rose-400 

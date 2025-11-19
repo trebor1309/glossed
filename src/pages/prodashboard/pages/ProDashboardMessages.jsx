@@ -16,9 +16,7 @@ export default function ProDashboardMessages() {
   const [unreadMap, setUnreadMap] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // --------------------------------------------------------------------
-  // 🔢 Charger les messages non-lus pour les conversations du pro
-  // --------------------------------------------------------------------
+  // 🔢 Non-lus côté pro
   const fetchUnreadMap = async (chatRows) => {
     const ids = chatRows.map((c) => c.id);
     if (!ids.length || !proId) {
@@ -45,9 +43,7 @@ export default function ProDashboardMessages() {
     setUnreadMap(map);
   };
 
-  // --------------------------------------------------------------------
-  // 📌 Charger les chats AVEC leur vrai dernier message
-  // --------------------------------------------------------------------
+  // 📌 Charger les chats + vrai dernier message
   const fetchChats = async () => {
     setLoading(true);
 
@@ -82,11 +78,9 @@ export default function ProDashboardMessages() {
       return;
     }
 
-    // ⚠️ last_msg est un tableau — on en extrait le dernier message
-    const normalized = data.map((chat) => {
+    const normalized = (data || []).map((chat) => {
       const msgs = chat.last_msg || [];
       const lastMessage = msgs.length ? msgs[msgs.length - 1] : null;
-
       return {
         ...chat,
         last_message_obj: lastMessage,
@@ -98,9 +92,7 @@ export default function ProDashboardMessages() {
     setLoading(false);
   };
 
-  // --------------------------------------------------------------------
-  // 📡 Realtime basé sur les messages (et non sur chats)
-  // --------------------------------------------------------------------
+  // 📡 Realtime
   useEffect(() => {
     if (!proId) return;
 
@@ -118,9 +110,6 @@ export default function ProDashboardMessages() {
     return () => supabase.removeChannel(channel);
   }, [proId]);
 
-  // --------------------------------------------------------------------
-  // 🔗 Ouvrir un chat
-  // --------------------------------------------------------------------
   const openChat = (chat) => navigate(`/prodashboard/messages/${chat.id}`);
 
   return (

@@ -16,9 +16,7 @@ export default function DashboardMessages() {
   const [unreadMap, setUnreadMap] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // -------------------------------------------------------------
-  // 🔍 Charger les messages non lus (compte par chat)
-  // -------------------------------------------------------------
+  // 🔍 Non-lus côté client
   const fetchUnreadMap = async (chatRows) => {
     const ids = chatRows.map((c) => c.id);
     if (!ids.length || !userId) {
@@ -45,9 +43,7 @@ export default function DashboardMessages() {
     setUnreadMap(map);
   };
 
-  // -------------------------------------------------------------
-  // 📌 Charger les conversations AVEC leur vrai dernier message
-  // -------------------------------------------------------------
+  // 📌 Charger les conversations + vrai dernier message
   const fetchChats = async () => {
     setLoading(true);
 
@@ -83,8 +79,8 @@ export default function DashboardMessages() {
       return;
     }
 
-    // ⚠️ Supabase renvoie last_msg comme un TABLEAU → prendre le dernier seulement
-    const normalized = data.map((chat) => {
+    // last_msg est un tableau → on garde le dernier
+    const normalized = (data || []).map((chat) => {
       const msgs = chat.last_msg || [];
       const lastMessage = msgs.length ? msgs[msgs.length - 1] : null;
       return {
@@ -98,16 +94,14 @@ export default function DashboardMessages() {
     setLoading(false);
   };
 
-  // -------------------------------------------------------------
-  // 📡 Realtime
-  // -------------------------------------------------------------
+  // 📡 Realtime : on écoute les messages
   useEffect(() => {
     if (!userId) return;
 
     fetchChats();
 
     const channel = supabase
-      .channel("realtime:chats_client")
+      .channel("realtime:messages_client")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "messages" },
@@ -118,9 +112,6 @@ export default function DashboardMessages() {
     return () => supabase.removeChannel(channel);
   }, [userId]);
 
-  // -------------------------------------------------------------
-  // 🔗 Ouvrir un chat
-  // -------------------------------------------------------------
   const openChat = (chat) => navigate(`/dashboard/messages/${chat.id}`);
 
   return (
