@@ -6,7 +6,7 @@ import NotificationBadge from "@/components/navigation/NotificationBadge";
 
 export default function ProBottomNav() {
   const navigate = useNavigate();
-  const { notifications } = useNotifications();
+  const { notifications, newMessages } = useNotifications();
 
   return (
     <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-lg flex justify-around items-center py-2 md:hidden z-[40]">
@@ -56,7 +56,10 @@ export default function ProBottomNav() {
           }`
         }
       >
-        <MessageSquare size={22} />
+        <div className="relative">
+          <MessageSquare size={22} />
+          {newMessages > 0 && <NotificationBadge count={newMessages} />}
+        </div>
         <span className="mt-1">Messages</span>
       </NavLink>
 

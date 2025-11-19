@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Facebook, Instagram } from "lucide-react";
 import Logo from "@/components/Logo";
+import { useNotifications } from "@/context/NotificationContext"; // ← NEW
 
 export default function Navbar({
   isAuthenticated,
@@ -14,6 +15,8 @@ export default function Navbar({
   isMobile = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
+
+  const { newMessages } = useNotifications(); // ← NEW
 
   // Cache la navbar sur mobile quand on est sur un dashboard
   if (isDashboard && isMobile) return null;
@@ -41,9 +44,15 @@ export default function Navbar({
           {isAuthenticated && (
             <a
               href={isPro ? "/prodashboard/messages" : "/dashboard/messages"}
-              className="hover:text-rose-600 transition-all duration-300 hover:scale-105"
+              className="relative hover:text-rose-600 transition-all duration-300 hover:scale-105"
             >
               Messages
+              {/* BADGE */}
+              {newMessages > 0 && (
+                <span className="absolute -top-2 -right-3 bg-rose-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                  {newMessages}
+                </span>
+              )}
             </a>
           )}
 
@@ -94,7 +103,7 @@ export default function Navbar({
           )}
         </div>
 
-        {/* Burger (mobile) */}
+        {/* Burger menu */}
         <button
           className="md:hidden flex flex-col justify-between w-7 h-6 focus:outline-none"
           onClick={() => setIsOpen(!isOpen)}
@@ -103,17 +112,17 @@ export default function Navbar({
             className={`h-[2px] bg-rose-600 rounded transition-transform duration-300 ease-in-out ${
               isOpen ? "rotate-45 translate-y-[10px]" : ""
             }`}
-          ></span>
+          />
           <span
             className={`h-[2px] bg-rose-600 rounded transition-all duration-300 ease-in-out ${
               isOpen ? "opacity-0" : "opacity-100"
             }`}
-          ></span>
+          />
           <span
             className={`h-[2px] bg-rose-600 rounded transition-transform duration-300 ease-in-out ${
               isOpen ? "-rotate-45 -translate-y-[10px]" : ""
             }`}
-          ></span>
+          />
         </button>
       </div>
 
@@ -135,9 +144,15 @@ export default function Navbar({
           <a
             href={isPro ? "/prodashboard/messages" : "/dashboard/messages"}
             onClick={() => setIsOpen(false)}
-            className="text-sm font-medium hover:text-rose-600 transition-all duration-300"
+            className="relative text-sm font-medium hover:text-rose-600 transition-all duration-300"
           >
             Messages
+            {/* BADGE MOBILE */}
+            {newMessages > 0 && (
+              <span className="absolute -top-1 -right-3 bg-rose-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                {newMessages}
+              </span>
+            )}
           </a>
         )}
 
@@ -179,17 +194,15 @@ export default function Navbar({
             </button>
           </>
         ) : (
-          <>
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                logout();
-              }}
-              className="text-gray-700 border border-gray-200 px-5 py-2 rounded-full text-sm font-semibold hover:bg-gray-100 transition-all duration-300 text-center mx-auto w-fit"
-            >
-              Log out
-            </button>
-          </>
+          <button
+            onClick={() => {
+              setIsOpen(false);
+              logout();
+            }}
+            className="text-gray-700 border border-gray-200 px-5 py-2 rounded-full text-sm font-semibold hover:bg-gray-100 transition-all duration-300 text-center mx-auto w-fit"
+          >
+            Log out
+          </button>
         )}
       </div>
     </nav>

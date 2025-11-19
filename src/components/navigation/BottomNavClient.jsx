@@ -6,7 +6,7 @@ import NotificationBadge from "@/components/navigation/NotificationBadge";
 
 export default function BottomNavClient() {
   const navigate = useNavigate();
-  const { notifications } = useNotifications();
+  const { notifications, newMessages } = useNotifications();
 
   const links = [
     { to: "/dashboard", icon: Home, label: "Home" },
@@ -16,7 +16,13 @@ export default function BottomNavClient() {
       label: "Bookings",
       badge: notifications.clientOffers,
     },
-    { to: "/dashboard/messages", icon: MessageSquare, label: "Messages" },
+    {
+      to: "/dashboard/messages",
+      icon: MessageSquare,
+      label: "Messages",
+      badge: newMessages, // ← NEW
+    },
+
     { to: "/dashboard/more", icon: MoreHorizontal, label: "More" },
   ];
 

@@ -18,12 +18,19 @@ export default function SidebarPro() {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, switchRole } = useUser();
-  const { notifications } = useNotifications();
+  const { notifications, newMessages } = useNotifications();
 
   const menuItems = [
     { name: "Home", icon: Home, path: "/prodashboard" },
     { name: "Missions", icon: Calendar, path: "/prodashboard/missions" },
-    { name: "Messages", icon: MessageSquare, path: "/prodashboard/messages" },
+    {
+      name: "Messages",
+      icon: MessageSquare,
+      path: "/prodashboard/messages",
+      hasBadge: newMessages > 0,
+      badgeCount: newMessages,
+    },
+
     { name: "Payments", icon: CreditCard, path: "/prodashboard/payments" },
     { name: "Account", icon: User, path: "/prodashboard/account" },
     { name: "Settings", icon: Settings, path: "/prodashboard/settings" },
@@ -43,7 +50,7 @@ export default function SidebarPro() {
 
       {/* Liens */}
       <nav className="p-4 space-y-2">
-        {menuItems.map(({ name, icon: Icon, path }) => {
+        {menuItems.map(({ name, icon: Icon, path, hasBadge, badgeCount }) => {
           const isActive = location.pathname === path;
           const isMissions = name === "Missions";
 
@@ -59,32 +66,20 @@ export default function SidebarPro() {
             >
               <div className="relative">
                 <Icon size={20} />
+
+                {/* Badge Missions */}
                 {isMissions && notifications.proBookings > 0 && (
                   <NotificationBadge count={notifications.proBookings} />
                 )}
+
+                {/* Badge Messages */}
+                {hasBadge && badgeCount > 0 && <NotificationBadge count={badgeCount} />}
               </div>
+
               <span>{name}</span>
             </button>
           );
         })}
-
-        {/* Switch vers client */}
-        <button
-          onClick={switchRole}
-          className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-rose-600 font-medium transition-colors mt-4"
-        >
-          <Repeat size={20} />
-          Book a Service
-        </button>
-
-        {/* Déconnexion */}
-        <button
-          onClick={logout}
-          className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-rose-600 font-medium transition-colors mt-6"
-        >
-          <LogOut size={20} />
-          Logout
-        </button>
       </nav>
     </aside>
   );

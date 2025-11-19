@@ -16,9 +16,13 @@ export function NotificationProvider({ children }) {
     payments: 0,
   });
 
-  const [toast, setToast] = useState(null);
+  // 🔔 Nouveau compteur global
+  const [newMessages, setNewMessages] = useState(0);
 
-  // 🔐 Prevent duplicated subscriptions
+  // Chat actuellement ouvert
+  const [chatOpenId, setChatOpenId] = useState(null);
+
+  const [toast, setToast] = useState(null);
   const channelsRef = useRef([]);
 
   const pushNotification = (message, type = "info") => {
@@ -34,23 +38,69 @@ export function NotificationProvider({ children }) {
     );
   };
 
-  // 🔁 Reset badges
   const resetNotification = (type) => {
     setNotifications((prev) => ({ ...prev, [type]: 0 }));
   };
 
+  // Écoute : quel chat est ouvert ?
+  useEffect(() => {
+    const handler = (e) => setChatOpenId(e.detail);
+    window.addEventListener("chat-open", handler);
+    return () => window.removeEventListener("chat-open", handler);
+  }, []);
+
+  // Reset du badge messages quand on ouvre un chat
+  useEffect(() => {
+    if (chatOpenId) setNewMessages(0);
+  }, [chatOpenId]);
+
+  // ------------------------------------------------------
+  // 🔥 Main realtime logic
+  // ------------------------------------------------------
   useEffect(() => {
     if (!user?.id) return;
 
     const userId = user.id;
 
-    // 🔥 Clear previous channels
+    // Nettoyage
     channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
     channelsRef.current = [];
 
-    // ------------------------------------------------------
-    // CLIENT — listens missions + payments
-    // ------------------------------------------------------
+    // -------------------------------
+    // 🔥 Realtime messages
+    // -------------------------------
+    const msgChannel = supabase
+      .channel(`messages_rt_${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          const msg = payload.new;
+
+          // Ignorer mes propres messages
+          if (msg.sender_id === userId) return;
+
+          // Si je suis dans ce chat → ne pas notifier
+          if (msg.chat_id === chatOpenId) return;
+
+          // Sinon : badge + toast
+          setNewMessages((n) => n + 1);
+
+          pushNotification("💬 New message received", "success");
+        }
+      )
+      .subscribe();
+
+    channelsRef.current.push(msgChannel);
+
+    // -------------------------------
+    // CLIENT & PRO realtime existant
+    // (inchangé)
+    // -------------------------------
     const clientChannel = supabase
       .channel(`client_realtime_${userId}`)
       .on(
@@ -87,7 +137,6 @@ export function NotificationProvider({ children }) {
           }
         }
       )
-      // 🔥 NEW : payments realtime for client
       .on(
         "postgres_changes",
         {
@@ -109,9 +158,6 @@ export function NotificationProvider({ children }) {
 
     channelsRef.current.push(clientChannel);
 
-    // ------------------------------------------------------
-    // PRO — listens booking_notifications + missions + payments
-    // ------------------------------------------------------
     const proChannel = supabase
       .channel(`pro_realtime_${userId}`)
       .on(
@@ -157,7 +203,6 @@ export function NotificationProvider({ children }) {
           }
         }
       )
-      // 🔥 NEW : payments realtime for the PRO too
       .on(
         "postgres_changes",
         {
@@ -179,10 +224,16 @@ export function NotificationProvider({ children }) {
       channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
       channelsRef.current = [];
     };
-  }, [user?.id]);
+  }, [user?.id, chatOpenId]);
 
   return (
-    <NotificationContext.Provider value={{ notifications, resetNotification }}>
+    <NotificationContext.Provider
+      value={{
+        notifications,
+        newMessages,
+        resetNotification,
+      }}
+    >
       {children}
       {toast && <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
     </NotificationContext.Provider>

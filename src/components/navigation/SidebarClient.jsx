@@ -17,7 +17,7 @@ import NotificationBadge from "@/components/navigation/NotificationBadge";
 export default function SidebarClient() {
   const navigate = useNavigate();
   const { logout, switchRole, isPro } = useUser();
-  const { notifications } = useNotifications();
+  const { notifications, newMessages } = useNotifications();
 
   const links = [
     { to: "/dashboard", label: "Dashboard", icon: Home },
@@ -32,7 +32,10 @@ export default function SidebarClient() {
       to: "/dashboard/messages",
       label: "Messages",
       icon: MessageSquare,
+      hasBadge: newMessages > 0,
+      badgeCount: newMessages,
     },
+
     { to: "/dashboard/account", label: "Account", icon: User },
     { to: "/dashboard/settings", label: "Settings", icon: Settings },
   ];
