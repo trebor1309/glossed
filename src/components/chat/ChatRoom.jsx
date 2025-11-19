@@ -11,7 +11,9 @@ export default function ChatRoom({ chatId, user }) {
   const [typingUser, setTypingUser] = useState(null);
   const bottomRef = useRef(null);
 
-  // 🔥 MARK AS READ
+  // ------------------------------------------------------
+  // 🔥 FONCTION : Marquer messages comme lus
+  // ------------------------------------------------------
   const markAsRead = async () => {
     try {
       await supabase
@@ -21,11 +23,13 @@ export default function ChatRoom({ chatId, user }) {
         .neq("sender_id", user.id)
         .is("read_at", null);
     } catch (e) {
-      console.error("Failed to mark as read", e);
+      console.error("Failed to mark messages as read:", e);
     }
   };
 
+  // ------------------------------------------------------
   // 📌 Charger messages
+  // ------------------------------------------------------
   const loadMessages = async () => {
     const { data } = await supabase
       .from("messages")
@@ -36,11 +40,14 @@ export default function ChatRoom({ chatId, user }) {
     setMessages(data || []);
   };
 
+  // ------------------------------------------------------
+  // 📌 Initialisation + realtime
+  // ------------------------------------------------------
   useEffect(() => {
     loadMessages();
-    markAsRead(); // Lire tout à l’ouverture
+    markAsRead(); // marquer comme lu directement
 
-    // --- REALTIME : Nouveaux messages ---
+    // --- REALTIME : nouveaux messages ---
     const msgChannel = supabase
       .channel(`realtime:messages:${chatId}`)
       .on(
@@ -54,7 +61,7 @@ export default function ChatRoom({ chatId, user }) {
         (payload) => {
           setMessages((prev) => [...prev, payload.new]);
 
-          // Si message reçu de l'autre → le marquer comme lu
+          // Si c’est un message reçu → marqué comme lu
           if (payload.new.sender_id !== user.id) {
             markAsRead();
           }
@@ -62,7 +69,7 @@ export default function ChatRoom({ chatId, user }) {
       )
       .subscribe();
 
-    // --- REALTIME : Typing indicator ---
+    // --- REALTIME : typing indicator ---
     const typingChannel = supabase
       .channel(`typing:${chatId}`)
       .on("broadcast", { event: "typing" }, ({ payload }) => {
@@ -79,14 +86,25 @@ export default function ChatRoom({ chatId, user }) {
     };
   }, [chatId]);
 
-  // Scroll auto
+  // ------------------------------------------------------
+  // 📌 Marquer comme lus dès que la liste change
+  // ------------------------------------------------------
+  useEffect(() => {
+    if (messages.length > 0) {
+      markAsRead();
+    }
+  }, [messages]);
+
+  // ------------------------------------------------------
+  // 📌 Auto scroll vers le bas
+  // ------------------------------------------------------
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUser]);
 
   return (
     <div className="relative flex flex-col w-full h-full bg-white overflow-hidden">
-      {/* Messages */}
+      {/* Zone messages */}
       <div className="flex-1 overflow-y-auto px-4 py-20 space-y-3">
         {messages.map((msg) => (
           <ChatBubble
@@ -105,12 +123,12 @@ export default function ChatRoom({ chatId, user }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
+      {/* Input fixé */}
       <div className="absolute bottom-0 left-0 w-full bg-white border-t z-10">
         <ChatInput chatId={chatId} user={user} />
       </div>
 
-      {/* Viewer */}
+      {/* Viewer image */}
       {viewerUrl && <ImageViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />}
     </div>
   );

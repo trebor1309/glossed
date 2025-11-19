@@ -15,9 +15,11 @@ export default function DashboardMessages() {
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // 📌 Charger toutes les conversations du client
   const fetchChats = async () => {
     setLoading(true);
 
+    // --- Charger chats + dernier message
     const { data, error } = await supabase
       .from("chats")
       .select(
@@ -35,7 +37,29 @@ export default function DashboardMessages() {
       .eq("client_id", userId)
       .order("updated_at", { ascending: false });
 
-    if (!error) setChats(data || []);
+    if (error) {
+      setChats([]);
+      setLoading(false);
+      return;
+    }
+
+    const chatList = data || [];
+
+    // --- Ajouter unread_count à chaque chat
+    const chatsWithUnread = await Promise.all(
+      chatList.map(async (chat) => {
+        const { count } = await supabase
+          .from("messages")
+          .select("id", { count: "exact", head: true })
+          .eq("chat_id", chat.id)
+          .is("read_at", null)
+          .eq("sender_id", chat.pro_id); // non-lu = messages venant du pro
+
+        return { ...chat, unread_count: count };
+      })
+    );
+
+    setChats(chatsWithUnread);
     setLoading(false);
   };
 
@@ -43,6 +67,7 @@ export default function DashboardMessages() {
     if (!userId) return;
     fetchChats();
 
+    // --- REALTIME ---
     const channel = supabase
       .channel("realtime:chats_client")
       .on(

@@ -18,6 +18,7 @@ export default function ProDashboardMessages() {
   const fetchChats = async () => {
     setLoading(true);
 
+    // --- Charger chats + info client
     const { data, error } = await supabase
       .from("chats")
       .select(
@@ -35,7 +36,29 @@ export default function ProDashboardMessages() {
       .eq("pro_id", proId)
       .order("updated_at", { ascending: false });
 
-    if (!error) setChats(data || []);
+    if (error) {
+      setChats([]);
+      setLoading(false);
+      return;
+    }
+
+    const chatList = data || [];
+
+    // --- Ajouter unread_count
+    const chatsWithUnread = await Promise.all(
+      chatList.map(async (chat) => {
+        const { count } = await supabase
+          .from("messages")
+          .select("id", { count: "exact", head: true })
+          .eq("chat_id", chat.id)
+          .is("read_at", null)
+          .eq("sender_id", chat.client_id); // non-lu = messages venant du client
+
+        return { ...chat, unread_count: count };
+      })
+    );
+
+    setChats(chatsWithUnread);
     setLoading(false);
   };
 
