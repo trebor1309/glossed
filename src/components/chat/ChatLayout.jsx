@@ -5,24 +5,24 @@ export default function ChatLayout({ leftPanel }) {
   const isMobile = useIsMobile(768);
   const location = useLocation();
 
-  // Detect chat route correctly
   const isChatPage =
     location.pathname.match(/\/dashboard\/messages\/[^/]+$/) ||
     location.pathname.match(/\/prodashboard\/messages\/[^/]+$/);
 
   return (
     <div className="w-full h-[calc(100vh-6rem)] flex overflow-hidden bg-white">
-      {/* --- DESKTOP SPLIT VIEW --- */}
+      {/* --- DESKTOP VIEW --- */}
       {!isMobile && (
-        <div className="flex flex-1 overflow-hidden">
-          {/* Inbox */}
-          <div className="w-1/3 min-w-[280px] max-w-[380px] border-r overflow-y-auto">
-            {leftPanel}
-          </div>
+        <div className="flex w-full justify-center">
+          {/* 🔥 Wrapper largeur max + centré */}
+          <div className="flex w-full max-w-5xl h-full">
+            {/* Inbox */}
+            <div className="w-1/3 min-w-[280px] max-w-[380px] border-r overflow-y-auto">
+              {leftPanel}
+            </div>
 
-          {/* Chat */}
-          <div className="flex-1 overflow-y-auto flex justify-center">
-            <div className="w-full max-w-3xl">
+            {/* Chat */}
+            <div className="flex-1 overflow-y-auto">
               <Outlet />
             </div>
           </div>
@@ -33,10 +33,8 @@ export default function ChatLayout({ leftPanel }) {
       {isMobile && (
         <>
           {!isChatPage ? (
-            // Inbox only
             <div className="flex-1 overflow-y-auto">{leftPanel}</div>
           ) : (
-            // Chat only
             <div className="flex-1 overflow-y-auto">
               <Outlet />
             </div>
