@@ -16,13 +16,12 @@ export default function DashboardMessages() {
   const [unreadMap, setUnreadMap] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // 🔍 Non-lus côté client
+  // -------------------------------------------------------------
+  // 🔢 Non-lus côté CLIENT
+  // -------------------------------------------------------------
   const fetchUnreadMap = async (chatRows) => {
     const ids = chatRows.map((c) => c.id);
-    if (!ids.length || !userId) {
-      setUnreadMap({});
-      return;
-    }
+    if (!ids.length || !userId) return setUnreadMap({});
 
     const { data, error } = await supabase
       .from("messages")
@@ -37,13 +36,14 @@ export default function DashboardMessages() {
     }
 
     const map = {};
-    for (const row of data || []) {
-      map[row.chat_id] = true;
-    }
+    for (const row of data || []) map[row.chat_id] = true;
+
     setUnreadMap(map);
   };
 
-  // 📌 Charger les conversations + vrai dernier message
+  // -------------------------------------------------------------
+  // 📌 Charger les chats + dernier message
+  // -------------------------------------------------------------
   const fetchChats = async () => {
     setLoading(true);
 
@@ -57,16 +57,13 @@ export default function DashboardMessages() {
         client_id,
         updated_at,
         missions:mission_id ( service ),
-        pro:pro_id (
-          first_name,
-          last_name,
-          business_name,
-          profile_photo
-        ),
+        pro:pro_id ( first_name, last_name, business_name, profile_photo ),
         last_msg:messages!messages_chat_id_fkey (
           content,
           attachment_url,
-          created_at
+          created_at,
+          read_at,
+          sender_id
         )
       `
       )
@@ -81,14 +78,10 @@ export default function DashboardMessages() {
       return;
     }
 
-    // last_msg est un tableau → on garde le dernier
     const normalized = (data || []).map((chat) => {
       const msgs = chat.last_msg || [];
       const lastMessage = msgs.length ? msgs[msgs.length - 1] : null;
-      return {
-        ...chat,
-        last_message_obj: lastMessage,
-      };
+      return { ...chat, last_message_obj: lastMessage };
     });
 
     setChats(normalized);
@@ -96,7 +89,9 @@ export default function DashboardMessages() {
     setLoading(false);
   };
 
-  // 📡 Realtime : on écoute les messages
+  // -------------------------------------------------------------
+  // 📡 Realtime : INSERT + UPDATE(read_at)
+  // -------------------------------------------------------------
   useEffect(() => {
     if (!userId) return;
 
@@ -105,19 +100,31 @@ export default function DashboardMessages() {
     const channel = supabase
       .channel("realtime:messages_client")
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
-        const chatId = payload.new.chat_id;
+        const msg = payload.new;
+        const chatId = msg.chat_id;
 
         setChats((prev) =>
-          prev.map((c) =>
-            c.id === chatId
-              ? { ...c, updated_at: payload.new.created_at, last_message_obj: payload.new }
-              : c
+          prev.map((chat) =>
+            chat.id === chatId
+              ? { ...chat, updated_at: msg.created_at, last_message_obj: msg }
+              : chat
           )
         );
 
-        // Met à jour le unreadMap sans refetch
-        if (payload.new.sender_id !== userId) {
-          setUnreadMap((prev) => ({ ...prev, [chatId]: true }));
+        if (payload.eventType === "INSERT") {
+          if (msg.sender_id !== userId) {
+            setUnreadMap((prev) => ({ ...prev, [chatId]: true }));
+          }
+        }
+
+        if (payload.eventType === "UPDATE") {
+          if (msg.sender_id !== userId && msg.read_at !== null) {
+            setUnreadMap((prev) => {
+              const copy = { ...prev };
+              delete copy[chatId];
+              return copy;
+            });
+          }
         }
       })
       .subscribe();

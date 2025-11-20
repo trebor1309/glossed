@@ -21,10 +21,7 @@ export default function ProDashboardMessages() {
   // -------------------------------------------------------------
   const fetchUnreadMap = async (chatRows) => {
     const ids = chatRows.map((c) => c.id);
-    if (!ids.length || !proId) {
-      setUnreadMap({});
-      return;
-    }
+    if (!ids.length || !proId) return setUnreadMap({});
 
     const { data, error } = await supabase
       .from("messages")
@@ -45,7 +42,7 @@ export default function ProDashboardMessages() {
   };
 
   // -------------------------------------------------------------
-  // 📌 Charger les chats + dernier message réel
+  // 📌 Charger les chats + dernier message (last_message_obj)
   // -------------------------------------------------------------
   const fetchChats = async () => {
     setLoading(true);
@@ -64,7 +61,9 @@ export default function ProDashboardMessages() {
         last_msg:messages!messages_chat_id_fkey (
           content,
           attachment_url,
-          created_at
+          created_at,
+          read_at,
+          sender_id
         )
       `
       )
@@ -82,21 +81,16 @@ export default function ProDashboardMessages() {
     const normalized = (data || []).map((chat) => {
       const msgs = chat.last_msg || [];
       const lastMessage = msgs.length ? msgs[msgs.length - 1] : null;
-
-      return {
-        ...chat,
-        last_message_obj: lastMessage,
-      };
+      return { ...chat, last_message_obj: lastMessage };
     });
 
     setChats(normalized);
     await fetchUnreadMap(normalized);
-
     setLoading(false);
   };
 
   // -------------------------------------------------------------
-  // 📡 Realtime : mises à jour douces, pas de flicker
+  // 📡 Realtime : INSERT + UPDATE (read_at)
   // -------------------------------------------------------------
   useEffect(() => {
     if (!proId) return;
@@ -106,24 +100,38 @@ export default function ProDashboardMessages() {
     const channel = supabase
       .channel("realtime:messages_pro")
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
-        const chatId = payload.new.chat_id;
+        const msg = payload.new;
+        const chatId = msg.chat_id;
 
-        // 🔄 Met à jour uniquement le chat concerné
+        // --- Mise à jour du dernier message dans la liste ---
         setChats((prev) =>
           prev.map((chat) =>
             chat.id === chatId
               ? {
                   ...chat,
-                  updated_at: payload.new.created_at,
-                  last_message_obj: payload.new,
+                  updated_at: msg.created_at,
+                  last_message_obj: msg,
                 }
               : chat
           )
         );
 
-        // 🟥 Badge "non-lu" si le PRO est le destinataire
-        if (payload.new.sender_id !== proId) {
-          setUnreadMap((prev) => ({ ...prev, [chatId]: true }));
+        // --- INSERT : nouveau message ---
+        if (payload.eventType === "INSERT") {
+          if (msg.sender_id !== proId) {
+            setUnreadMap((prev) => ({ ...prev, [chatId]: true }));
+          }
+        }
+
+        // --- UPDATE : read_at vient d'être modifié ---
+        if (payload.eventType === "UPDATE") {
+          if (msg.sender_id !== proId && msg.read_at !== null) {
+            setUnreadMap((prev) => {
+              const copy = { ...prev };
+              delete copy[chatId];
+              return copy;
+            });
+          }
         }
       })
       .subscribe();
