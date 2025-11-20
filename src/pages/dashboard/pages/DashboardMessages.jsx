@@ -49,7 +49,8 @@ export default function DashboardMessages() {
 
     const { data, error } = await supabase
       .from("chats")
-      .select(`
+      .select(
+        `
         id,
         mission_id,
         pro_id,
@@ -67,7 +68,8 @@ export default function DashboardMessages() {
           attachment_url,
           created_at
         )
-      `)
+      `
+      )
       .eq("client_id", userId)
       .order("updated_at", { ascending: false });
 
@@ -102,11 +104,22 @@ export default function DashboardMessages() {
 
     const channel = supabase
       .channel("realtime:messages_client")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "messages" },
-        () => fetchChats()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
+        const chatId = payload.new.chat_id;
+
+        setChats((prev) =>
+          prev.map((c) =>
+            c.id === chatId
+              ? { ...c, updated_at: payload.new.created_at, last_message_obj: payload.new }
+              : c
+          )
+        );
+
+        // Met à jour le unreadMap sans refetch
+        if (payload.new.sender_id !== userId) {
+          setUnreadMap((prev) => ({ ...prev, [chatId]: true }));
+        }
+      })
       .subscribe();
 
     return () => supabase.removeChannel(channel);
@@ -123,12 +136,7 @@ export default function DashboardMessages() {
       {!loading && chats.length === 0 && <ChatEmptyState />}
 
       {!loading && chats.length > 0 && (
-        <ChatList
-          chats={chats}
-          onOpenChat={openChat}
-          userRole="client"
-          unreadMap={unreadMap}
-        />
+        <ChatList chats={chats} onOpenChat={openChat} userRole="client" unreadMap={unreadMap} />
       )}
     </div>
   );

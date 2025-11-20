@@ -16,7 +16,9 @@ export default function ProDashboardMessages() {
   const [unreadMap, setUnreadMap] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // 🔢 Non-lus côté pro
+  // -------------------------------------------------------------
+  // 🔢 Non-lus côté PRO
+  // -------------------------------------------------------------
   const fetchUnreadMap = async (chatRows) => {
     const ids = chatRows.map((c) => c.id);
     if (!ids.length || !proId) {
@@ -37,36 +39,35 @@ export default function ProDashboardMessages() {
     }
 
     const map = {};
-    for (const row of data || []) {
-      map[row.chat_id] = true;
-    }
+    for (const row of data || []) map[row.chat_id] = true;
+
     setUnreadMap(map);
   };
 
-  // 📌 Charger les chats + vrai dernier message
+  // -------------------------------------------------------------
+  // 📌 Charger les chats + dernier message réel
+  // -------------------------------------------------------------
   const fetchChats = async () => {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("chats")
-      .select(`
+      .select(
+        `
         id,
         mission_id,
         pro_id,
         client_id,
         updated_at,
         missions:mission_id ( service ),
-        client:client_id (
-          first_name,
-          last_name,
-          profile_photo
-        ),
+        client:client_id ( first_name, last_name, profile_photo ),
         last_msg:messages!messages_chat_id_fkey (
           content,
           attachment_url,
           created_at
         )
-      `)
+      `
+      )
       .eq("pro_id", proId)
       .order("updated_at", { ascending: false });
 
@@ -81,6 +82,7 @@ export default function ProDashboardMessages() {
     const normalized = (data || []).map((chat) => {
       const msgs = chat.last_msg || [];
       const lastMessage = msgs.length ? msgs[msgs.length - 1] : null;
+
       return {
         ...chat,
         last_message_obj: lastMessage,
@@ -89,10 +91,13 @@ export default function ProDashboardMessages() {
 
     setChats(normalized);
     await fetchUnreadMap(normalized);
+
     setLoading(false);
   };
 
-  // 📡 Realtime
+  // -------------------------------------------------------------
+  // 📡 Realtime : mises à jour douces, pas de flicker
+  // -------------------------------------------------------------
   useEffect(() => {
     if (!proId) return;
 
@@ -100,11 +105,27 @@ export default function ProDashboardMessages() {
 
     const channel = supabase
       .channel("realtime:messages_pro")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "messages" },
-        () => fetchChats()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
+        const chatId = payload.new.chat_id;
+
+        // 🔄 Met à jour uniquement le chat concerné
+        setChats((prev) =>
+          prev.map((chat) =>
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  updated_at: payload.new.created_at,
+                  last_message_obj: payload.new,
+                }
+              : chat
+          )
+        );
+
+        // 🟥 Badge "non-lu" si le PRO est le destinataire
+        if (payload.new.sender_id !== proId) {
+          setUnreadMap((prev) => ({ ...prev, [chatId]: true }));
+        }
+      })
       .subscribe();
 
     return () => supabase.removeChannel(channel);
@@ -121,12 +142,7 @@ export default function ProDashboardMessages() {
       {!loading && chats.length === 0 && <ChatEmptyState />}
 
       {!loading && chats.length > 0 && (
-        <ChatList
-          chats={chats}
-          onOpenChat={openChat}
-          userRole="pro"
-          unreadMap={unreadMap}
-        />
+        <ChatList chats={chats} onOpenChat={openChat} userRole="pro" unreadMap={unreadMap} />
       )}
     </div>
   );

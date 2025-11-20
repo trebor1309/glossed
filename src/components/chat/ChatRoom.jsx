@@ -110,8 +110,10 @@ export default function ChatRoom({ chatId, user }) {
   // 📌 Auto scroll
   // ------------------------------------------------------
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typingUser]);
+    setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 0);
+  }, [messages]);
 
   return (
     <div className="relative flex flex-col w-full h-full bg-white overflow-hidden">
