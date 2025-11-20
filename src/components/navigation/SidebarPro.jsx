@@ -36,6 +36,8 @@ export default function SidebarPro() {
     { name: "Settings", icon: Settings, path: "/prodashboard/settings" },
   ];
 
+  const missionsBadge = (notifications.proBookings || 0) + (notifications.proCancellations || 0);
+
   return (
     <aside className="hidden md:block bg-white shadow-md border-r border-gray-100 w-64 sticky top-0 self-start">
       {/* Logo */}
@@ -68,9 +70,7 @@ export default function SidebarPro() {
                 <Icon size={20} />
 
                 {/* Badge Missions */}
-                {isMissions && notifications.proBookings > 0 && (
-                  <NotificationBadge count={notifications.proBookings} />
-                )}
+                {isMissions && missionsBadge > 0 && <NotificationBadge count={missionsBadge} />}
 
                 {/* Badge Messages */}
                 {hasBadge && badgeCount > 0 && <NotificationBadge count={badgeCount} />}

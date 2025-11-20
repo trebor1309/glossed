@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "@/context/UserContext"; // ← ajouté
+import { useUser } from "@/context/UserContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { supabase } from "@/lib/supabaseClient";
 
 const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
@@ -29,16 +30,60 @@ const fmtDate = (d) => {
 export default function ProMissionDetailsModal({ booking, onClose, onEvaluate }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { isPro } = useUser(); // ← ajouté
+  const { user, isPro } = useUser();
+  const { pushNotification } = useNotifications();
 
   if (!booking) return null;
 
   const isMission = typeof booking.price !== "undefined" || typeof booking.time !== "undefined";
   const status = booking.status;
-  const showChat = status === "confirmed";
+  const showChat = status === "confirmed" || status === "cancel_requested";
 
   const dateLabel = isMission ? fmtDate(booking.date) : booking.date;
   const timeLabel = isMission ? fmtTime(booking.time) : booking.time_slot;
+
+  const ensureChatAndSendMessage = async (message) => {
+    if (!booking?.id || !user?.id) return;
+
+    const { data: existing } = await supabase
+      .from("chats")
+      .select("id")
+      .eq("mission_id", booking.id)
+      .maybeSingle();
+
+    let chatId = existing?.id;
+
+    if (!chatId) {
+      const { data: created, error: createError } = await supabase
+        .from("chats")
+        .insert([
+          {
+            mission_id: booking.id,
+            pro_id: booking.pro_id,
+            client_id: booking.client_id,
+          },
+        ])
+        .select("id")
+        .single();
+
+      if (createError) {
+        console.error("Error creating chat:", createError);
+        return;
+      }
+
+      chatId = created.id;
+    }
+
+    const { error: msgError } = await supabase.from("messages").insert({
+      chat_id: chatId,
+      sender_id: user.id,
+      content: message,
+    });
+
+    if (msgError) {
+      console.error("Error sending system message:", msgError);
+    }
+  };
 
   const handleOpenChat = async () => {
     if (!booking?.id) return;
@@ -46,7 +91,6 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
     try {
       let chatId;
 
-      // 1) Existing chat?
       const { data: existing } = await supabase
         .from("chats")
         .select("id")
@@ -55,7 +99,6 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
       chatId = existing?.id;
 
-      // 2) Create chat if needed
       if (!chatId) {
         const { data: created, error: createError } = await supabase
           .from("chats")
@@ -77,7 +120,6 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
         chatId = created.id;
       }
 
-      // 3) Redirect based on role
       if (isPro) {
         navigate(`/prodashboard/messages/${chatId}`);
       } else {
@@ -85,6 +127,88 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
       }
     } catch (err) {
       console.error("Unexpected error while opening chat:", err);
+    }
+  };
+
+  const handleApproveCancellation = async () => {
+    if (!booking?.id) return;
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .from("missions")
+        .update({ status: "cancelled" })
+        .eq("id", booking.id);
+
+      if (error) {
+        console.error("Error approving cancellation:", error);
+        pushNotification("Unable to approve cancellation.", "error");
+        return;
+      }
+
+      await ensureChatAndSendMessage(
+        "The pro approved the cancellation. The booking has been cancelled."
+      );
+
+      pushNotification("Cancellation approved.", "success");
+      onClose?.();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectCancellation = async () => {
+    if (!booking?.id) return;
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .from("missions")
+        .update({ status: "confirmed" })
+        .eq("id", booking.id);
+
+      if (error) {
+        console.error("Error rejecting cancellation:", error);
+        pushNotification("Unable to reject cancellation.", "error");
+        return;
+      }
+
+      await ensureChatAndSendMessage(
+        "The pro rejected the cancellation request. The booking remains confirmed."
+      );
+
+      pushNotification("Cancellation request rejected.", "success");
+      onClose?.();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProCancel = async () => {
+    if (!booking?.id) return;
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .from("missions")
+        .update({ status: "cancelled" })
+        .eq("id", booking.id);
+
+      if (error) {
+        console.error("Error cancelling booking:", error);
+        pushNotification("Unable to cancel booking.", "error");
+        return;
+      }
+
+      await ensureChatAndSendMessage("The pro cancelled this reservation.");
+
+      pushNotification("Booking cancelled.", "success");
+      onClose?.();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -157,14 +281,26 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
                     ? "bg-blue-100 text-blue-700"
                     : status === "confirmed"
                       ? "bg-green-100 text-green-700"
-                      : status === "completed"
-                        ? "bg-rose-100 text-rose-700"
-                        : "bg-gray-100 text-gray-600"
+                      : status === "cancel_requested"
+                        ? "bg-orange-100 text-orange-700"
+                        : status === "completed"
+                          ? "bg-rose-100 text-rose-700"
+                          : "bg-gray-100 text-gray-600"
               }`}
             >
               {status}
             </span>
           </div>
+
+          {status === "cancel_requested" && (
+            <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-start gap-2">
+              <span className="mt-0.5">⚠️</span>
+              <span>
+                The client requested a cancellation for this reservation. Please approve or keep the
+                booking below.
+              </span>
+            </p>
+          )}
         </div>
 
         {/* ACTIONS */}
@@ -180,6 +316,38 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
                 <Trash2 size={16} /> Cancel proposal
               </button>
             </>
+          )}
+
+          {/* Cancellation requested: approve / keep */}
+          {status === "cancel_requested" && (
+            <>
+              <button
+                onClick={handleApproveCancellation}
+                disabled={loading}
+                className="px-4 py-2 bg-red-500 text-white rounded-full font-semibold hover:bg-red-600 transition disabled:opacity-60 flex items-center gap-2"
+              >
+                <Trash2 size={16} /> Approve cancellation
+              </button>
+
+              <button
+                onClick={handleRejectCancellation}
+                disabled={loading}
+                className="px-4 py-2 border border-gray-300 text-gray-600 rounded-full font-medium hover:bg-gray-100 transition disabled:opacity-60"
+              >
+                Keep booking
+              </button>
+            </>
+          )}
+
+          {/* Pro cancel direct (booking confirmé) */}
+          {status === "confirmed" && (
+            <button
+              onClick={handleProCancel}
+              disabled={loading}
+              className="px-4 py-2 border border-red-200 text-red-600 rounded-full font-medium hover:bg-red-50 transition flex items-center gap-2 disabled:opacity-60"
+            >
+              <Trash2 size={16} /> Cancel booking
+            </button>
           )}
 
           {/* Chat */}

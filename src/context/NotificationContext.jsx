@@ -1,4 +1,4 @@
-// 📄 src/context/NotificationContext.jsx
+// src/context/NotificationContext.jsx
 import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -14,12 +14,11 @@ export function NotificationProvider({ children }) {
     clientOffers: 0,
     proBookings: 0,
     payments: 0,
+    proCancellations: 0,
+    clientCancellations: 0,
   });
 
-  // 🔔 Nouveau compteur global
   const [newMessages, setNewMessages] = useState(0);
-
-  // Chat actuellement ouvert
   const [chatOpenId, setChatOpenId] = useState(null);
 
   const [toast, setToast] = useState(null);
@@ -42,27 +41,21 @@ export function NotificationProvider({ children }) {
     setNotifications((prev) => ({ ...prev, [type]: 0 }));
   };
 
-  // Écoute : quel chat est ouvert ?
   useEffect(() => {
     const handler = (e) => setChatOpenId(e.detail);
     window.addEventListener("chat-open", handler);
     return () => window.removeEventListener("chat-open", handler);
   }, []);
 
-  // Reset du badge messages quand on ouvre un chat
   useEffect(() => {
     if (chatOpenId) setNewMessages(0);
   }, [chatOpenId]);
 
-  // ------------------------------------------------------
-  // 🔥 Main realtime logic
-  // ------------------------------------------------------
   useEffect(() => {
     if (!user?.id) return;
 
     const userId = user.id;
 
-    // Nettoyage
     channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
     channelsRef.current = [];
 
@@ -81,15 +74,10 @@ export function NotificationProvider({ children }) {
         (payload) => {
           const msg = payload.new;
 
-          // Ignorer mes propres messages
           if (msg.sender_id === userId) return;
-
-          // Si je suis dans ce chat → ne pas notifier
           if (msg.chat_id === chatOpenId) return;
 
-          // Sinon : badge + toast
           setNewMessages((n) => n + 1);
-
           pushNotification("💬 New message received", "success");
         }
       )
@@ -98,8 +86,7 @@ export function NotificationProvider({ children }) {
     channelsRef.current.push(msgChannel);
 
     // -------------------------------
-    // CLIENT & PRO realtime existant
-    // (inchangé)
+    // CLIENT realtime
     // -------------------------------
     const clientChannel = supabase
       .channel(`client_realtime_${userId}`)
@@ -131,8 +118,19 @@ export function NotificationProvider({ children }) {
           filter: `client_id=eq.${userId}`,
         },
         (payload) => {
-          if (payload.new.status === "confirmed") {
+          const { old, new: updated } = payload;
+
+          if (updated.status === "confirmed" && old.status !== "confirmed") {
             pushNotification("💳 Your booking was confirmed!", "success");
+            broadcast("missions", "UPDATE", payload);
+          }
+
+          if (updated.status === "cancelled" && old.status !== "cancelled") {
+            setNotifications((prev) => ({
+              ...prev,
+              clientCancellations: (prev.clientCancellations || 0) + 1,
+            }));
+            pushNotification("⚠️ Your booking was cancelled.", "info");
             broadcast("missions", "UPDATE", payload);
           }
         }
@@ -158,6 +156,9 @@ export function NotificationProvider({ children }) {
 
     channelsRef.current.push(clientChannel);
 
+    // -------------------------------
+    // PRO realtime
+    // -------------------------------
     const proChannel = supabase
       .channel(`pro_realtime_${userId}`)
       .on(
@@ -194,10 +195,21 @@ export function NotificationProvider({ children }) {
           filter: `pro_id=eq.${userId}`,
         },
         (payload) => {
-          if (payload.new.status === "confirmed") {
+          const { old, new: updated } = payload;
+
+          if (updated.status === "confirmed" && old.status !== "confirmed") {
+            pushNotification(`💰 Your offer for "${updated.service}" has been paid!`, "success");
+            broadcast("missions", "UPDATE", payload);
+          }
+
+          if (updated.status === "cancel_requested" && old.status !== "cancel_requested") {
+            setNotifications((prev) => ({
+              ...prev,
+              proCancellations: (prev.proCancellations || 0) + 1,
+            }));
             pushNotification(
-              `💰 Your offer for "${payload.new.service}" has been paid!`,
-              "success"
+              `⚠️ The client requested a cancellation for "${updated.service}".`,
+              "info"
             );
             broadcast("missions", "UPDATE", payload);
           }
@@ -232,6 +244,7 @@ export function NotificationProvider({ children }) {
         notifications,
         newMessages,
         resetNotification,
+        pushNotification,
       }}
     >
       {children}

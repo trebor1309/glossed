@@ -8,6 +8,8 @@ export default function ProBottomNav() {
   const navigate = useNavigate();
   const { notifications, newMessages } = useNotifications();
 
+  const missionsBadge = (notifications.proBookings || 0) + (notifications.proCancellations || 0);
+
   return (
     <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-lg flex justify-around items-center py-2 md:hidden z-[40]">
       {/* 🔘 Missions bouton central */}
@@ -19,7 +21,7 @@ export default function ProBottomNav() {
           title="My Missions"
         >
           <Calendar className="h-6 w-6 text-white" />
-          {notifications.proBookings > 0 && <NotificationBadge count={notifications.proBookings} />}
+          {missionsBadge > 0 && <NotificationBadge count={missionsBadge} />}
         </button>
       </div>
 
@@ -47,7 +49,6 @@ export default function ProBottomNav() {
         <span className="mt-1">Payments</span>
       </NavLink>
 
-      {/* 👉 Messages à la place de Profile */}
       <NavLink
         to="/prodashboard/messages"
         className={({ isActive }) =>

@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { X, Calendar, Clock, MapPin, FileText, MessageSquare, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "@/context/UserContext"; // ← ajouté
+import { useUser } from "@/context/UserContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { supabase } from "@/lib/supabaseClient";
 
 const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
@@ -19,7 +20,8 @@ const fmtDate = (d) => {
 export default function ClientReservationDetailsModal({ booking, onClose, onCancel, onEvaluate }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { isPro } = useUser(); // ← ajouté
+  const { user } = useUser();
+  const { pushNotification } = useNotifications();
 
   if (!booking) return null;
 
@@ -30,13 +32,58 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
   const dateLabel = isMission ? fmtDate(booking.date) : booking.date;
   const timeLabel = isMission ? fmtTime(booking.time) : booking.time_slot;
 
+  const ensureChatAndSendMessage = async (message) => {
+    if (!booking?.id || !user?.id) return;
+
+    // 1) Check for existing chat
+    const { data: existing } = await supabase
+      .from("chats")
+      .select("id")
+      .eq("mission_id", booking.id)
+      .maybeSingle();
+
+    let chatId = existing?.id;
+
+    // 2) Create chat if missing
+    if (!chatId) {
+      const { data: created, error: createError } = await supabase
+        .from("chats")
+        .insert([
+          {
+            mission_id: booking.id,
+            pro_id: booking.pro_id,
+            client_id: booking.client_id,
+          },
+        ])
+        .select("id")
+        .single();
+
+      if (createError) {
+        console.error("Error creating chat:", createError);
+        return;
+      }
+
+      chatId = created.id;
+    }
+
+    // 3) Send message in chat
+    const { error: msgError } = await supabase.from("messages").insert({
+      chat_id: chatId,
+      sender_id: user.id,
+      content: message,
+    });
+
+    if (msgError) {
+      console.error("Error sending cancellation message:", msgError);
+    }
+  };
+
   const handleOpenChat = async () => {
     if (!booking?.id) return;
 
     try {
       let chatId;
 
-      // 1) Check for existing chat
       const { data: existing } = await supabase
         .from("chats")
         .select("id")
@@ -45,7 +92,6 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
 
       chatId = existing?.id;
 
-      // 2) Create chat if missing
       if (!chatId) {
         const { data: created, error: createError } = await supabase
           .from("chats")
@@ -67,10 +113,38 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
         chatId = created.id;
       }
 
-      // 3) Navigate depending on role
       navigate(`/dashboard/messages/${chatId}`);
     } catch (err) {
       console.error("Unexpected error while opening chat:", err);
+    }
+  };
+
+  const handleRequestCancellation = async () => {
+    if (!booking?.id || !user?.id) return;
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .from("missions")
+        .update({
+          status: "cancel_requested",
+          cancel_requested_at: new Date().toISOString(),
+        })
+        .eq("id", booking.id);
+
+      if (error) {
+        console.error("Error requesting cancellation:", error);
+        pushNotification("Unable to request cancellation.", "error");
+        return;
+      }
+
+      await ensureChatAndSendMessage("The client requested a cancellation for this reservation.");
+
+      pushNotification("Your cancellation request was sent to the pro.", "success");
+      onClose?.();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -143,14 +217,28 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
                     ? "bg-blue-100 text-blue-700"
                     : status === "confirmed"
                       ? "bg-green-100 text-green-700"
-                      : status === "completed"
-                        ? "bg-rose-100 text-rose-700"
-                        : "bg-gray-100 text-gray-600"
+                      : status === "cancel_requested"
+                        ? "bg-orange-100 text-orange-700"
+                        : status === "completed"
+                          ? "bg-rose-100 text-rose-700"
+                          : "bg-gray-100 text-gray-600"
               }`}
             >
               {status}
             </span>
           </div>
+
+          {/* Discret: demander une annulation (réservation confirmée) */}
+          {status === "confirmed" && (
+            <button
+              type="button"
+              onClick={handleRequestCancellation}
+              disabled={loading}
+              className="mt-3 text-xs text-red-500 underline opacity-70 hover:opacity-100 disabled:opacity-40"
+            >
+              Request cancellation
+            </button>
+          )}
         </div>
 
         {/* ACTION BUTTONS */}
