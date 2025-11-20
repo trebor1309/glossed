@@ -105,8 +105,15 @@ export default function DashboardLayout() {
             </div>
           </header>
 
-          <main className="p-6 pb-20 md:pb-6 flex-1">
-            <Outlet />
+          <main className="p-6 pb-20 md:pb-6 flex-1 flex justify-center">
+            <div
+              className={`
+      w-full 
+      ${location.pathname.includes("messages") ? "max-w-5xl" : "max-w-6xl"}
+    `}
+            >
+              <Outlet />
+            </div>
           </main>
         </div>
       </div>
