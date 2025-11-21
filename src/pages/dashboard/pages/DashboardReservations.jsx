@@ -1,5 +1,3 @@
-// 📄 src/pages/dashboard/pages/DashboardReservations.jsx
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -32,7 +30,7 @@ export default function DashboardReservations() {
   const [sortBy, setSortBy] = useState("date_upcoming");
 
   const [selectedBooking, setSelectedBooking] = useState(null); // for Offers
-  const [selectedConfirmedBooking, setSelectedConfirmedBooking] = useState(null); // NEW ⭐
+  const [selectedConfirmedBooking, setSelectedConfirmedBooking] = useState(null);
 
   const [showOffersModal, setShowOffersModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -59,11 +57,18 @@ export default function DashboardReservations() {
         .from("missions")
         .select("*")
         .eq("client_id", clientId)
-        .in("status", ["proposed", "offers", "confirmed", "completed", "cancelled"])
+        .in("status", [
+          "proposed",
+          "offers",
+          "confirmed",
+          "completed",
+          "cancelled",
+          "cancel_requested",
+        ])
         .order("date", { ascending: true });
 
       const confirmedBookingIds = (missionsData || [])
-        .filter((m) => m.status === "confirmed")
+        .filter((m) => m.status === "confirmed" || m.status === "cancel_requested")
         .map((m) => m.booking_id);
 
       const cleanedBookings = (bookingsData || []).filter(
@@ -163,11 +168,14 @@ export default function DashboardReservations() {
   const grouped = {
     pending: sortList(display.filter((b) => b.status === "pending")),
     offers: sortList(display.filter((b) => ["proposed", "offers"].includes(b.status))),
-    confirmed: sortList(display.filter((b) => b.status === "confirmed")),
+    confirmed: sortList(
+      display.filter((b) => b.status === "confirmed" || b.status === "cancel_requested")
+    ),
     completed: sortList(display.filter((b) => b.status === "completed")),
     cancelled: sortList(display.filter((b) => b.status === "cancelled")),
   };
 
+  // Ne pas montrer un pending doublon d'une mission déjà confirmée/cancel_requested
   grouped.pending = grouped.pending.filter(
     (b) => !grouped.confirmed.some((c) => c.booking_id === b.id)
   );
@@ -186,7 +194,7 @@ export default function DashboardReservations() {
      🎨 RENDER
   ----------------------------------------------------------- */
   return (
-    <section className="mt-10 max-w-4xl mx-auto p-4 space-y-6">
+    <section className="mt-10 max-w-4xl mx_auto p-4 space-y-6">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800 text-center sm:text-left">
           My Reservations
@@ -268,7 +276,7 @@ export default function DashboardReservations() {
         color="text-blue-600"
         data={grouped.confirmed}
         empty="You have no confirmed appointments."
-        onViewConfirmed={(b) => setSelectedConfirmedBooking(b)} // ⭐ NEW
+        onViewConfirmed={(b) => setSelectedConfirmedBooking(b)}
       />
 
       <ReservationSection
@@ -358,6 +366,7 @@ function ReservationSection({
           {data.map((b) => {
             const isNew =
               newItems?.has(`mission_${b.id}`) && ["proposed", "offers"].includes(b.status);
+            const isCancelRequested = b.status === "cancel_requested";
 
             return (
               <li
@@ -381,9 +390,17 @@ function ReservationSection({
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
-                  <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>
-                    {b.status}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>
+                      {b.status}
+                    </span>
+
+                    {isCancelRequested && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full">
+                        cancellation requested
+                      </span>
+                    )}
+                  </div>
 
                   <div className="flex gap-2">
                     {actions.view && (
@@ -395,7 +412,6 @@ function ReservationSection({
                       </button>
                     )}
 
-                    {/* NEW ⭐ œil sur Confirmed Appointments */}
                     {title === "Confirmed Appointments" && (
                       <button
                         onClick={() => onViewConfirmed?.(b)}

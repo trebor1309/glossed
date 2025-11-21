@@ -1,4 +1,3 @@
-// 📄 src/pages/prodashboard/pages/ProDashboardMissions.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -20,7 +19,6 @@ const buildDate = (item) => {
   if (!item?.date) return null;
   const d = new Date(item.date);
   if (Number.isNaN(d.getTime())) return null;
-  // Si jamais on veut affiner avec heure plus tard, on pourra ici
   return d;
 };
 
@@ -32,7 +30,7 @@ export default function ProDashboardMissions() {
   const [loading, setLoading] = useState(true);
 
   const [selectedDayMissions, setSelectedDayMissions] = useState(null);
-  const [sortBy, setSortBy] = useState("date_upcoming"); // "date_upcoming" | "created_newest"
+  const [sortBy, setSortBy] = useState("date_upcoming");
 
   const [toast, setToast] = useState(null);
 
@@ -52,7 +50,7 @@ export default function ProDashboardMissions() {
     try {
       const proId = session.user.id;
 
-      // 1️⃣ BOOKINGS directs (quand un client choisit le pro directement)
+      // 1️⃣ BOOKINGS directs
       const { data: directBookings, error: directErr } = await supabase
         .from("bookings")
         .select("*")
@@ -61,7 +59,7 @@ export default function ProDashboardMissions() {
 
       if (directErr) throw directErr;
 
-      // 2️⃣ Notifications envoyées à ce pro (zone / rayon)
+      // 2️⃣ Notifications (zone / rayon)
       const { data: notifData, error: notifErr } = await supabase
         .from("booking_notifications")
         .select("booking_id")
@@ -83,11 +81,19 @@ export default function ProDashboardMissions() {
         notifiedBookings = data || [];
       }
 
-      // 3️⃣ Missions (proposals, confirmed, completed…)
+      // 3️⃣ Missions
       const { data: proMissions, error: missionsErr } = await supabase
         .from("missions")
         .select("*")
         .eq("pro_id", proId)
+        .in("status", [
+          "pending",
+          "proposed",
+          "confirmed",
+          "completed",
+          "cancelled",
+          "cancel_requested",
+        ])
         .order("date", { ascending: true });
 
       if (missionsErr) throw missionsErr;
@@ -97,16 +103,16 @@ export default function ProDashboardMissions() {
         net_amount: Math.round(m.price * 0.9 * 100) / 100, // 10% fee Glossed
       }));
 
-      // 4️⃣ Ne pas montrer de bookings déjà confirmés
+      // 4️⃣ Ne pas montrer de bookings déjà confirmés ou cancel_requested
       const confirmedBookingIds = missionsWithNet
-        .filter((m) => m.status === "confirmed")
+        .filter((m) => m.status === "confirmed" || m.status === "cancel_requested")
         .map((m) => m.booking_id);
 
       const cleanedBookings = (directBookings || []).filter(
         (b) => !confirmedBookingIds.includes(b.id)
       );
 
-      // 5️⃣ Taguer les sources pour clé + NEW propre
+      // 5️⃣ Taguer les sources
       const taggedDirect = (cleanedBookings || []).map((b) => ({
         ...b,
         type: "booking",
@@ -135,7 +141,7 @@ export default function ProDashboardMissions() {
   };
 
   /* ------------------------------------------------------------------
-     🔁 Initialisation + écoute des events globaux (NotificationContext)
+     🔁 Initialisation + écoute des events globaux
   ------------------------------------------------------------------ */
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -162,7 +168,6 @@ export default function ProDashboardMissions() {
         }
       }
 
-      // On rafraîchit dans tous les cas (offer confirmée, completed, etc.)
       fetchMissions();
     };
 
@@ -174,7 +179,7 @@ export default function ProDashboardMissions() {
   }, [session?.user?.id]);
 
   /* ------------------------------------------------------------------
-     ❌ Supprimer une demande (pas utilisée sur toutes les sections)
+     ❌ Supprimer une demande
   ------------------------------------------------------------------ */
   const handleDelete = async (booking) => {
     try {
@@ -201,10 +206,9 @@ export default function ProDashboardMissions() {
       if (sortBy === "created_newest") {
         const da = new Date(a.created_at || a.inserted_at || a.date || 0);
         const db = new Date(b.created_at || b.inserted_at || b.date || 0);
-        return db.getTime() - da.getTime(); // plus récent en premier
+        return db.getTime() - da.getTime();
       }
 
-      // "date_upcoming" (par défaut) → date la plus proche
       const da = buildDate(a) || new Date(0);
       const db = buildDate(b) || new Date(0);
       return da.getTime() - db.getTime();
@@ -216,7 +220,9 @@ export default function ProDashboardMissions() {
   const grouped = {
     pending: sortMissions(sourceList.filter((m) => m.status === "pending")),
     proposed: sortMissions(sourceList.filter((m) => m.status === "proposed")),
-    confirmed: sortMissions(sourceList.filter((m) => m.status === "confirmed")),
+    confirmed: sortMissions(
+      sourceList.filter((m) => m.status === "confirmed" || m.status === "cancel_requested")
+    ),
     completed: sortMissions(sourceList.filter((m) => m.status === "completed")),
     cancelled: sortMissions(sourceList.filter((m) => m.status === "cancelled")),
   };
@@ -327,14 +333,13 @@ export default function ProDashboardMissions() {
         empty="No pending requests."
         onView={(b) => {
           setSelectedView(b);
-          // On marque comme "vu"
           setNewItems((prev) => {
             const next = new Set(prev);
             next.delete(`booking_${b.id}`);
             return next;
           });
         }}
-        newItems={newItems} // 🔔 NEW visible ici
+        newItems={newItems}
       />
 
       <MissionSection
@@ -392,6 +397,7 @@ function MissionSection({ title, icon, data, color, empty, onView, setSelectedMi
         <ul className="divide-y divide-gray-100">
           {data.map((m) => {
             const isNew = newItems?.has(`booking_${m.id}`) && m.status === "pending";
+            const isCancelRequested = m.status === "cancel_requested";
 
             return (
               <li
@@ -418,11 +424,19 @@ function MissionSection({ title, icon, data, color, empty, onView, setSelectedMi
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
-                  <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>
-                    {m.status}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>
+                      {m.status}
+                    </span>
 
-                  {/* Pending → bouton "View" (détails + delete/proposal) */}
+                    {isCancelRequested && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full">
+                        cancellation requested
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Pending → bouton "View" */}
                   {m.status === "pending" && onView ? (
                     <button
                       onClick={() => onView(m)}

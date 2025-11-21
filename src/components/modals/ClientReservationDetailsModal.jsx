@@ -1,4 +1,3 @@
-// src/components/modals/ClientReservationDetailsModal.jsx
 import { motion } from "framer-motion";
 import { X, Calendar, Clock, MapPin, FileText, MessageSquare, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -6,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { supabase } from "@/lib/supabaseClient";
+import { openConfirmModal } from "@/components/ui/openConfirmModal";
 
 const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
 
@@ -21,19 +21,19 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useUser();
-  const { pushNotification } = useNotifications();
+  const { pushNotification } = useNotifications() || {};
 
   if (!booking) return null;
 
   const isMission = typeof booking.price !== "undefined" || typeof booking.time !== "undefined";
   const status = booking.status;
-  const showChat = status === "confirmed";
+  const showChat = status === "confirmed" || status === "cancel_requested";
 
   const dateLabel = isMission ? fmtDate(booking.date) : booking.date;
   const timeLabel = isMission ? fmtTime(booking.time) : booking.time_slot;
 
   const ensureChatAndSendMessage = async (message) => {
-    if (!booking?.id || !user?.id) return;
+    if (!booking?.id) return;
 
     // 1) Check for existing chat
     const { data: existing } = await supabase
@@ -66,10 +66,10 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
       chatId = created.id;
     }
 
-    // 3) Send message in chat
+    // 3) Send system-style message (sender_id = null)
     const { error: msgError } = await supabase.from("messages").insert({
       chat_id: chatId,
-      sender_id: user.id,
+      sender_id: null,
       content: message,
     });
 
@@ -135,13 +135,13 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
 
       if (error) {
         console.error("Error requesting cancellation:", error);
-        pushNotification("Unable to request cancellation.", "error");
+        pushNotification?.("Unable to request cancellation.", "error");
         return;
       }
 
       await ensureChatAndSendMessage("The client requested a cancellation for this reservation.");
 
-      pushNotification("Your cancellation request was sent to the pro.", "success");
+      pushNotification?.("Your cancellation request was sent to the pro.", "success");
       onClose?.();
     } finally {
       setLoading(false);
@@ -228,11 +228,33 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
             </span>
           </div>
 
+          {status === "cancel_requested" && (
+            <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-start gap-2">
+              <span className="mt-0.5">⚠️</span>
+              <span>
+                Your cancellation request has been sent to the pro. The booking remains active until
+                the pro approves or rejects it.
+              </span>
+            </p>
+          )}
+
           {/* Discret: demander une annulation (réservation confirmée) */}
           {status === "confirmed" && (
             <button
               type="button"
-              onClick={handleRequestCancellation}
+              onClick={async () => {
+                const ok = await openConfirmModal(
+                  "Request cancellation?",
+                  "The pro will be notified. Your booking will remain active until they approve or reject your request.",
+                  {
+                    confirmLabel: "Send request",
+                    cancelLabel: "Back",
+                    type: "delete",
+                  }
+                );
+                if (!ok) return;
+                await handleRequestCancellation();
+              }}
               disabled={loading}
               className="mt-3 text-xs text-red-500 underline opacity-70 hover:opacity-100 disabled:opacity-40"
             >

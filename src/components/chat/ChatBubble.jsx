@@ -1,4 +1,3 @@
-// 📄 src/components/chat/ChatBubble.jsx
 export default function ChatBubble({ msg, isOwn, onImageClick }) {
   const isImage = !!msg.attachment_url;
 
@@ -9,6 +8,27 @@ export default function ChatBubble({ msg, isOwn, onImageClick }) {
 
   const isRead = !!msg.read_at;
 
+  const isSystem = msg.sender_id === null;
+
+  // 🧾 Messages système (annulations, etc.) → option C (full-width divider)
+  if (isSystem) {
+    return (
+      <div className="my-4 flex justify-center">
+        <div className="w-full px-4 flex flex-col items-center">
+          <div className="flex items-center w-full gap-2 text-[11px] text-gray-400">
+            <span className="flex-1 h-px bg-gray-200" />
+            <span className="flex items-center gap-1 whitespace-nowrap">
+              <span>⚠️</span>
+              <span>{msg.content}</span>
+            </span>
+            <span className="flex-1 h-px bg-gray-200" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 💬 Messages classiques
   return (
     <div className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
       <div
