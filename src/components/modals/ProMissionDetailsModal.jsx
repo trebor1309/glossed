@@ -1,3 +1,4 @@
+// src/components/modals/ProMissionDetailsModal.jsx
 import { motion } from "framer-motion";
 import {
   X,
@@ -31,19 +32,23 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user, isPro } = useUser();
-  const { pushNotification } = useNotifications() || {};
+  const { pushNotification } = useNotifications();
 
   if (!booking) return null;
 
   const isMission = typeof booking.price !== "undefined" || typeof booking.time !== "undefined";
   const status = booking.status;
-  const showChat = status === "confirmed" || status === "cancel_requested";
+  const showChat =
+    status === "confirmed" ||
+    status === "cancel_requested" ||
+    status === "cancelled" ||
+    status === "completed";
 
   const dateLabel = isMission ? fmtDate(booking.date) : booking.date;
   const timeLabel = isMission ? fmtTime(booking.time) : booking.time_slot;
 
   const ensureChatAndSendMessage = async (message) => {
-    if (!booking?.id) return;
+    if (!booking?.id || !user?.id) return;
 
     const { data: existing } = await supabase
       .from("chats")
@@ -76,13 +81,16 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
     const { error: msgError } = await supabase.from("messages").insert({
       chat_id: chatId,
-      sender_id: null,
-      content: message,
+      sender_id: user.id,
+      content: `[system] ${message}`,
     });
 
     if (msgError) {
       console.error("Error sending system message:", msgError);
+      return;
     }
+
+    await supabase.from("chats").update({ updated_at: new Date().toISOString() }).eq("id", chatId);
   };
 
   const handleOpenChat = async () => {
@@ -133,6 +141,18 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
   const handleApproveCancellation = async () => {
     if (!booking?.id) return;
 
+    const confirmed = await openConfirmModal(
+      "Approve cancellation?",
+      "Do you really want to cancel this booking? The client will be refunded.",
+      {
+        confirmLabel: "Approve cancellation",
+        cancelLabel: "Keep booking",
+        type: "delete",
+      }
+    );
+
+    if (!confirmed) return;
+
     try {
       setLoading(true);
 
@@ -143,7 +163,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
       if (error) {
         console.error("Error approving cancellation:", error);
-        pushNotification?.("Unable to approve cancellation.", "error");
+        pushNotification("Unable to approve cancellation.", "error");
         return;
       }
 
@@ -151,7 +171,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
         "The pro approved the cancellation. The booking has been cancelled."
       );
 
-      pushNotification?.("Cancellation approved.", "success");
+      pushNotification("Cancellation approved.", "success");
       onClose?.();
     } finally {
       setLoading(false);
@@ -160,6 +180,17 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
   const handleRejectCancellation = async () => {
     if (!booking?.id) return;
+
+    const confirmed = await openConfirmModal(
+      "Keep this booking?",
+      "The client asked for a cancellation. Do you want to keep the booking confirmed?",
+      {
+        confirmLabel: "Keep booking",
+        cancelLabel: "Back",
+      }
+    );
+
+    if (!confirmed) return;
 
     try {
       setLoading(true);
@@ -171,7 +202,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
       if (error) {
         console.error("Error rejecting cancellation:", error);
-        pushNotification?.("Unable to reject cancellation.", "error");
+        pushNotification("Unable to reject cancellation.", "error");
         return;
       }
 
@@ -179,7 +210,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
         "The pro rejected the cancellation request. The booking remains confirmed."
       );
 
-      pushNotification?.("Cancellation request rejected.", "success");
+      pushNotification("Cancellation request rejected.", "success");
       onClose?.();
     } finally {
       setLoading(false);
@@ -188,6 +219,18 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
   const handleProCancel = async () => {
     if (!booking?.id) return;
+
+    const confirmed = await openConfirmModal(
+      "Cancel this booking?",
+      "Do you really want to cancel this booking? The client will be fully refunded.",
+      {
+        confirmLabel: "Cancel booking",
+        cancelLabel: "Back",
+        type: "delete",
+      }
+    );
+
+    if (!confirmed) return;
 
     try {
       setLoading(true);
@@ -199,13 +242,13 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
       if (error) {
         console.error("Error cancelling booking:", error);
-        pushNotification?.("Unable to cancel booking.", "error");
+        pushNotification("Unable to cancel booking.", "error");
         return;
       }
 
       await ensureChatAndSendMessage("The pro cancelled this reservation.");
 
-      pushNotification?.("Booking cancelled.", "success");
+      pushNotification("Booking cancelled.", "success");
       onClose?.();
     } finally {
       setLoading(false);
@@ -296,8 +339,8 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
             <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-start gap-2">
               <span className="mt-0.5">⚠️</span>
               <span>
-                The client requested a cancellation for this reservation. You can approve it (the
-                booking will be cancelled) or keep the booking.
+                The client requested a cancellation for this reservation. Please approve or keep the
+                booking below.
               </span>
             </p>
           )}
@@ -305,7 +348,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
         {/* ACTIONS */}
         <div className="mt-8 flex flex-wrap justify-end gap-3">
-          {/* Proposed: edit/cancel — unmodified (à brancher plus tard si besoin) */}
+          {/* Proposed: edit/cancel — à implémenter plus tard si besoin */}
           {status === "proposed" && (
             <>
               <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-full font-medium hover:bg-gray-100 transition flex items-center gap-2">
@@ -322,19 +365,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
           {status === "cancel_requested" && (
             <>
               <button
-                onClick={async () => {
-                  const ok = await openConfirmModal(
-                    "Approve cancellation?",
-                    "The client will be refunded according to Glossed's policy and the booking will be cancelled. This action cannot be undone.",
-                    {
-                      confirmLabel: "Approve",
-                      cancelLabel: "Back",
-                      type: "delete",
-                    }
-                  );
-                  if (!ok) return;
-                  await handleApproveCancellation();
-                }}
+                onClick={handleApproveCancellation}
                 disabled={loading}
                 className="px-4 py-2 bg-red-500 text-white rounded-full font-semibold hover:bg-red-600 transition disabled:opacity-60 flex items-center gap-2"
               >
@@ -342,18 +373,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
               </button>
 
               <button
-                onClick={async () => {
-                  const ok = await openConfirmModal(
-                    "Keep this booking?",
-                    "The cancellation request will be rejected and the appointment will remain confirmed.",
-                    {
-                      confirmLabel: "Keep booking",
-                      cancelLabel: "Back",
-                    }
-                  );
-                  if (!ok) return;
-                  await handleRejectCancellation();
-                }}
+                onClick={handleRejectCancellation}
                 disabled={loading}
                 className="px-4 py-2 border border-gray-300 text-gray-600 rounded-full font-medium hover:bg-gray-100 transition disabled:opacity-60"
               >
@@ -362,26 +382,14 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
             </>
           )}
 
-          {/* Pro cancel direct (booking confirmé) — bouton discret */}
+          {/* Pro cancel direct (booking confirmé) */}
           {status === "confirmed" && (
             <button
-              onClick={async () => {
-                const ok = await openConfirmModal(
-                  "Cancel this booking?",
-                  "The client will be fully refunded and the booking will be cancelled. This action cannot be undone.",
-                  {
-                    confirmLabel: "Cancel booking",
-                    cancelLabel: "Back",
-                    type: "delete",
-                  }
-                );
-                if (!ok) return;
-                await handleProCancel();
-              }}
+              onClick={handleProCancel}
               disabled={loading}
-              className="mr-auto text-xs text-red-500 underline opacity-70 hover:opacity-100 disabled:opacity-40"
+              className="px-4 py-2 border border-red-200 text-red-600 rounded-full font-medium hover:bg-red-50 transition flex items-center gap-2 disabled:opacity-60"
             >
-              Cancel booking
+              <Trash2 size={16} /> Cancel booking
             </button>
           )}
 

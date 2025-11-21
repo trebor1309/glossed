@@ -1,3 +1,4 @@
+// src/components/modals/ClientReservationDetailsModal.jsx
 import { motion } from "framer-motion";
 import { X, Calendar, Clock, MapPin, FileText, MessageSquare, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -21,19 +22,23 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useUser();
-  const { pushNotification } = useNotifications() || {};
+  const { pushNotification } = useNotifications();
 
   if (!booking) return null;
 
   const isMission = typeof booking.price !== "undefined" || typeof booking.time !== "undefined";
   const status = booking.status;
-  const showChat = status === "confirmed" || status === "cancel_requested";
+  const showChat =
+    status === "confirmed" ||
+    status === "cancel_requested" ||
+    status === "cancelled" ||
+    status === "completed";
 
   const dateLabel = isMission ? fmtDate(booking.date) : booking.date;
   const timeLabel = isMission ? fmtTime(booking.time) : booking.time_slot;
 
   const ensureChatAndSendMessage = async (message) => {
-    if (!booking?.id) return;
+    if (!booking?.id || !user?.id) return;
 
     // 1) Check for existing chat
     const { data: existing } = await supabase
@@ -66,16 +71,20 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
       chatId = created.id;
     }
 
-    // 3) Send system-style message (sender_id = null)
+    // 3) Send system-like message
     const { error: msgError } = await supabase.from("messages").insert({
       chat_id: chatId,
-      sender_id: null,
-      content: message,
+      sender_id: user.id,
+      content: `[system] ${message}`,
     });
 
     if (msgError) {
       console.error("Error sending cancellation message:", msgError);
+      return;
     }
+
+    // 4) Bump chat updated_at (comme ChatInput)
+    await supabase.from("chats").update({ updated_at: new Date().toISOString() }).eq("id", chatId);
   };
 
   const handleOpenChat = async () => {
@@ -122,6 +131,17 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
   const handleRequestCancellation = async () => {
     if (!booking?.id || !user?.id) return;
 
+    const confirmed = await openConfirmModal(
+      "Request cancellation?",
+      "Do you really want to request a cancellation? Your pro will have to approve it before the booking is cancelled.",
+      {
+        confirmLabel: "Send request",
+        cancelLabel: "Keep booking",
+      }
+    );
+
+    if (!confirmed) return;
+
     try {
       setLoading(true);
 
@@ -135,13 +155,13 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
 
       if (error) {
         console.error("Error requesting cancellation:", error);
-        pushNotification?.("Unable to request cancellation.", "error");
+        pushNotification("Unable to request cancellation.", "error");
         return;
       }
 
       await ensureChatAndSendMessage("The client requested a cancellation for this reservation.");
 
-      pushNotification?.("Your cancellation request was sent to the pro.", "success");
+      pushNotification("Your cancellation request was sent to the pro.", "success");
       onClose?.();
     } finally {
       setLoading(false);
@@ -228,33 +248,11 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
             </span>
           </div>
 
-          {status === "cancel_requested" && (
-            <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-start gap-2">
-              <span className="mt-0.5">⚠️</span>
-              <span>
-                Your cancellation request has been sent to the pro. The booking remains active until
-                the pro approves or rejects it.
-              </span>
-            </p>
-          )}
-
           {/* Discret: demander une annulation (réservation confirmée) */}
           {status === "confirmed" && (
             <button
               type="button"
-              onClick={async () => {
-                const ok = await openConfirmModal(
-                  "Request cancellation?",
-                  "The pro will be notified. Your booking will remain active until they approve or reject your request.",
-                  {
-                    confirmLabel: "Send request",
-                    cancelLabel: "Back",
-                    type: "delete",
-                  }
-                );
-                if (!ok) return;
-                await handleRequestCancellation();
-              }}
+              onClick={handleRequestCancellation}
               disabled={loading}
               className="mt-3 text-xs text-red-500 underline opacity-70 hover:opacity-100 disabled:opacity-40"
             >

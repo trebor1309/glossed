@@ -1,4 +1,4 @@
-// src/context/NotificationContext.jsx
+// 📄 src/context/NotificationContext.jsx
 import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -14,11 +14,12 @@ export function NotificationProvider({ children }) {
     clientOffers: 0,
     proBookings: 0,
     payments: 0,
-    proCancellations: 0,
-    clientCancellations: 0,
   });
 
+  // 🔔 Nouveau compteur global
   const [newMessages, setNewMessages] = useState(0);
+
+  // Chat actuellement ouvert
   const [chatOpenId, setChatOpenId] = useState(null);
 
   const [toast, setToast] = useState(null);
@@ -41,21 +42,27 @@ export function NotificationProvider({ children }) {
     setNotifications((prev) => ({ ...prev, [type]: 0 }));
   };
 
+  // Écoute : quel chat est ouvert ?
   useEffect(() => {
     const handler = (e) => setChatOpenId(e.detail);
     window.addEventListener("chat-open", handler);
     return () => window.removeEventListener("chat-open", handler);
   }, []);
 
+  // Reset du badge messages quand on ouvre un chat
   useEffect(() => {
     if (chatOpenId) setNewMessages(0);
   }, [chatOpenId]);
 
+  // ------------------------------------------------------
+  // 🔥 Main realtime logic
+  // ------------------------------------------------------
   useEffect(() => {
     if (!user?.id) return;
 
     const userId = user.id;
 
+    // Nettoyage
     channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
     channelsRef.current = [];
 
@@ -74,10 +81,15 @@ export function NotificationProvider({ children }) {
         (payload) => {
           const msg = payload.new;
 
+          // Ignorer mes propres messages
           if (msg.sender_id === userId) return;
+
+          // Si je suis dans ce chat → ne pas notifier
           if (msg.chat_id === chatOpenId) return;
 
+          // Sinon : badge + toast
           setNewMessages((n) => n + 1);
+
           pushNotification("💬 New message received", "success");
         }
       )
@@ -118,21 +130,17 @@ export function NotificationProvider({ children }) {
           filter: `client_id=eq.${userId}`,
         },
         (payload) => {
-          const { old, new: updated } = payload;
+          const status = payload.new.status;
 
-          if (updated.status === "confirmed" && old.status !== "confirmed") {
+          if (status === "confirmed") {
             pushNotification("💳 Your booking was confirmed!", "success");
-            broadcast("missions", "UPDATE", payload);
+          } else if (status === "cancelled") {
+            pushNotification("❌ Your booking was cancelled.", "info");
           }
+          // pour cancel_requested côté client, on ne spam pas, il a déjà eu un confirm modal
 
-          if (updated.status === "cancelled" && old.status !== "cancelled") {
-            setNotifications((prev) => ({
-              ...prev,
-              clientCancellations: (prev.clientCancellations || 0) + 1,
-            }));
-            pushNotification("⚠️ Your booking was cancelled.", "info");
-            broadcast("missions", "UPDATE", payload);
-          }
+          // 🔁 Toujours broadcast → DashboardReservations se met à jour
+          broadcast("missions", "UPDATE", payload);
         }
       )
       .on(
@@ -195,24 +203,24 @@ export function NotificationProvider({ children }) {
           filter: `pro_id=eq.${userId}`,
         },
         (payload) => {
-          const { old, new: updated } = payload;
+          const status = payload.new.status;
 
-          if (updated.status === "confirmed" && old.status !== "confirmed") {
-            pushNotification(`💰 Your offer for "${updated.service}" has been paid!`, "success");
-            broadcast("missions", "UPDATE", payload);
-          }
-
-          if (updated.status === "cancel_requested" && old.status !== "cancel_requested") {
-            setNotifications((prev) => ({
-              ...prev,
-              proCancellations: (prev.proCancellations || 0) + 1,
-            }));
+          if (status === "confirmed") {
             pushNotification(
-              `⚠️ The client requested a cancellation for "${updated.service}".`,
+              `💰 Your offer for "${payload.new.service}" has been paid!`,
+              "success"
+            );
+          } else if (status === "cancel_requested") {
+            pushNotification(
+              `⚠️ ${payload.new.service}: the client requested a cancellation.`,
               "info"
             );
-            broadcast("missions", "UPDATE", payload);
+          } else if (status === "cancelled") {
+            pushNotification(`❌ "${payload.new.service}" was cancelled.`, "info");
           }
+
+          // 🔁 Toujours broadcast → ProDashboardMissions se met à jour
+          broadcast("missions", "UPDATE", payload);
         }
       )
       .on(
@@ -245,6 +253,7 @@ export function NotificationProvider({ children }) {
         newMessages,
         resetNotification,
         pushNotification,
+        setNewMessages,
       }}
     >
       {children}
