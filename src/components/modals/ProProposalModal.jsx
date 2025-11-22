@@ -43,12 +43,18 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
         pro_id: session.user.id,
         service: booking.service,
         description: form.note || booking.notes || null,
-        date: form.date, // "YYYY-MM-DD"
-        time: form.time, // "HH:mm"
+
+        date: form.date, // YYYY-MM-DD
+        time: form.time, // HH:mm
         duration: 60,
-        price: total, // total (service + travel)
+
+        // 🔥 valeurs séparées
+        service_price: servicePrice,
+        travel_fee: travelFee,
+        price: total, // total à payer (service + déplacement)
+        total_price: total, // pour cohérence + lisibilité
+
         status: "proposed",
-        // Requires the missions table to have booking_id (as discussed)
         booking_id: booking.id,
       };
 
