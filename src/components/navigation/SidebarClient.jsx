@@ -8,6 +8,7 @@ import {
   Repeat,
   Plus,
   MessageSquare,
+  CreditCard,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -21,6 +22,7 @@ export default function SidebarClient() {
 
   const links = [
     { to: "/dashboard", label: "Dashboard", icon: Home },
+
     {
       to: "/dashboard/reservations",
       label: "My Reservations",
@@ -28,6 +30,7 @@ export default function SidebarClient() {
       hasBadge: notifications.clientOffers > 0,
       badgeCount: notifications.clientOffers,
     },
+
     {
       to: "/dashboard/messages",
       label: "Messages",
@@ -38,6 +41,12 @@ export default function SidebarClient() {
 
     { to: "/dashboard/account", label: "Account", icon: User },
     { to: "/dashboard/settings", label: "Settings", icon: Settings },
+    // ⭐ NEW: Payments
+    {
+      to: "/dashboard/payments",
+      label: "Payments",
+      icon: CreditCard,
+    },
   ];
 
   return (
@@ -59,13 +68,13 @@ export default function SidebarClient() {
         <span>New Booking</span>
       </button>
 
-      {/* Liens */}
+      {/* Links */}
       <div className="space-y-1">
         {links.map(({ to, label, icon: Icon, hasBadge, badgeCount }) => (
           <NavLink
             key={to}
             to={to}
-            end={to === "/dashboard"} // 👈 empêche Dashboard d’être actif partout
+            end={to === "/dashboard"}
             className={({ isActive }) =>
               `relative flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${
                 isActive ? "bg-rose-50 text-rose-600 shadow-sm" : "text-gray-700 hover:bg-gray-100"

@@ -51,6 +51,7 @@ import DashboardSettings from "./pages/dashboard/pages/DashboardSettings";
 import DashboardMore from "./pages/dashboard/pages/DashboardMore";
 import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 import PaymentSuccess from "@/pages/dashboard/payment/Success";
+import DashboardPayments from "@/pages/dashboard/pages/DashboardPayments";
 
 // Pro dashboard
 import ProDashboardLayout from "./pages/prodashboard/ProDashboardLayout";
@@ -190,6 +191,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               <Route path="account" element={<DashboardAccount />} />
               <Route path="settings" element={<DashboardSettings />} />
               <Route path="more" element={<DashboardMore />} />
+              <Route path="payments" element={<DashboardPayments />} />
 
               {/* ⭐ NEW: Inbox + Chat */}
               <Route path="messages" element={<ChatLayout leftPanel={<DashboardMessages />} />}>
@@ -197,7 +199,7 @@ export default function App({ showUpgradeModal, closeUpgradeModal }) {
               </Route>
             </Route>
 
-            <Route path="/dashboard/payment/success" element={<PaymentSuccess />} />
+            <Route path="payment/success" element={<PaymentSuccess />} />
 
             {/* 💼 Dashboard Pro */}
             <Route

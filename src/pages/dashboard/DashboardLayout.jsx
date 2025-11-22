@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
-import { Home, User, Calendar, CreditCard, Settings, Repeat, Plus } from "lucide-react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import BottomNav from "../../components/navigation/BottomNavClient";
 import Sidebar from "../../components/navigation/SidebarClient";
@@ -19,7 +18,6 @@ export default function DashboardLayout() {
   const [showNewBookingModal, setShowNewBookingModal] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
 
-  // Charge Google Maps une seule fois pour tout le dashboard
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
     libraries,
@@ -79,38 +77,14 @@ export default function DashboardLayout() {
 
         {/* Main content */}
         <div className="flex-1 flex flex-col">
-          <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-10 flex items-center justify-between">
-            <h1 className="text-xl font-semibold text-gray-800">{active}</h1>
-
-            <div className="flex items-center gap-3">
-              {!isPro && (
-                <button
-                  onClick={handleNewBookingClick}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-rose-600 to-red-600 text-white text-sm font-medium shadow hover:scale-[1.03] transition"
-                >
-                  <Plus size={18} />
-                  New Booking
-                </button>
-              )}
-
-              {!isPro && (
-                <button
-                  onClick={switchRole}
-                  className="hidden md:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 text-sm font-medium shadow hover:bg-gray-200 transition"
-                >
-                  <Repeat size={18} />
-                  Switch to Pro
-                </button>
-              )}
-            </div>
-          </header>
+          {/* 🧹 HEADER SUPPRIMÉ */}
 
           <main className="p-6 pb-20 md:pb-6 flex-1 flex justify-center">
             <div
               className={`
-      w-full 
-      ${location.pathname.includes("messages") ? "max-w-5xl" : "max-w-6xl"}
-    `}
+                w-full 
+                ${location.pathname.includes("messages") ? "max-w-5xl" : "max-w-6xl"}
+              `}
             >
               <Outlet />
             </div>
@@ -120,8 +94,8 @@ export default function DashboardLayout() {
 
       <BottomNav />
 
-      {/* Modal for desktop */}
-      {isDesktop && showNewBookingModal && (
+      {/* Modal: NEW BOOKING */}
+      {isDesktop && showNewBookingModal && isLoaded && (
         <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
           <DashboardNew
             isModal={true}
@@ -137,7 +111,7 @@ export default function DashboardLayout() {
         </div>
       )}
 
-      {/* ✅ Toast responsive */}
+      {/* Toast */}
       {toast && (
         <div
           className="fixed z-[10000]
