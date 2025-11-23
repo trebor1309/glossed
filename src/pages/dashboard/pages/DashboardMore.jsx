@@ -1,29 +1,41 @@
-import { useState } from "react";
-import { useUser } from "../../../context/UserContext";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { useUser } from "@/context/UserContext";
 import {
+  User,
+  CalendarDays,
+  CreditCard,
+  MessageSquare,
   Settings,
   HelpCircle,
   FileText,
   Info,
-  Briefcase,
-  Newspaper,
-  Facebook,
-  Instagram,
-  LogOut,
   Repeat,
+  LogOut,
 } from "lucide-react";
 
 export default function DashboardMore() {
   const navigate = useNavigate();
-  const { user, logout, switchRole, setShowUpgradeModal } = useUser();
+  const { isPro, logout, switchRole } = useUser();
 
   const sections = [
     {
+      title: "My Account",
+      items: [
+        { label: "Account", icon: User, to: "/dashboard/account" },
+        { label: "Settings", icon: Settings, to: "/dashboard/settings" },
+      ],
+    },
+    {
+      title: "My Activity",
+      items: [
+        { label: "My Reservations", icon: CalendarDays, to: "/dashboard/reservations" },
+        { label: "Messages", icon: MessageSquare, to: "/dashboard/messages" },
+        { label: "Payments", icon: CreditCard, to: "/dashboard/payments" },
+      ],
+    },
+    {
       title: "App & Support",
       items: [
-        { label: "Settings", icon: Settings, to: "/dashboard/settings" },
         { label: "Help Center", icon: HelpCircle, to: "/help-center" },
         { label: "Contact", icon: Info, to: "/contact" },
         { label: "FAQ", icon: FileText, to: "/faq" },
@@ -37,47 +49,21 @@ export default function DashboardMore() {
         { label: "Terms of Service", icon: FileText, to: "/terms" },
       ],
     },
-    {
-      title: "About Glossed",
-      items: [
-        { label: "About Us", icon: Info, to: "/about-us" },
-        { label: "Careers", icon: Briefcase, to: "/careers" },
-        { label: "Press", icon: Newspaper, to: "/press" },
-      ],
-    },
   ];
 
-  // 🌹 Nouveau comportement intelligent du bouton "Switch to Pro"
-  const handleSwitchToPro = async () => {
-    if (user?.roles?.includes("pro")) {
-      try {
-        await supabase.from("users").update({ active_role: "pro" }).eq("id", user.id);
-      } catch (e) {
-        console.warn("⚠️ Erreur lors de la mise à jour du rôle actif :", e);
-      }
-      navigate("/prodashboard", { replace: true });
-    } else {
-      // client uniquement → ouvre le modal d’upgrade via le contexte
-      setShowUpgradeModal(true);
-    }
-  };
-
   return (
-    <section className="space-y-6">
-      {sections.map((section) => (
-        <div
-          key={section.title}
-          className="bg-white rounded-2xl shadow-md p-6 border border-gray-100"
-        >
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">{section.title}</h3>
+    <section className="space-y-6 pb-16">
+      {sections.map(({ title, items }) => (
+        <div key={title} className="bg-white rounded-2xl shadow p-6 border border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">{title}</h3>
           <ul className="space-y-3">
-            {section.items.map(({ label, icon: Icon, to }) => (
+            {items.map(({ label, icon: Icon, to }) => (
               <li key={label}>
                 <button
                   onClick={() => navigate(to)}
-                  className="flex items-center gap-3 w-full text-left text-gray-700 hover:text-rose-600 transition-colors"
+                  className="flex items-center gap-3 w-full text-left text-gray-700 hover:text-rose-600 transition"
                 >
-                  <Icon className="w-5 h-5 text-rose-600" />
+                  <Icon size={20} className="text-rose-600" />
                   {label}
                 </button>
               </li>
@@ -86,52 +72,32 @@ export default function DashboardMore() {
         </div>
       ))}
 
-      {/* 🌹 Switch to Pro */}
-      <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 text-center">
-        <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center justify-center gap-2">
-          <Repeat className="w-5 h-5 text-rose-600" />
-          Become a Pro
-        </h3>
-        <p className="text-gray-600 text-sm mb-4 max-w-sm mx-auto">
-          Join Glossed as a beauty professional and start receiving client bookings.
-        </p>
-        <button
-          onClick={handleSwitchToPro}
-          className="px-5 py-2.5 bg-gradient-to-r from-gray-200 to-gray-100 text-gray-700 rounded-full text-sm font-medium shadow hover:shadow-md hover:scale-105 transition-transform"
-        >
-          Switch to Pro
-        </button>
-      </div>
-
-      {/* 📱 Réseaux sociaux */}
-      <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Follow us</h3>
-        <div className="flex gap-4">
-          <a
-            href="#"
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-700 hover:bg-gradient-to-r hover:from-rose-500 hover:to-red-500 hover:text-white transition-all duration-300"
+      {/* Switch to Pro */}
+      {!isPro && (
+        <div className="bg-white rounded-2xl shadow p-6 border border-gray-100 text-center">
+          <h3 className="text-lg font-semibold flex items-center justify-center gap-2 text-gray-800 mb-2">
+            <Repeat className="text-rose-600" /> Switch to Pro
+          </h3>
+          <p className="text-gray-600 text-sm mb-4">Join Glossed as a professional.</p>
+          <button
+            onClick={switchRole}
+            className="px-5 py-2.5 bg-gradient-to-r from-gray-200 to-gray-100 text-gray-700 rounded-full font-medium shadow hover:scale-105 transition"
           >
-            <Facebook className="w-5 h-5" />
-          </a>
-          <a
-            href="#"
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-700 hover:bg-gradient-to-r hover:from-rose-500 hover:to-red-500 hover:text-white transition-all duration-300"
-          >
-            <Instagram className="w-5 h-5" />
-          </a>
+            Switch
+          </button>
         </div>
-      </div>
+      )}
 
-      {/* 🚪 Déconnexion */}
-      <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 text-center">
+      {/* Logout */}
+      <div className="bg-white rounded-2xl shadow p-6 border border-gray-100 text-center">
         <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center justify-center gap-2">
-          <LogOut className="w-5 h-5 text-rose-600" />
+          <LogOut className="text-rose-600" />
           Logout
         </h3>
-        <p className="text-gray-600 text-sm mb-4">You can log out of your account anytime.</p>
+        <p className="text-gray-600 text-sm mb-4">You can log out anytime.</p>
         <button
           onClick={logout}
-          className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full text-sm font-medium shadow hover:shadow-md hover:scale-105 transition-transform"
+          className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-medium shadow hover:scale-105 transition"
         >
           Log out
         </button>

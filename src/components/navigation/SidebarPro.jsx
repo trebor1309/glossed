@@ -37,9 +37,10 @@ export default function SidebarPro() {
       hasBadge: newMessages > 0,
       badgeCount: newMessages,
     },
-    { name: "Payments", icon: CreditCard, path: "/prodashboard/payments" },
+
     { name: "Account", icon: User, path: "/prodashboard/account" },
     { name: "Settings", icon: Settings, path: "/prodashboard/settings" },
+    { name: "Payments", icon: CreditCard, path: "/prodashboard/payments" },
   ];
 
   return (
