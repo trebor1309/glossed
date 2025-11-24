@@ -1,7 +1,7 @@
 // src/components/modals/SignupModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "../../context/UserContext"; // contexte utilisateur global
-import { useNavigate } from "react-router-dom"; // navigation
+import { useUser } from "../../context/UserContext";
+import { useNavigate } from "react-router-dom";
 
 export default function SignupModal({ onClose, onProSignup, onLogin }) {
   const { signup } = useUser();
@@ -9,15 +9,24 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
 
   const handleSignup = async (e) => {
     e.preventDefault();
+
+    const username = e.target.username.value.trim();
+    const firstName = e.target.firstName.value.trim();
+    const lastName = e.target.lastName.value.trim();
     const email = e.target.email.value.trim();
     const password = e.target.password.value.trim();
 
     try {
-      await signup(email, password, "client"); // fonction Supabase du UserContext
+      await signup(email, password, "client", {
+        username,
+        firstName,
+        lastName,
+      });
+
       onClose();
       navigate("/dashboard");
     } catch (error) {
-      alert(" Signup failed: " + error.message);
+      alert("Signup failed: " + error.message);
     }
   };
 
@@ -38,7 +47,6 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ duration: 0.3 }}
         >
-          {/* ✖️ Fermer */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -48,15 +56,43 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
 
           <h2 className="text-3xl font-bold text-center mb-6">Create your account</h2>
 
-          {/* Formulaire */}
           <form className="space-y-4" onSubmit={handleSignup}>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Full name</label>
+              <label className="block text-sm font-medium text-gray-700">Username</label>
               <input
                 type="text"
+                name="username"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="Jane Doe"
+                placeholder="yourusername"
+                required
               />
+              <p className="text-xs text-gray-400 mt-1">
+                Will be stored in lowercase. Used to login and in chats later.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700">First name</label>
+                <input
+                  type="text"
+                  name="firstName"
+                  className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  placeholder="Jane"
+                  required
+                />
+              </div>
+
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700">Last name</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  placeholder="Doe"
+                  required
+                />
+              </div>
             </div>
 
             <div>
@@ -66,6 +102,7 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
                 name="email"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="you@example.com"
+                required
               />
             </div>
 
@@ -76,6 +113,7 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
                 name="password"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="••••••••"
+                required
               />
             </div>
 
@@ -87,7 +125,6 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
             </button>
           </form>
 
-          {/* Liens complémentaires */}
           <p className="text-center text-sm text-gray-500 mt-6">
             Are you a beauty professional?{" "}
             <button onClick={onProSignup} className="text-rose-600 font-medium hover:underline">

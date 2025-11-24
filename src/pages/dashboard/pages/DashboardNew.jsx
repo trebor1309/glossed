@@ -1,3 +1,4 @@
+// src/pages/dashboard/pages/DashboardNew.jsx
 import { useState, useEffect } from "react";
 import { v4 as uuid } from "uuid";
 import { supabase } from "@/lib/supabaseClient";
@@ -79,7 +80,9 @@ function StepServices({ bookingData, setBookingData, onNext }) {
               <img
                 src={opt.img}
                 alt={opt.label}
-                className={`object-cover w-full h-36 group-hover:opacity-90 transition ${selected ? "opacity-80" : "opacity-100"}`}
+                className={`object-cover w-full h-36 group-hover:opacity-90 transition ${
+                  selected ? "opacity-80" : "opacity-100"
+                }`}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent flex items-end justify-center pb-3 text-white font-semibold text-center text-sm sm:text-base">
                 {opt.label}
@@ -179,7 +182,7 @@ function StepWhen({ bookingData, setBookingData, onNext, onPrev }) {
 }
 
 /* ---------------------------------------------------------
-   STEP 3 – Address & Notes
+   STEP 3 – Address & Notes (avec Google Places + préfill)
 --------------------------------------------------------- */
 function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
   /* global google */
@@ -202,7 +205,12 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
       const formatted = place.formatted_address;
       const lat = place.geometry.location.lat();
       const lng = place.geometry.location.lng();
-      setBookingData((prev) => ({ ...prev, address: formatted, latitude: lat, longitude: lng }));
+      setBookingData((prev) => ({
+        ...prev,
+        address: formatted,
+        latitude: lat,
+        longitude: lng,
+      }));
     });
   }, [setBookingData]);
 
@@ -222,7 +230,13 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         id="autocomplete-input"
         type="text"
         placeholder="Enter your address"
-        defaultValue={bookingData.address}
+        value={bookingData.address}
+        onChange={(e) =>
+          setBookingData((prev) => ({
+            ...prev,
+            address: e.target.value,
+          }))
+        }
         className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-rose-500 focus:outline-none"
       />
       <textarea
@@ -309,7 +323,7 @@ function StepRecap({ bookingData, onPrev, onConfirm, loading }) {
    MAIN COMPONENT
 --------------------------------------------------------- */
 export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
-  const { session } = useUser();
+  const { session, user } = useUser();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [bookingData, setBookingData] = useState({
@@ -323,6 +337,21 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
+
+  // 🧩 Préremplir avec l'adresse du user, si dispo
+  useEffect(() => {
+    if (!user) return;
+
+    setBookingData((prev) => {
+      if (prev.address && prev.address.trim() !== "") return prev;
+      return {
+        ...prev,
+        address: user.address || "",
+        latitude: user.latitude ?? prev.latitude,
+        longitude: user.longitude ?? prev.longitude,
+      };
+    });
+  }, [user]);
 
   const handleConfirm = async () => {
     if (isSubmitting) return;
@@ -369,10 +398,8 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       };
 
-      // 🔍 Vérifier les services demandés par le client
       console.log("🎨 BookingData.services:", bookingData.services);
 
-      // ✅ Trouver les pros compatibles (distance + service)
       const matchingPros = pros.filter((p) => {
         if (!p.latitude || !p.longitude) {
           console.warn(`❌ Pro ${p.first_name || p.id} sans coordonnées`);
@@ -386,20 +413,17 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
           p.longitude
         );
 
-        // ✅ Parser correctement business_type (PostgreSQL text[] ou string)
         let proServices = [];
         try {
           if (Array.isArray(p.business_type)) {
             proServices = p.business_type.map((s) => s.trim());
           } else if (typeof p.business_type === "string") {
             if (p.business_type.startsWith("{")) {
-              // Format PostgreSQL text[]
               proServices = p.business_type
                 .replace(/^{|}$/g, "")
                 .split(",")
                 .map((s) => s.replace(/"/g, "").trim());
             } else {
-              // Format CSV simple
               proServices = p.business_type.split(",").map((s) => s.trim());
             }
           }
@@ -407,7 +431,6 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
           console.warn("⚠️ Impossible de parser business_type pour", p.id, e);
         }
 
-        // ✅ Comparaison souple (tolère les différences de casse ou d’intitulé)
         const clientServices = Array.isArray(bookingData.services)
           ? bookingData.services.map((s) => s.toLowerCase().trim())
           : [String(bookingData.services).toLowerCase().trim()];
@@ -420,13 +443,11 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
           });
         });
 
-        // ✅ Vérifie si le pro est dans le rayon
         const isInRange = dist <= (p.radius_km || 20);
 
         return isInRange && offersService;
       });
 
-      // 🔍 Logs de contrôle
       console.log("📋 Pros trouvés:", pros);
       console.log("✅ Pros correspondants:", matchingPros);
       if (!matchingPros.length) console.warn("⚠️ Aucun pro correspondant trouvé.");

@@ -8,13 +8,21 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
   const handleProSignup = async (e) => {
     e.preventDefault();
 
+    const username = e.target.username.value.trim();
+    const firstName = e.target.firstName.value.trim();
+    const lastName = e.target.lastName.value.trim();
     const businessName = e.target.businessName.value.trim();
     const email = e.target.email.value.trim();
     const password = e.target.password.value.trim();
 
     try {
-      // Création du compte pro avec le businessName
-      await signup(email, password, "pro", { businessName });
+      await signup(email, password, "pro", {
+        username,
+        firstName,
+        lastName,
+        businessName,
+      });
+
       onClose();
       window.location.href = "/prodashboard";
     } catch (error) {
@@ -49,6 +57,43 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
           <h2 className="text-3xl font-bold text-center mb-6">Join Glossed as a Pro</h2>
 
           <form className="space-y-4" onSubmit={handleProSignup}>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Username</label>
+              <input
+                type="text"
+                name="username"
+                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                placeholder="yourusername"
+                required
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Will be stored in lowercase. Used to login and in chats later.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700">First name</label>
+                <input
+                  type="text"
+                  name="firstName"
+                  className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  placeholder="Mary"
+                  required
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700">Last name</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  placeholder="Smith"
+                  required
+                />
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700">Business name</label>
               <input

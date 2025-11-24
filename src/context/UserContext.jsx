@@ -1,3 +1,4 @@
+// src/context/UserContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import UpgradeToProModal from "@/components/modals/UpgradeToProModal";
@@ -13,7 +14,7 @@ export function UserProvider({ children }) {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // -----------------------------------------------------------
-  // 🧠 Charger le profil complet
+  // 🧠 Charger le profil complet (table public.users)
   // -----------------------------------------------------------
   const fetchUserProfile = async (supaUser) => {
     try {
@@ -30,6 +31,7 @@ export function UserProvider({ children }) {
       const fullUser = {
         id: supaUser.id,
         email: supaUser.email,
+        username: profile.username || null,
         first_name: profile.first_name || "",
         last_name: profile.last_name || "",
         business_name: profile.business_name || "",
@@ -37,11 +39,12 @@ export function UserProvider({ children }) {
         address: profile.address || "",
         professional_email: profile.professional_email || "",
         phone_number: profile.phone_number || "",
+        latitude: profile.latitude ?? null,
+        longitude: profile.longitude ?? null,
         role,
         activeRole: role,
-        language: profile.language || "en",
-        currency: profile.currency || "EUR",
         theme: profile.theme || "light",
+        // language / currency supprimés ici, on ne s'appuie plus dessus
       };
 
       setUser(fullUser);
@@ -52,9 +55,8 @@ export function UserProvider({ children }) {
   };
 
   // -----------------------------------------------------------
-  // 🔄 Initialisation de la session (cross-browser)
+  // 🔄 Initialisation de la session
   // -----------------------------------------------------------
-  // remplace ton useEffect principal (auth listener)
   useEffect(() => {
     const init = async () => {
       setLoading(true);
@@ -72,10 +74,9 @@ export function UserProvider({ children }) {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("🔄 Auth state changed:", event);
 
-      // ✅ corrige le cas TOKEN_REFRESHED : on ne réinitialise pas tout
       if (event === "TOKEN_REFRESHED" && session) {
         setSession(session);
-        return; // pas de reset inutile
+        return;
       }
 
       if (session?.user) {
@@ -104,7 +105,7 @@ export function UserProvider({ children }) {
       setUser(null);
       setSession(null);
       localStorage.removeItem("glossed_user");
-      window.location.assign("/"); // ⚙️ évite l’historique et force le reload complet
+      window.location.assign("/");
     }
   };
 
@@ -114,9 +115,7 @@ export function UserProvider({ children }) {
   const switchRole = async () => {
     if (!user) return;
 
-    // 🔹 Si c’est un client qui veut devenir pro
     if (user.activeRole === "client") {
-      // Vérifie si le profil pro est déjà configuré
       const { data: profile } = await supabase
         .from("users")
         .select("business_name, professional_email, stripe_account_id")
@@ -127,13 +126,11 @@ export function UserProvider({ children }) {
         profile?.business_name || profile?.professional_email || profile?.stripe_account_id;
 
       if (!hasProData) {
-        // 💡 Pas encore de profil pro → ouvrir le modal d’upgrade
         setShowUpgradeModal(true);
         return;
       }
     }
 
-    // 🔁 Sinon, on fait le switch normal
     const nextRole = user.activeRole === "client" ? "pro" : "client";
 
     const { error } = await supabase
@@ -154,14 +151,50 @@ export function UserProvider({ children }) {
   };
 
   // -----------------------------------------------------------
-  // ⚙️ Helpers
+  // 🔑 Login : email OU username
   // -----------------------------------------------------------
-  const isAuthenticated = !!user;
-  const isPro = user?.activeRole === "pro";
-  const isClient = user?.activeRole === "client";
+  const login = async (identifier, password) => {
+    const trimmed = identifier.trim();
 
-  const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    // 1) On tente directement comme email
+    if (trimmed.includes("@")) {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: trimmed,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data.session?.user) {
+        setSession(data.session);
+        await fetchUserProfile(data.session.user);
+      }
+      return;
+    }
+
+    // 2) Sinon, on le traite comme username (en minuscules)
+    const username = trimmed.toLowerCase();
+
+    const { data: row, error: userError } = await supabase
+      .from("users")
+      .select("email")
+      .eq("username", username)
+      .maybeSingle();
+
+    if (userError) {
+      console.error("❌ login username lookup error:", userError.message);
+      throw new Error("Unable to login with this username.");
+    }
+
+    if (!row?.email) {
+      throw new Error("No user found with this username.");
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: row.email,
+      password,
+    });
+
     if (error) throw error;
 
     if (data.session?.user) {
@@ -170,6 +203,73 @@ export function UserProvider({ children }) {
     }
   };
 
+  // -----------------------------------------------------------
+  // 🆕 Signup : email + password + rôle + meta (username, prénom, nom, business)
+  // -----------------------------------------------------------
+  const signup = async (email, password, role = "client", meta = {}) => {
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+    const username =
+      meta.username && typeof meta.username === "string"
+        ? meta.username.trim().toLowerCase()
+        : null;
+
+    const firstName =
+      meta.firstName && typeof meta.firstName === "string" ? meta.firstName.trim() : null;
+    const lastName =
+      meta.lastName && typeof meta.lastName === "string" ? meta.lastName.trim() : null;
+    const businessName =
+      meta.businessName && typeof meta.businessName === "string" ? meta.businessName.trim() : null;
+
+    // 1) Création dans auth
+    const { data, error } = await supabase.auth.signUp({
+      email: cleanEmail,
+      password: cleanPassword,
+    });
+
+    if (error) throw error;
+
+    const authUser = data.user;
+    if (!authUser) {
+      throw new Error("Signup failed: auth user not created.");
+    }
+
+    // 2) Création du profil "users"
+    const insertPayload = {
+      id: authUser.id,
+      email: cleanEmail,
+      role,
+      active_role: role,
+      username,
+      first_name: firstName,
+      last_name: lastName,
+      business_name: businessName,
+      theme: "light",
+    };
+
+    const { error: profileError } = await supabase.from("users").insert(insertPayload);
+
+    if (profileError) {
+      console.error("❌ Error creating user profile:", profileError.message);
+      throw new Error("Signup succeeded, but failed to create profile.");
+    }
+
+    // Optionnel : on met à jour le contexte si une session est déjà ouverte
+    if (data.session?.user) {
+      setSession(data.session);
+      await fetchUserProfile(data.session.user);
+    }
+
+    return { user: authUser };
+  };
+
+  // -----------------------------------------------------------
+  // ⚙️ Helpers
+  // -----------------------------------------------------------
+  const isAuthenticated = !!user;
+  const isPro = user?.activeRole === "pro";
+  const isClient = user?.activeRole === "client";
+
   const value = {
     session,
     user,
@@ -177,6 +277,7 @@ export function UserProvider({ children }) {
     isPro,
     isClient,
     login,
+    signup,
     logout,
     switchRole,
     loading,

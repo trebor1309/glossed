@@ -1,7 +1,7 @@
 // src/components/modals/LoginModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "../../context/UserContext"; // contexte utilisateur
-import { useNavigate } from "react-router-dom"; // navigation
+import { useUser } from "../../context/UserContext";
+import { useNavigate } from "react-router-dom";
 
 export default function LoginModal({ onClose, onSignup }) {
   const { login } = useUser();
@@ -10,15 +10,15 @@ export default function LoginModal({ onClose, onSignup }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const email = e.target.email.value.trim();
+    const identifier = e.target.identifier.value.trim(); // email OU username
     const password = e.target.password.value.trim();
 
     try {
-      await login(email, password); // vraie fonction Supabase
-      onClose(); // ferme après succès
-      navigate("/dashboard"); // redirige selon rôle (on peut ajuster ensuite)
+      await login(identifier, password);
+      onClose();
+      navigate("/dashboard");
     } catch (error) {
-      alert(" Login failed: " + error.message);
+      alert("Login failed: " + error.message);
     }
   };
 
@@ -39,7 +39,6 @@ export default function LoginModal({ onClose, onSignup }) {
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ duration: 0.3 }}
         >
-          {/* Close button */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -49,15 +48,14 @@ export default function LoginModal({ onClose, onSignup }) {
 
           <h2 className="text-3xl font-bold text-center mb-6">Sign in</h2>
 
-          {/* Formulaire */}
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <label className="block text-sm font-medium text-gray-700">Email or username</label>
               <input
-                type="email"
-                name="email"
+                type="text"
+                name="identifier"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="you@example.com"
+                placeholder="you@example.com or yourusername"
                 required
               />
             </div>
