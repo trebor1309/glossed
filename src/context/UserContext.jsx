@@ -11,7 +11,15 @@ export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [proBadge, setProBadge] = useState(0);
+
+  // IMPORTANT : le modal doit être complètement indépendant
+  // Il ne sera ouvert QUE si l'on appelle setShowUpgradeModal(true)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // RESET modal quand user = null (évite le bug landing page)
+  useEffect(() => {
+    if (!user) setShowUpgradeModal(false);
+  }, [user]);
 
   // -----------------------------------------------------------
   // 🧠 Charger (ou créer) le profil dans public.users
@@ -28,7 +36,7 @@ export function UserProvider({ children }) {
 
       let finalProfile = profile;
 
-      // 🔄 Si aucun profil → on tente d'en créer un minimal
+      // 🔄 Création automatique si trigger cassé
       if (!finalProfile) {
         const { data: inserted, error: insertError } = await supabase
           .from("users")
@@ -95,6 +103,7 @@ export function UserProvider({ children }) {
       } else {
         setUser(null);
       }
+
       setLoading(false);
     };
 
@@ -114,6 +123,7 @@ export function UserProvider({ children }) {
       } else {
         setUser(null);
         localStorage.removeItem("glossed_user");
+        setShowUpgradeModal(false); // 🛑 sécurité absolue
       }
     });
 
@@ -127,17 +137,17 @@ export function UserProvider({ children }) {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
+    setShowUpgradeModal(false); // 🛑 éviter apparition du modal après logout
     localStorage.removeItem("glossed_user");
     window.location.assign("/");
   };
 
   // -----------------------------------------------------------
-  // 🔑 Login (email OU username)
+  // 🔑 Login
   // -----------------------------------------------------------
   const login = async (identifier, password) => {
     const input = identifier.trim();
 
-    // Email direct
     if (input.includes("@")) {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: input,
@@ -152,7 +162,6 @@ export function UserProvider({ children }) {
       return;
     }
 
-    // Sinon → username → lookup email
     const { data: lookup, error: lookupErr } = await supabase
       .from("users")
       .select("email")
@@ -166,6 +175,7 @@ export function UserProvider({ children }) {
       email: lookup.email,
       password,
     });
+
     if (error) throw error;
 
     if (data.session?.user) {
@@ -175,25 +185,21 @@ export function UserProvider({ children }) {
   };
 
   // -----------------------------------------------------------
-  // 🆕 Signup : Auth seulement → profil plus tard (onboarding)
+  // 🆕 Signup (profil rempli ensuite dans onboarding)
   // -----------------------------------------------------------
   const signup = async (email, password) => {
-    const cleanEmail = email.trim();
-    const cleanPassword = password.trim();
-
     const { data, error } = await supabase.auth.signUp({
-      email: cleanEmail,
-      password: cleanPassword,
+      email: email.trim(),
+      password: password.trim(),
     });
 
     if (error) throw error;
 
-    // En mode "email confirmation", pas de session immédiate → on ne touche pas au profil ici.
     return { user: data.user };
   };
 
   // -----------------------------------------------------------
-  // 🔁 Switch rôle (client <-> pro) pour les comptes existants
+  // 🔁 Switch rôle
   // -----------------------------------------------------------
   const switchRole = async () => {
     if (!user) return;
@@ -228,8 +234,11 @@ export function UserProvider({ children }) {
     isAuthenticated: !!user,
     isPro: user?.activeRole === "pro",
     isClient: user?.activeRole === "client",
+
     proBadge,
     setProBadge,
+
+    // modal accessible manuellement UNIQUEMENT
     showUpgradeModal,
     setShowUpgradeModal,
   };
@@ -237,7 +246,9 @@ export function UserProvider({ children }) {
   return (
     <UserContext.Provider value={value}>
       {children}
-      {showUpgradeModal && <UpgradeToProModal onClose={() => setShowUpgradeModal(false)} />}
+
+      {/* 🛡️ Modal ne s'affiche QUE si user est authentifié */}
+      {user && showUpgradeModal && <UpgradeToProModal onClose={() => setShowUpgradeModal(false)} />}
     </UserContext.Provider>
   );
 }

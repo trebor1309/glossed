@@ -1,8 +1,14 @@
-// src/router/AppRouter.jsx
+// 📄 src/router/AppRouter.jsx
 import { Routes, Route, Navigate } from "react-router-dom";
 
 // 🌍 Public pages
 import Home from "@/pages/Home";
+import About from "@/pages/About";
+import Services from "@/pages/Services";
+import Legal from "@/pages/Legal";
+import Privacy from "@/pages/Privacy";
+import Terms from "@/pages/Terms";
+import FAQ from "@/pages/FAQ";
 import AboutUs from "@/pages/AboutUs";
 import Careers from "@/pages/Careers";
 import Press from "@/pages/Press";
@@ -10,39 +16,24 @@ import Blog from "@/pages/Blog";
 import HelpCenter from "@/pages/HelpCenter";
 import Contact from "@/pages/Contact";
 import Safety from "@/pages/Safety";
-import About from "@/pages/About";
-import Services from "@/pages/Services";
-import Legal from "@/pages/Legal";
-import Privacy from "@/pages/Privacy";
-import Terms from "@/pages/Terms";
-import FAQ from "@/pages/FAQ";
 
-// 🔐 Auth pages
+// 👤 Auth pages
 import CheckEmail from "@/pages/auth/CheckEmail";
 import EmailVerified from "@/pages/auth/EmailVerified";
-import Onboarding from "@/pages/auth/Onboarding";
+import OnboardingPage from "@/pages/auth/OnboardingPage";
 
-// 💬 Chat (client)
-import DashboardMessages from "@/pages/dashboard/pages/DashboardMessages";
-import DashboardChat from "@/pages/dashboard/pages/DashboardChat";
-
-// 💬 Chat (pro)
-import ProDashboardMessages from "@/pages/prodashboard/pages/ProDashboardMessages";
-import ProDashboardChat from "@/pages/prodashboard/pages/ProDashboardChat";
-import ChatLayout from "@/components/chat/ChatLayout";
-
-// 👤 Client dashboard
+// Dashboard — Client
 import DashboardLayout from "@/pages/dashboard/DashboardLayout";
 import DashboardHome from "@/pages/dashboard/pages/DashboardHome";
+import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 import DashboardReservations from "@/pages/dashboard/pages/DashboardReservations";
 import DashboardAccount from "@/pages/dashboard/pages/DashboardAccount";
 import DashboardSettings from "@/pages/dashboard/pages/DashboardSettings";
 import DashboardMore from "@/pages/dashboard/pages/DashboardMore";
-import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 import DashboardPayments from "@/pages/dashboard/pages/DashboardPayments";
 import PaymentSuccess from "@/pages/dashboard/payment/Success";
 
-// 💼 Pro dashboard
+// Dashboard — Pro
 import ProDashboardLayout from "@/pages/prodashboard/ProDashboardLayout";
 import ProDashboardHome from "@/pages/prodashboard/pages/ProDashboardHome";
 import ProDashboardMissions from "@/pages/prodashboard/pages/ProDashboardMissions";
@@ -53,34 +44,24 @@ import ProDashboardAccount from "@/pages/prodashboard/pages/ProDashboardAccount"
 import StripeSuccess from "@/pages/prodashboard/stripe/Success";
 import StripeRefresh from "@/pages/prodashboard/stripe/Refresh";
 
-// 🔒 Guards
+// Chat system
+import ChatLayout from "@/components/chat/ChatLayout";
+import DashboardMessages from "@/pages/dashboard/pages/DashboardMessages";
+import DashboardChat from "@/pages/dashboard/pages/DashboardChat";
+import ProDashboardMessages from "@/pages/prodashboard/pages/ProDashboardMessages";
+import ProDashboardChat from "@/pages/prodashboard/pages/ProDashboardChat";
+
+// Route guards
 import ProtectedRoute from "./ProtectedRoute";
+import ProRoute from "./ProRoute";
+import PublicOnlyRoute from "./PublicOnlyRoute";
 import OnboardingGuard from "./OnboardingGuard";
 
-export default function AppRouter({
-  isAuthenticated,
-  isPro,
-  user,
-  onOpenLogin,
-  onOpenSignup,
-  onOpenDownload,
-}) {
+export default function AppRouter() {
   return (
     <Routes>
       {/* 🌍 Public */}
-      <Route
-        path="/"
-        element={
-          <Home
-            onOpenLogin={onOpenLogin}
-            onOpenSignup={onOpenSignup}
-            // onOpenProSignup utilise le même modal Signup
-            onOpenProSignup={onOpenSignup}
-            onOpenDownload={onOpenDownload}
-          />
-        }
-      />
-
+      <Route path="/" element={<Home />} />
       <Route path="/about" element={<About />} />
       <Route path="/services" element={<Services />} />
       <Route path="/legal" element={<Legal />} />
@@ -95,26 +76,37 @@ export default function AppRouter({
       <Route path="/contact" element={<Contact />} />
       <Route path="/safety" element={<Safety />} />
 
-      {/* 🔐 Auth flow */}
-      <Route path="/auth/check-email" element={<CheckEmail />} />
+      {/* 📧 Email verification flow */}
+      <Route
+        path="/auth/check-email"
+        element={
+          <PublicOnlyRoute>
+            <CheckEmail />
+          </PublicOnlyRoute>
+        }
+      />
+
       <Route path="/auth/email-verified" element={<EmailVerified />} />
+
+      {/* 🧭 Onboarding */}
       <Route
         path="/auth/onboarding"
         element={
           <ProtectedRoute>
-            <Onboarding />
+            <OnboardingGuard>
+              <OnboardingPage />
+            </OnboardingGuard>
           </ProtectedRoute>
         }
       />
 
       {/* 👤 Dashboard Client */}
       <Route
-        path="/dashboard/*"
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <OnboardingGuard>
-              {/* si pro connecté → redirige vers prodashboard */}
-              {isPro ? <Navigate to="/prodashboard" replace /> : <DashboardLayout />}
+              <DashboardLayout />
             </OnboardingGuard>
           </ProtectedRoute>
         }
@@ -127,27 +119,24 @@ export default function AppRouter({
         <Route path="more" element={<DashboardMore />} />
         <Route path="payments" element={<DashboardPayments />} />
 
-        {/* Inbox + Chat client */}
+        {/* 💬 Client Chat */}
         <Route path="messages" element={<ChatLayout leftPanel={<DashboardMessages />} />}>
           <Route path=":chat_id" element={<DashboardChat />} />
         </Route>
       </Route>
 
-      {/* ✅ Stripe retour client */}
       <Route path="/payment/success" element={<PaymentSuccess />} />
 
       {/* 💼 Dashboard Pro */}
       <Route
-        path="/prodashboard/*"
+        path="/prodashboard"
         element={
           <ProtectedRoute>
-            <OnboardingGuard>
-              {isPro || user?.role === "pro" || user?.activeRole === "pro" ? (
+            <ProRoute>
+              <OnboardingGuard>
                 <ProDashboardLayout />
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )}
-            </OnboardingGuard>
+              </OnboardingGuard>
+            </ProRoute>
           </ProtectedRoute>
         }
       >
@@ -158,17 +147,16 @@ export default function AppRouter({
         <Route path="account" element={<ProDashboardAccount />} />
         <Route path="more" element={<ProDashboardMore />} />
 
-        {/* Inbox + Chat pro */}
+        {/* 💬 Pro Chat */}
         <Route path="messages" element={<ChatLayout leftPanel={<ProDashboardMessages />} />}>
           <Route path=":chat_id" element={<ProDashboardChat />} />
         </Route>
 
-        {/* Stripe pro */}
         <Route path="stripe/success" element={<StripeSuccess />} />
         <Route path="stripe/refresh" element={<StripeRefresh />} />
       </Route>
 
-      {/* Fallback */}
+      {/* ❓ Unknown route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
