@@ -10,61 +10,75 @@ export function UserProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [proBadge, setProBadge] = useState(0);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  /* ============================================================
-     🔍 CHARGER LE PROFIL PUBLIC.USERS COMPLET
-  ============================================================ */
-  const fetchUserProfile = async (authUser) => {
-    const { data, error } = await supabase.from("users").select("*").eq("id", authUser.id).single();
+  // -----------------------------------------------------------
+  // 🧠 Charger le profil complet
+  // -----------------------------------------------------------
+  const fetchUserProfile = async (supaUser) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", supaUser.id)
+        .single();
 
-    if (error) {
-      console.error("❌ fetchUserProfile failed:", error);
-      return;
+      if (error) throw error;
+
+      const role = profile.active_role || profile.role || "client";
+
+      const fullUser = {
+        id: profile.id,
+        email: profile.email,
+        username: profile.username || null,
+        first_name: profile.first_name || "",
+        last_name: profile.last_name || "",
+        business_name: profile.business_name || "",
+        address: profile.address || "",
+        latitude: profile.latitude,
+        longitude: profile.longitude,
+        phone_number: profile.phone_number || "",
+        profile_photo: profile.profile_photo || null,
+        role,
+        activeRole: role,
+        theme: profile.theme || "light",
+      };
+
+      setUser(fullUser);
+      localStorage.setItem("glossed_user", JSON.stringify(fullUser));
+    } catch (err) {
+      console.error("❌ fetchUserProfile failed:", err.message);
     }
-
-    const role = data.active_role || data.role || "client";
-
-    const fullUser = {
-      id: authUser.id,
-      email: authUser.email,
-      username: data.username || null,
-      first_name: data.first_name || "",
-      last_name: data.last_name || "",
-      business_name: data.business_name || "",
-      city: data.city || "",
-      address: data.address || "",
-      latitude: data.latitude ?? null,
-      longitude: data.longitude ?? null,
-      theme: data.theme || "light",
-      phone_number: data.phone_number || "",
-      professional_email: data.professional_email || "",
-      activeRole: role,
-      role,
-    };
-
-    setUser(fullUser);
-    localStorage.setItem("glossed_user", JSON.stringify(fullUser));
   };
 
-  /* ============================================================
-     🔄 INIT SESSION + LISTENER
-  ============================================================ */
+  // -----------------------------------------------------------
+  // 🔄 Initialisation auth + session
+  // -----------------------------------------------------------
   useEffect(() => {
     const init = async () => {
+      setLoading(true);
       const { data } = await supabase.auth.getSession();
 
       if (data?.session) {
         setSession(data.session);
         await fetchUserProfile(data.session.user);
+      } else {
+        setUser(null);
       }
       setLoading(false);
     };
 
     init();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("🔄 Auth change:", event);
+
+      if (event === "TOKEN_REFRESHED" && session) {
+        setSession(session);
+        return;
+      }
+
       if (session?.user) {
         setSession(session);
         await fetchUserProfile(session.user);
@@ -74,108 +88,132 @@ export function UserProvider({ children }) {
       }
     });
 
-    return () => listener.subscription.unsubscribe();
+    return () => authListener.subscription.unsubscribe();
   }, []);
 
-  /* ============================================================
-     🚪 LOGOUT
-  ============================================================ */
+  // -----------------------------------------------------------
+  // 🚪 Logout
+  // -----------------------------------------------------------
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setSession(null);
+    localStorage.removeItem("glossed_user");
     window.location.assign("/");
   };
 
-  /* ============================================================
-     🔁 SWITCH ROLE
-  ============================================================ */
-  const switchRole = async () => {
-    if (!user) return;
-
-    const newRole = user.activeRole === "client" ? "pro" : "client";
-
-    const { error } = await supabase
-      .from("users")
-      .update({ active_role: newRole })
-      .eq("id", user.id);
-
-    if (error) {
-      console.error("❌ switchRole:", error);
-      return;
-    }
-
-    const updated = { ...user, activeRole: newRole };
-    setUser(updated);
-    localStorage.setItem("glossed_user", JSON.stringify(updated));
-
-    window.location.assign(newRole === "pro" ? "/prodashboard" : "/dashboard");
-  };
-
-  /* ============================================================
-     🔐 LOGIN : email OU username
-  ============================================================ */
+  // -----------------------------------------------------------
+  // 🔑 Login (email OU username)
+  // -----------------------------------------------------------
   const login = async (identifier, password) => {
     const input = identifier.trim();
 
-    // LOGIN EMAIL
     if (input.includes("@")) {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: input,
         password,
       });
       if (error) throw error;
+
+      if (data.session?.user) {
+        setSession(data.session);
+        await fetchUserProfile(data.session.user);
+      }
       return;
     }
 
-    // LOGIN USERNAME
-    const username = input.toLowerCase();
-    const { data: row } = await supabase
+    // username → récup email → login normal
+    const { data: lookup, error: lookupErr } = await supabase
       .from("users")
       .select("email")
-      .eq("username", username)
+      .eq("username", input.toLowerCase())
       .maybeSingle();
 
-    if (!row?.email) throw new Error("Username not found.");
+    if (lookupErr) throw lookupErr;
+    if (!lookup?.email) throw new Error("No user with this username.");
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: row.email,
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: lookup.email,
       password,
     });
-
     if (error) throw error;
+
+    if (data.session?.user) {
+      setSession(data.session);
+      await fetchUserProfile(data.session.user);
+    }
   };
 
-  /* ============================================================
-     🆕 SIGNUP : SANS INSERT, AVEC METADATA
-  ============================================================ */
+  // -----------------------------------------------------------
+  // 🆕 Signup : via signUp + UPDATE users
+  // -----------------------------------------------------------
   const signup = async (email, password, role = "client", meta = {}) => {
-    const username = meta.username ? meta.username.trim().toLowerCase() : null;
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
 
+    const desiredUsername = meta.username?.trim().toLowerCase() || null;
+    const firstName = meta.firstName?.trim() || null;
+    const lastName = meta.lastName?.trim() || null;
+    const businessName = meta.businessName?.trim() || null;
+
+    // 1) Create Auth User
     const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username,
-          first_name: meta.firstName || null,
-          last_name: meta.lastName || null,
-          business_name: meta.businessName || null,
-          role,
-          active_role: role,
-          theme: "light",
-        },
-      },
+      email: cleanEmail,
+      password: cleanPassword,
     });
-
     if (error) throw error;
 
-    // Si une session existe déjà (email non confirmé), on met à jour le profil
-    if (data.user) {
-      await fetchUserProfile(data.user);
+    const authUser = data.user;
+    if (!authUser) throw new Error("Signup failed: No auth user returned.");
+
+    // 2) Update the profile created by the trigger
+    const updates = {
+      role,
+      active_role: role,
+      username: desiredUsername,
+      first_name: firstName,
+      last_name: lastName,
+      business_name: businessName,
+    };
+
+    const { error: updateErr } = await supabase.from("users").update(updates).eq("id", authUser.id);
+
+    if (updateErr) {
+      console.error("❌ Profile update error:", updateErr.message);
+      throw new Error("Signup succeeded, but profile update failed.");
     }
 
-    return data.user;
+    // Session active ? → mettre à jour le contexte
+    if (data.session?.user) {
+      setSession(data.session);
+      await fetchUserProfile(data.session.user);
+    }
+
+    return { user: authUser };
+  };
+
+  // -----------------------------------------------------------
+  // 🔁 Switch rôle
+  // -----------------------------------------------------------
+  const switchRole = async () => {
+    if (!user) return;
+
+    const nextRole = user.activeRole === "client" ? "pro" : "client";
+
+    const { error } = await supabase
+      .from("users")
+      .update({ active_role: nextRole })
+      .eq("id", user.id);
+
+    if (error) {
+      console.error("Error switchRole:", error.message);
+      return;
+    }
+
+    const updated = { ...user, activeRole: nextRole };
+    setUser(updated);
+    localStorage.setItem("glossed_user", JSON.stringify(updated));
+
+    window.location.assign(nextRole === "pro" ? "/prodashboard" : "/dashboard");
   };
 
   const value = {

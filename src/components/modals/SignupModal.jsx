@@ -1,6 +1,6 @@
 // src/components/modals/SignupModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "../../context/UserContext";
+import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 
 export default function SignupModal({ onClose, onProSignup, onLogin }) {
@@ -9,24 +9,16 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
 
   const handleSignup = async (e) => {
     e.preventDefault();
-
     const username = e.target.username.value.trim();
-    const firstName = e.target.firstName.value.trim();
-    const lastName = e.target.lastName.value.trim();
     const email = e.target.email.value.trim();
     const password = e.target.password.value.trim();
 
     try {
-      await signup(email, password, "client", {
-        username,
-        firstName,
-        lastName,
-      });
-
+      await signup(email, password, "client", { username });
       onClose();
       navigate("/dashboard");
-    } catch (error) {
-      alert("Signup failed: " + error.message);
+    } catch (err) {
+      alert("Signup failed: " + err.message);
     }
   };
 
@@ -37,15 +29,12 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
         onClick={onClose}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
       >
         <motion.div
           className="bg-white rounded-2xl shadow-xl w-11/12 max-w-md p-8 relative"
           onClick={(e) => e.stopPropagation()}
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          transition={{ duration: 0.3 }}
         >
           <button
             onClick={onClose}
@@ -62,37 +51,10 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
               <input
                 type="text"
                 name="username"
-                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="yourusername"
                 required
+                className="w-full mt-1 px-4 py-2 border rounded-lg"
+                placeholder="yourname"
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Will be stored in lowercase. Used to login and in chats later.
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700">First name</label>
-                <input
-                  type="text"
-                  name="firstName"
-                  className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                  placeholder="Jane"
-                  required
-                />
-              </div>
-
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700">Last name</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                  placeholder="Doe"
-                  required
-                />
-              </div>
             </div>
 
             <div>
@@ -100,9 +62,9 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
               <input
                 type="email"
                 name="email"
-                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="you@example.com"
                 required
+                className="w-full mt-1 px-4 py-2 border rounded-lg"
+                placeholder="you@example.com"
               />
             </div>
 
@@ -111,15 +73,15 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
               <input
                 type="password"
                 name="password"
-                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="••••••••"
                 required
+                className="w-full mt-1 px-4 py-2 border rounded-lg"
+                placeholder="••••••••"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all"
+              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg"
             >
               Sign up
             </button>

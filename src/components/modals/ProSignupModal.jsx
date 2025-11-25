@@ -1,6 +1,6 @@
 // src/components/modals/ProSignupModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "../../context/UserContext";
+import { useUser } from "@/context/UserContext";
 
 export default function ProSignupModal({ onClose, onClientSignup }) {
   const { signup } = useUser();
@@ -9,8 +9,6 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
     e.preventDefault();
 
     const username = e.target.username.value.trim();
-    const firstName = e.target.firstName.value.trim();
-    const lastName = e.target.lastName.value.trim();
     const businessName = e.target.businessName.value.trim();
     const email = e.target.email.value.trim();
     const password = e.target.password.value.trim();
@@ -18,15 +16,13 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
     try {
       await signup(email, password, "pro", {
         username,
-        firstName,
-        lastName,
         businessName,
       });
 
       onClose();
       window.location.href = "/prodashboard";
-    } catch (error) {
-      alert("Erreur lors de l'inscription : " + error.message);
+    } catch (err) {
+      alert("Pro signup failed: " + err.message);
     }
   };
 
@@ -37,15 +33,12 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
         onClick={onClose}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
       >
         <motion.div
           className="bg-white rounded-2xl shadow-xl w-11/12 max-w-md p-8 relative"
           onClick={(e) => e.stopPropagation()}
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          transition={{ duration: 0.3 }}
         >
           <button
             onClick={onClose}
@@ -62,36 +55,10 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
               <input
                 type="text"
                 name="username"
-                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="yourusername"
                 required
+                className="w-full mt-1 px-4 py-2 border rounded-lg"
+                placeholder="yourname"
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Will be stored in lowercase. Used to login and in chats later.
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700">First name</label>
-                <input
-                  type="text"
-                  name="firstName"
-                  className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                  placeholder="Mary"
-                  required
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700">Last name</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                  placeholder="Smith"
-                  required
-                />
-              </div>
             </div>
 
             <div>
@@ -99,9 +66,9 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
               <input
                 type="text"
                 name="businessName"
-                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="Your Salon or Brand"
                 required
+                className="w-full mt-1 px-4 py-2 border rounded-lg"
+                placeholder="Your Salon or Brand"
               />
             </div>
 
@@ -110,9 +77,9 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
               <input
                 type="email"
                 name="email"
-                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="contact@yourbrand.com"
                 required
+                className="w-full mt-1 px-4 py-2 border rounded-lg"
+                placeholder="contact@yourbrand.com"
               />
             </div>
 
@@ -121,15 +88,15 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
               <input
                 type="password"
                 name="password"
-                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="••••••••"
                 required
+                className="w-full mt-1 px-4 py-2 border rounded-lg"
+                placeholder="••••••••"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all"
+              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg"
             >
               Join as a Pro
             </button>
