@@ -3,20 +3,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 
-export default function SignupModal({ onClose, onProSignup, onLogin }) {
+export default function SignupModal({ onClose, onLogin }) {
   const { signup } = useUser();
   const navigate = useNavigate();
 
   const handleSignup = async (e) => {
     e.preventDefault();
-    const username = e.target.username.value.trim();
     const email = e.target.email.value.trim();
     const password = e.target.password.value.trim();
 
     try {
-      await signup(email, password, "client", { username });
+      await signup(email, password);
       onClose();
-      navigate("/dashboard");
+      navigate("/auth/check-email", { state: { email } });
     } catch (err) {
       alert("Signup failed: " + err.message);
     }
@@ -29,12 +28,15 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
         onClick={onClose}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
       >
         <motion.div
           className="bg-white rounded-2xl shadow-xl w-11/12 max-w-md p-8 relative"
           onClick={(e) => e.stopPropagation()}
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          transition={{ duration: 0.3 }}
         >
           <button
             onClick={onClose}
@@ -47,23 +49,12 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
 
           <form className="space-y-4" onSubmit={handleSignup}>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Username</label>
-              <input
-                type="text"
-                name="username"
-                required
-                className="w-full mt-1 px-4 py-2 border rounded-lg"
-                placeholder="yourname"
-              />
-            </div>
-
-            <div>
               <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
                 type="email"
                 name="email"
                 required
-                className="w-full mt-1 px-4 py-2 border rounded-lg"
+                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="you@example.com"
               />
             </div>
@@ -74,31 +65,28 @@ export default function SignupModal({ onClose, onProSignup, onLogin }) {
                 type="password"
                 name="password"
                 required
-                className="w-full mt-1 px-4 py-2 border rounded-lg"
+                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="••••••••"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg"
+              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all"
             >
               Sign up
             </button>
           </form>
 
           <p className="text-center text-sm text-gray-500 mt-6">
-            Are you a beauty professional?{" "}
-            <button onClick={onProSignup} className="text-rose-600 font-medium hover:underline">
-              Join as a Pro
-            </button>
-          </p>
-
-          <p className="text-center text-sm text-gray-500 mt-3">
             Already have an account?{" "}
             <button onClick={onLogin} className="text-rose-600 font-medium hover:underline">
               Sign in
             </button>
+          </p>
+
+          <p className="text-center text-xs text-gray-400 mt-3">
+            You’ll choose between client and pro and set your username during onboarding.
           </p>
         </motion.div>
       </motion.div>

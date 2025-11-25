@@ -29,12 +29,15 @@ export default function LoginModal({ onClose, onSignup }) {
         onClick={onClose}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
       >
         <motion.div
           className="bg-white rounded-2xl shadow-xl w-11/12 max-w-md p-8 relative"
           onClick={(e) => e.stopPropagation()}
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          transition={{ duration: 0.3 }}
         >
           <button
             onClick={onClose}
@@ -51,9 +54,9 @@ export default function LoginModal({ onClose, onSignup }) {
               <input
                 type="text"
                 name="identifier"
+                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                placeholder="you@example.com or yourname"
                 required
-                className="w-full mt-1 px-4 py-2 border rounded-lg"
-                placeholder="email or username"
               />
             </div>
 
@@ -62,15 +65,15 @@ export default function LoginModal({ onClose, onSignup }) {
               <input
                 type="password"
                 name="password"
-                required
-                className="w-full mt-1 px-4 py-2 border rounded-lg"
+                className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 placeholder="••••••••"
+                required
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg"
+              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all"
             >
               Continue
             </button>

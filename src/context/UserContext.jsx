@@ -14,35 +14,64 @@ export function UserProvider({ children }) {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // -----------------------------------------------------------
-  // 🧠 Charger le profil complet
+  // 🧠 Charger (ou créer) le profil dans public.users
   // -----------------------------------------------------------
   const fetchUserProfile = async (supaUser) => {
+    if (!supaUser) return;
+
     try {
       const { data: profile, error } = await supabase
         .from("users")
         .select("*")
         .eq("id", supaUser.id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      let finalProfile = profile;
 
-      const role = profile.active_role || profile.role || "client";
+      // 🔄 Si aucun profil → on tente d'en créer un minimal
+      if (!finalProfile) {
+        const { data: inserted, error: insertError } = await supabase
+          .from("users")
+          .upsert(
+            {
+              id: supaUser.id,
+              email: supaUser.email,
+              role: "client",
+              active_role: "client",
+              theme: "light",
+            },
+            { onConflict: "id" }
+          )
+          .select("*")
+          .single();
+
+        if (insertError) {
+          console.error("❌ upsert users failed:", insertError.message);
+          return;
+        }
+        finalProfile = inserted;
+      } else if (error) {
+        console.error("❌ fetchUserProfile error:", error.message);
+        return;
+      }
+
+      const role = finalProfile.active_role || finalProfile.role || "client";
 
       const fullUser = {
-        id: profile.id,
-        email: profile.email,
-        username: profile.username || null,
-        first_name: profile.first_name || "",
-        last_name: profile.last_name || "",
-        business_name: profile.business_name || "",
-        address: profile.address || "",
-        latitude: profile.latitude,
-        longitude: profile.longitude,
-        phone_number: profile.phone_number || "",
-        profile_photo: profile.profile_photo || null,
+        id: finalProfile.id,
+        email: finalProfile.email,
+        username: finalProfile.username || null,
+        first_name: finalProfile.first_name || "",
+        last_name: finalProfile.last_name || "",
+        business_name: finalProfile.business_name || "",
+        address: finalProfile.address || "",
+        latitude: finalProfile.latitude ?? null,
+        longitude: finalProfile.longitude ?? null,
+        phone_number: finalProfile.phone_number || "",
+        profile_photo: finalProfile.profile_photo || null,
         role,
         activeRole: role,
-        theme: profile.theme || "light",
+        theme: finalProfile.theme || "light",
       };
 
       setUser(fullUser);
@@ -97,6 +126,7 @@ export function UserProvider({ children }) {
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
     localStorage.removeItem("glossed_user");
     window.location.assign("/");
   };
@@ -107,6 +137,7 @@ export function UserProvider({ children }) {
   const login = async (identifier, password) => {
     const input = identifier.trim();
 
+    // Email direct
     if (input.includes("@")) {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: input,
@@ -121,7 +152,7 @@ export function UserProvider({ children }) {
       return;
     }
 
-    // username → récup email → login normal
+    // Sinon → username → lookup email
     const { data: lookup, error: lookupErr } = await supabase
       .from("users")
       .select("email")
@@ -144,55 +175,25 @@ export function UserProvider({ children }) {
   };
 
   // -----------------------------------------------------------
-  // 🆕 Signup : via signUp + UPDATE users
+  // 🆕 Signup : Auth seulement → profil plus tard (onboarding)
   // -----------------------------------------------------------
-  const signup = async (email, password, role = "client", meta = {}) => {
+  const signup = async (email, password) => {
     const cleanEmail = email.trim();
     const cleanPassword = password.trim();
 
-    const desiredUsername = meta.username?.trim().toLowerCase() || null;
-    const firstName = meta.firstName?.trim() || null;
-    const lastName = meta.lastName?.trim() || null;
-    const businessName = meta.businessName?.trim() || null;
-
-    // 1) Create Auth User
     const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
       password: cleanPassword,
     });
+
     if (error) throw error;
 
-    const authUser = data.user;
-    if (!authUser) throw new Error("Signup failed: No auth user returned.");
-
-    // 2) Update the profile created by the trigger
-    const updates = {
-      role,
-      active_role: role,
-      username: desiredUsername,
-      first_name: firstName,
-      last_name: lastName,
-      business_name: businessName,
-    };
-
-    const { error: updateErr } = await supabase.from("users").update(updates).eq("id", authUser.id);
-
-    if (updateErr) {
-      console.error("❌ Profile update error:", updateErr.message);
-      throw new Error("Signup succeeded, but profile update failed.");
-    }
-
-    // Session active ? → mettre à jour le contexte
-    if (data.session?.user) {
-      setSession(data.session);
-      await fetchUserProfile(data.session.user);
-    }
-
-    return { user: authUser };
+    // En mode "email confirmation", pas de session immédiate → on ne touche pas au profil ici.
+    return { user: data.user };
   };
 
   // -----------------------------------------------------------
-  // 🔁 Switch rôle
+  // 🔁 Switch rôle (client <-> pro) pour les comptes existants
   // -----------------------------------------------------------
   const switchRole = async () => {
     if (!user) return;
@@ -201,7 +202,7 @@ export function UserProvider({ children }) {
 
     const { error } = await supabase
       .from("users")
-      .update({ active_role: nextRole })
+      .update({ active_role: nextRole, role: nextRole })
       .eq("id", user.id);
 
     if (error) {
@@ -209,7 +210,7 @@ export function UserProvider({ children }) {
       return;
     }
 
-    const updated = { ...user, activeRole: nextRole };
+    const updated = { ...user, activeRole: nextRole, role: nextRole };
     setUser(updated);
     localStorage.setItem("glossed_user", JSON.stringify(updated));
 
