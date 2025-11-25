@@ -231,6 +231,8 @@ export function UserProvider({ children }) {
     signup,
     logout,
     switchRole,
+    fetchUserProfile,
+
     isAuthenticated: !!user,
     isPro: user?.activeRole === "pro",
     isClient: user?.activeRole === "client",
