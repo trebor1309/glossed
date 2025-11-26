@@ -5,10 +5,18 @@ import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MapPin, Upload, User, Building2, Phone } from "lucide-react";
+import { useLoadScript } from "@react-google-maps/api";
+
+const libraries = ["places"];
 
 export default function OnboardingPage() {
   const { user, fetchUserProfile } = useUser();
   const navigate = useNavigate();
+
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries,
+  });
 
   const [roleChoice, setRoleChoice] = useState(user?.role || null);
 
@@ -33,6 +41,7 @@ export default function OnboardingPage() {
      Google Places Autocomplete
   -------------------------------------------------------- */
   useEffect(() => {
+    if (!isLoaded) return;
     if (!window.google?.maps?.places) return;
 
     const input = document.getElementById("autocomplete-address");
@@ -40,7 +49,7 @@ export default function OnboardingPage() {
 
     input.dataset.autocompleteAttached = "true";
 
-    const autocomplete = new google.maps.places.Autocomplete(input, {
+    const autocomplete = new window.google.maps.places.Autocomplete(input, {
       types: ["address"],
       componentRestrictions: { country: "be" },
       fields: ["formatted_address", "geometry"],
@@ -50,11 +59,14 @@ export default function OnboardingPage() {
       const place = autocomplete.getPlace();
       if (!place.geometry) return;
 
-      setAddress(place.formatted_address);
-      setLat(place.geometry.location.lat());
-      setLng(place.geometry.location.lng());
+      const formatted = place.formatted_address;
+      const location = place.geometry.location;
+
+      setAddress(formatted);
+      setLat(location.lat());
+      setLng(location.lng());
     });
-  }, []);
+  }, [isLoaded]);
 
   /* --------------------------------------------------------
      Upload to Supabase Storage
@@ -75,6 +87,7 @@ export default function OnboardingPage() {
 
       if (uploadError) throw uploadError;
 
+      // ⚠️ Si besoin on pourra remplacer par supabase.storage.from().getPublicUrl()
       return `${supabase.storageUrl}/object/public/glossed-media/${filePath}`;
     } catch (err) {
       alert("Error uploading image: " + err.message);
@@ -118,7 +131,6 @@ export default function OnboardingPage() {
       }
 
       const { error } = await supabase.from("users").update(payload).eq("id", user.id);
-
       if (error) throw error;
 
       await fetchUserProfile({ id: user.id, email: user.email });
@@ -134,6 +146,23 @@ export default function OnboardingPage() {
   /* --------------------------------------------------------
      UI
   -------------------------------------------------------- */
+
+  if (loadError) {
+    return (
+      <div className="max-w-3xl mx-auto py-12 px-6 text-center text-red-600">
+        Error loading Google Maps. Please refresh the page.
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="max-w-3xl mx-auto py-12 px-6 text-center text-gray-500">
+        Loading map tools…
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl mx-auto py-12 px-6">
       <motion.div
