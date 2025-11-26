@@ -10,76 +10,67 @@ export function UserProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [proBadge, setProBadge] = useState(0);
 
-  // IMPORTANT : le modal doit être complètement indépendant
-  // Il ne sera ouvert QUE si l'on appelle setShowUpgradeModal(true)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  // RESET modal quand user = null (évite le bug landing page)
+  // 🔒 Quand user disparaît → on reset le modal
   useEffect(() => {
     if (!user) setShowUpgradeModal(false);
   }, [user]);
 
-  // -----------------------------------------------------------
-  // 🧠 Charger (ou créer) le profil dans public.users
-  // -----------------------------------------------------------
+  /* -----------------------------------------------------------
+    LOAD USER PROFILE (SELECT LIGHT → no JSON columns)
+  ----------------------------------------------------------- */
   const fetchUserProfile = async (supaUser) => {
     if (!supaUser) return;
 
     try {
       const { data: profile, error } = await supabase
         .from("users")
-        .select("*")
+        .select(
+          `
+          id,
+          email,
+          username,
+          first_name,
+          last_name,
+          phone_number,
+          address,
+          latitude,
+          longitude,
+          active_role,
+          role,
+          theme
+        `
+        )
         .eq("id", supaUser.id)
         .maybeSingle();
 
-      let finalProfile = profile;
-
-      // 🔄 Création automatique si trigger cassé
-      if (!finalProfile) {
-        const { data: inserted, error: insertError } = await supabase
-          .from("users")
-          .upsert(
-            {
-              id: supaUser.id,
-              email: supaUser.email,
-              role: "client",
-              active_role: "client",
-              theme: "light",
-            },
-            { onConflict: "id" }
-          )
-          .select("*")
-          .single();
-
-        if (insertError) {
-          console.error("❌ upsert users failed:", insertError.message);
-          return;
-        }
-        finalProfile = inserted;
-      } else if (error) {
+      if (error) {
         console.error("❌ fetchUserProfile error:", error.message);
         return;
       }
 
-      const role = finalProfile.active_role || finalProfile.role || "client";
+      if (!profile) {
+        console.warn("⚠️ fetchUserProfile returned NULL — RLS issue?");
+        return;
+      }
+
+      const role = profile.active_role || profile.role || "client";
 
       const fullUser = {
-        id: finalProfile.id,
-        email: finalProfile.email,
-        username: finalProfile.username || null,
-        first_name: finalProfile.first_name || "",
-        last_name: finalProfile.last_name || "",
-        business_name: finalProfile.business_name || "",
-        address: finalProfile.address || "",
-        latitude: finalProfile.latitude ?? null,
-        longitude: finalProfile.longitude ?? null,
-        phone_number: finalProfile.phone_number || "",
-        profile_photo: finalProfile.profile_photo || null,
+        id: profile.id,
+        email: profile.email,
+        username: profile.username || null,
+        first_name: profile.first_name || "",
+        last_name: profile.last_name || "",
+        phone_number: profile.phone_number || "",
+        address: profile.address || "",
+        latitude: profile.latitude ?? null,
+        longitude: profile.longitude ?? null,
         role,
         activeRole: role,
-        theme: finalProfile.theme || "light",
+        theme: profile.theme || "light",
       };
 
       setUser(fullUser);
@@ -89,12 +80,13 @@ export function UserProvider({ children }) {
     }
   };
 
-  // -----------------------------------------------------------
-  // 🔄 Initialisation auth + session
-  // -----------------------------------------------------------
+  /* -----------------------------------------------------------
+    INIT
+  ----------------------------------------------------------- */
   useEffect(() => {
     const init = async () => {
       setLoading(true);
+
       const { data } = await supabase.auth.getSession();
 
       if (data?.session) {
@@ -123,57 +115,32 @@ export function UserProvider({ children }) {
       } else {
         setUser(null);
         localStorage.removeItem("glossed_user");
-        setShowUpgradeModal(false); // 🛑 sécurité absolue
+        setShowUpgradeModal(false);
       }
     });
 
     return () => authListener.subscription.unsubscribe();
   }, []);
 
-  // -----------------------------------------------------------
-  // 🚪 Logout
-  // -----------------------------------------------------------
+  /* -----------------------------------------------------------
+    LOGOUT
+  ----------------------------------------------------------- */
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
-    setShowUpgradeModal(false); // 🛑 éviter apparition du modal après logout
     localStorage.removeItem("glossed_user");
+    setShowUpgradeModal(false);
     window.location.assign("/");
   };
 
-  // -----------------------------------------------------------
-  // 🔑 Login
-  // -----------------------------------------------------------
+  /* -----------------------------------------------------------
+    LOGIN
+  ----------------------------------------------------------- */
   const login = async (identifier, password) => {
-    const input = identifier.trim();
-
-    if (input.includes("@")) {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: input,
-        password,
-      });
-      if (error) throw error;
-
-      if (data.session?.user) {
-        setSession(data.session);
-        await fetchUserProfile(data.session.user);
-      }
-      return;
-    }
-
-    const { data: lookup, error: lookupErr } = await supabase
-      .from("users")
-      .select("email")
-      .eq("username", input.toLowerCase())
-      .maybeSingle();
-
-    if (lookupErr) throw lookupErr;
-    if (!lookup?.email) throw new Error("No user with this username.");
-
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: lookup.email,
-      password,
+      email: identifier.trim(),
+      password: password.trim(),
     });
 
     if (error) throw error;
@@ -184,9 +151,9 @@ export function UserProvider({ children }) {
     }
   };
 
-  // -----------------------------------------------------------
-  // 🆕 Signup (profil rempli ensuite dans onboarding)
-  // -----------------------------------------------------------
+  /* -----------------------------------------------------------
+    SIGNUP
+  ----------------------------------------------------------- */
   const signup = async (email, password) => {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -198,9 +165,9 @@ export function UserProvider({ children }) {
     return { user: data.user };
   };
 
-  // -----------------------------------------------------------
-  // 🔁 Switch rôle
-  // -----------------------------------------------------------
+  /* -----------------------------------------------------------
+    SWITCH ROLE
+  ----------------------------------------------------------- */
   const switchRole = async () => {
     if (!user) return;
 
@@ -237,10 +204,6 @@ export function UserProvider({ children }) {
     isPro: user?.activeRole === "pro",
     isClient: user?.activeRole === "client",
 
-    proBadge,
-    setProBadge,
-
-    // modal accessible manuellement UNIQUEMENT
     showUpgradeModal,
     setShowUpgradeModal,
   };
@@ -248,8 +211,6 @@ export function UserProvider({ children }) {
   return (
     <UserContext.Provider value={value}>
       {children}
-
-      {/* 🛡️ Modal ne s'affiche QUE si user est authentifié */}
       {user && showUpgradeModal && <UpgradeToProModal onClose={() => setShowUpgradeModal(false)} />}
     </UserContext.Provider>
   );
