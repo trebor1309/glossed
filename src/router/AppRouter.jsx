@@ -90,7 +90,7 @@ export default function AppRouter() {
 
       {/* 🧭 Onboarding */}
       <Route
-        path="/auth/onboarding"
+        path="/onboarding"
         element={
           <ProtectedRoute>
             <OnboardingGuard>
