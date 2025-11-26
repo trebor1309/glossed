@@ -1,3 +1,4 @@
+// src/router/OnboardingGuard.jsx
 import { Navigate, useLocation } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 
@@ -5,27 +6,22 @@ export default function OnboardingGuard({ children }) {
   const { user, loading } = useUser();
   const location = useLocation();
 
-  // On attend que le contexte soit prêt
   if (loading) return null;
 
-  // ❗ Pas connecté → On ne passe pas ici, c'est ProtectedRoute qui gère.
+  // ⚠ S'il n'y a pas d'utilisateur, on ne gère rien ici
   if (!user) return null;
 
-  // Champs requis pour considérer le profil "complet"
-  const missingUsername = !user.username || user.username.trim() === "";
-  const missingAddress = !user.address || user.address.trim() === "";
-  const missingPhone = !user.phone_number || user.phone_number.trim() === "";
+  const needsOnboarding = user.onboardingCompleted !== true;
 
-  const needsOnboarding = missingUsername || missingAddress || missingPhone;
-
-  // Si l'utilisateur doit compléter son profil → /onboarding obligatoire
+  // 🚧 Si onboarding requis → redirige TOUT vers /onboarding (sauf /onboarding)
   if (needsOnboarding && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" replace />;
   }
 
-  // Si le profil est complet → il ne peut PAS aller sur /onboarding
+  // 🚫 Si onboarding déjà fini → /onboarding est interdit
   if (!needsOnboarding && location.pathname === "/onboarding") {
-    return <Navigate to="/dashboard" replace />;
+    const destination = user.activeRole === "pro" ? "/prodashboard" : "/dashboard";
+    return <Navigate to={destination} replace />;
   }
 
   return children;

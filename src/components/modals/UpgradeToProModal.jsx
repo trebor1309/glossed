@@ -4,9 +4,10 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function UpgradeToProModal({ onClose }) {
-  const { user, setProBadge, switchRole } = useUser();
-  const [loading, setLoading] = useState(false);
+  const { user, fetchUserProfile } = useUser();
+
   const [businessName, setBusinessName] = useState("");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
@@ -22,27 +23,31 @@ export default function UpgradeToProModal({ onClose }) {
     }
 
     try {
-      // Mise à jour du profil dans Supabase
+      // ---------------------------------------------------
+      // Mise à jour du rôle PRO + changement immédiat de dashboard
+      // ---------------------------------------------------
       const { error: updateError } = await supabase
         .from("users")
         .update({
-          role: "pro",
-          active_role: "pro",
-          company: businessName.trim(),
+          role: "pro", // rôle permanent
+          active_role: "pro", // rôle actif immédiatement
+          business_name: businessName.trim(),
         })
         .eq("id", user.id);
 
       if (updateError) throw updateError;
 
+      // On refresh le user dans le contexte
+      await fetchUserProfile({ id: user.id });
+
       setSuccess(true);
 
-      // Laisse un léger délai avant redirection
       setTimeout(() => {
         onClose();
-        window.location.href = "/prodashboard";
-      }, 1500);
+        window.location.assign("/prodashboard");
+      }, 1200);
     } catch (err) {
-      setError(err.message || "Upgrade failed, please try again.");
+      setError(err.message || "Upgrade failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -77,19 +82,18 @@ export default function UpgradeToProModal({ onClose }) {
           {!success ? (
             <>
               <p className="text-center text-gray-600 mb-4">
-                To access the Pro Dashboard, please provide your business name.
+                To unlock the Pro Dashboard, please enter your business name.
               </p>
 
               <form onSubmit={handleUpgrade} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Business name</label>
+                  <label className="block text-sm font-medium text-gray-700">Business name *</label>
                   <input
                     type="text"
-                    name="businessName"
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
                     className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                    placeholder="Your Salon or Brand"
+                    placeholder="Your Salon • Your Brand"
                   />
                 </div>
 
@@ -106,7 +110,7 @@ export default function UpgradeToProModal({ onClose }) {
             </>
           ) : (
             <p className="text-green-600 text-center font-medium">
-              Your account has been upgraded! Redirecting...
+              Your account has been upgraded! Redirecting…
             </p>
           )}
         </motion.div>
