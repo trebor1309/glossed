@@ -13,13 +13,13 @@ export function UserProvider({ children }) {
 
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  // 🔒 Quand user disparaît → on reset le modal
+  // 🔒 Quand user disparaît → reset modal
   useEffect(() => {
     if (!user) setShowUpgradeModal(false);
   }, [user]);
 
   /* -----------------------------------------------------------
-    LOAD USER PROFILE (SELECT LIGHT → no JSON columns)
+    FETCH USER PROFILE
   ----------------------------------------------------------- */
   const fetchUserProfile = async (supaUser) => {
     if (!supaUser) return;
@@ -42,7 +42,6 @@ export function UserProvider({ children }) {
           role,
           theme,
           onboarding_completed
-
         `
         )
         .eq("id", supaUser.id)
@@ -55,11 +54,11 @@ export function UserProvider({ children }) {
         return;
       }
 
-      const role = profile.active_role || profile.role || "client";
-
+      // 🟢 VRAI rôle + rôle actif bien séparés
       const fullUser = {
         id: profile.id,
         email: profile.email,
+
         username: profile.username || null,
         first_name: profile.first_name || "",
         last_name: profile.last_name || "",
@@ -67,9 +66,17 @@ export function UserProvider({ children }) {
         address: profile.address || "",
         latitude: profile.latitude ?? null,
         longitude: profile.longitude ?? null,
-        role,
-        activeRole: role,
+
+        // ⚠️ Le vrai rôle — ne change jamais
+        role: profile.role || "client",
+
+        // ⚠️ rôle actif (dashboard courant)
+        activeRole: profile.active_role || profile.role || "client",
+
         theme: profile.theme || "light",
+
+        // ⚠️ Maintenant correctement présent !
+        onboardingCompleted: profile.onboarding_completed === true,
       };
 
       setUser(fullUser);
@@ -100,39 +107,35 @@ export function UserProvider({ children }) {
 
     init();
 
+    // Auth listener
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("🔄 Auth change:", event);
 
-      // 1) TOKEN REFRESH
       if (event === "TOKEN_REFRESHED" && session) {
         setSession(session);
         return;
       }
 
-      // 2) SIGNED IN
       if (event === "SIGNED_IN" && session?.user) {
         setSession(session);
         await fetchUserProfile(session.user);
         return;
       }
 
-      // 3) INITIAL_SESSION → ne plus rien toucher ici !
       if (event === "INITIAL_SESSION") {
         if (session?.user) {
           setSession(session);
           await fetchUserProfile(session.user);
         }
-        return; // 🔥 ne surtout PAS reset user ici
+        return;
       }
 
-      // 4) PASSWORD RECOVERY → laisser la session active
       if (event === "PASSWORD_RECOVERY" && session?.user) {
         setSession(session);
         await fetchUserProfile(session.user);
         return;
       }
 
-      // 5) SIGNED OUT → le seul endroit où on efface l’utilisateur
       if (event === "SIGNED_OUT") {
         setUser(null);
         setSession(null);
@@ -189,19 +192,19 @@ export function UserProvider({ children }) {
   };
 
   /* -----------------------------------------------------------
-    SWITCH ROLE
+    SWITCH ROLE (client <-> pro actif)
   ----------------------------------------------------------- */
   const switchRole = async () => {
     if (!user) return;
 
-    // ⚠️ Le vrai rôle NE CHANGE JAMAIS !
+    // 🛑 CLIENT → PRO ?
+    // interdit → ouvrir modal
     if (user.role !== "pro") {
-      // Un client ne peut pas activer le dashboard pro → on ouvre le modal
       setShowUpgradeModal(true);
       return;
     }
 
-    // 👉 Seul active_role peut changer
+    // 🟢 PRO → peut changer activeRole
     const nextActive = user.activeRole === "client" ? "pro" : "client";
 
     const { error } = await supabase
@@ -210,7 +213,7 @@ export function UserProvider({ children }) {
       .eq("id", user.id);
 
     if (error) {
-      console.error("Error switchRole:", error.message);
+      console.error("switchRole error:", error.message);
       return;
     }
 
@@ -232,6 +235,8 @@ export function UserProvider({ children }) {
     fetchUserProfile,
 
     isAuthenticated: !!user,
+
+    // ⚠️ Important → basé sur activeRole
     isPro: user?.activeRole === "pro",
     isClient: user?.activeRole === "client",
 
