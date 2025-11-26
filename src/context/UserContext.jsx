@@ -46,10 +46,7 @@ export function UserProvider({ children }) {
         .eq("id", supaUser.id)
         .maybeSingle();
 
-      if (error) {
-        console.error("❌ fetchUserProfile error:", error.message);
-        return;
-      }
+      console.log("🔍 RAW SUPABASE PROFILE RESULT", { profile, error });
 
       if (!profile) {
         console.warn("⚠️ fetchUserProfile returned NULL — RLS issue?");
