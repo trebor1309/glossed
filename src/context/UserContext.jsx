@@ -194,11 +194,19 @@ export function UserProvider({ children }) {
   const switchRole = async () => {
     if (!user) return;
 
-    const nextRole = user.activeRole === "client" ? "pro" : "client";
+    // ⚠️ Le vrai rôle NE CHANGE JAMAIS !
+    if (user.role !== "pro") {
+      // Un client ne peut pas activer le dashboard pro → on ouvre le modal
+      setShowUpgradeModal(true);
+      return;
+    }
+
+    // 👉 Seul active_role peut changer
+    const nextActive = user.activeRole === "client" ? "pro" : "client";
 
     const { error } = await supabase
       .from("users")
-      .update({ active_role: nextRole, role: nextRole })
+      .update({ active_role: nextActive })
       .eq("id", user.id);
 
     if (error) {
@@ -206,11 +214,11 @@ export function UserProvider({ children }) {
       return;
     }
 
-    const updated = { ...user, activeRole: nextRole, role: nextRole };
+    const updated = { ...user, activeRole: nextActive };
     setUser(updated);
     localStorage.setItem("glossed_user", JSON.stringify(updated));
 
-    window.location.assign(nextRole === "pro" ? "/prodashboard" : "/dashboard");
+    window.location.assign(nextActive === "pro" ? "/prodashboard" : "/dashboard");
   };
 
   const value = {
