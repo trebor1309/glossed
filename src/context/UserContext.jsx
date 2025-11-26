@@ -101,18 +101,42 @@ export function UserProvider({ children }) {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("🔄 Auth change:", event);
 
+      // 1) TOKEN REFRESH
       if (event === "TOKEN_REFRESHED" && session) {
         setSession(session);
         return;
       }
 
-      if (session?.user) {
+      // 2) SIGNED IN
+      if (event === "SIGNED_IN" && session?.user) {
         setSession(session);
         await fetchUserProfile(session.user);
-      } else {
+        return;
+      }
+
+      // 3) INITIAL_SESSION → ne plus rien toucher ici !
+      if (event === "INITIAL_SESSION") {
+        if (session?.user) {
+          setSession(session);
+          await fetchUserProfile(session.user);
+        }
+        return; // 🔥 ne surtout PAS reset user ici
+      }
+
+      // 4) PASSWORD RECOVERY → laisser la session active
+      if (event === "PASSWORD_RECOVERY" && session?.user) {
+        setSession(session);
+        await fetchUserProfile(session.user);
+        return;
+      }
+
+      // 5) SIGNED OUT → le seul endroit où on efface l’utilisateur
+      if (event === "SIGNED_OUT") {
         setUser(null);
+        setSession(null);
         localStorage.removeItem("glossed_user");
         setShowUpgradeModal(false);
+        return;
       }
     });
 
