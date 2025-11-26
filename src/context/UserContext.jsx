@@ -41,6 +41,8 @@ export function UserProvider({ children }) {
           active_role,
           role,
           theme
+          onboarding_completed,
+
         `
         )
         .eq("id", supaUser.id)
