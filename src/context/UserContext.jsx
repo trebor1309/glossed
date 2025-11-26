@@ -40,8 +40,8 @@ export function UserProvider({ children }) {
           longitude,
           active_role,
           role,
-          theme
-          onboarding_completed,
+          theme,
+          onboarding_completed
 
         `
         )
