@@ -29,6 +29,7 @@
     "react": "^19.1.1",
     "react-calendar": "^6.0.0",
     "react-dom": "^19.1.1",
+    "react-easy-crop": "^5.5.5",
     "react-router-dom": "^7.9.4",
     "uuid": "^13.0.0"
   },

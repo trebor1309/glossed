@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MapPin, Upload, User, Building2, Phone } from "lucide-react";
+import { MapPin, Upload, User, Building2, Phone, Mail } from "lucide-react";
 import { useLoadScript } from "@react-google-maps/api";
 
 const libraries = ["places"];
@@ -18,55 +18,96 @@ export default function OnboardingPage() {
     libraries,
   });
 
-  const [roleChoice, setRoleChoice] = useState(user?.role || null);
+  // 🧠 Rôle réel en base
+  const forcedRole = user?.role === "pro" ? "pro" : null;
 
+  // 👉 Rôle "actif" dans le formulaire
+  const [roleChoice, setRoleChoice] = useState(
+    forcedRole || user?.activeRole || user?.role || "client"
+  );
+
+  // 🧍 Infos "client"
   const [username, setUsername] = useState(user?.username || "");
   const [phone, setPhone] = useState(user?.phone_number || "");
   const [address, setAddress] = useState(user?.address || "");
-  const [lat, setLat] = useState(user?.latitude || null);
-  const [lng, setLng] = useState(user?.longitude || null);
+  const [lat, setLat] = useState(user?.latitude ?? null);
+  const [lng, setLng] = useState(user?.longitude ?? null);
 
   const [profileFile, setProfileFile] = useState(null);
 
-  // Champs PRO
-  const [businessName, setBusinessName] = useState("");
-  const [companyNumber, setCompanyNumber] = useState("");
-  const [vatNumber, setVatNumber] = useState("");
-  const [proEmail, setProEmail] = useState("");
+  // 🧾 Infos "pro" (business)
+  const [businessName, setBusinessName] = useState(user?.business_name || "");
+  const [companyNumber, setCompanyNumber] = useState(user?.company_number || "");
+  const [vatNumber, setVatNumber] = useState(user?.vat_number || "");
+  const [proEmail, setProEmail] = useState(user?.professional_email || "");
+  const [businessAddress, setBusinessAddress] = useState(user?.business_address || "");
+  const [businessSameAsPrivate, setBusinessSameAsPrivate] = useState(false);
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const isProFlow = forcedRole === "pro" || roleChoice === "pro";
+
   /* --------------------------------------------------------
-     Google Places Autocomplete
+     Google Places Autocomplete (privé + business)
   -------------------------------------------------------- */
   useEffect(() => {
     if (!isLoaded) return;
     if (!window.google?.maps?.places) return;
 
-    const input = document.getElementById("autocomplete-address");
-    if (!input || input.dataset.autocompleteAttached) return;
+    const attachAutocomplete = (inputId, onPlaceSelected) => {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      if (input.dataset.autocompleteAttached) return;
 
-    input.dataset.autocompleteAttached = "true";
+      input.dataset.autocompleteAttached = "true";
 
-    const autocomplete = new window.google.maps.places.Autocomplete(input, {
-      types: ["address"],
-      componentRestrictions: { country: "be" },
-      fields: ["formatted_address", "geometry"],
-    });
+      const autocomplete = new window.google.maps.places.Autocomplete(input, {
+        types: ["address"],
+        componentRestrictions: { country: "be" },
+        fields: ["formatted_address", "geometry"],
+      });
 
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-      if (!place.geometry) return;
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (!place.geometry) return;
 
-      const formatted = place.formatted_address;
-      const location = place.geometry.location;
+        const formatted = place.formatted_address;
+        const location = place.geometry.location;
 
+        onPlaceSelected({
+          formatted,
+          lat: location.lat(),
+          lng: location.lng(),
+        });
+      });
+    };
+
+    // Adresse privée
+    attachAutocomplete("autocomplete-address", ({ formatted, lat, lng }) => {
       setAddress(formatted);
-      setLat(location.lat());
-      setLng(location.lng());
+      setLat(lat);
+      setLng(lng);
+
+      if (businessSameAsPrivate) {
+        setBusinessAddress(formatted);
+      }
     });
-  }, [isLoaded]);
+
+    // Adresse business (uniquement si elle est différente)
+    if (!businessSameAsPrivate) {
+      attachAutocomplete("autocomplete-business-address", ({ formatted }) => {
+        setBusinessAddress(formatted);
+      });
+    }
+  }, [isLoaded, businessSameAsPrivate]);
+
+  // 🔄 Sync businessAddress si "Same as private" est coché
+  useEffect(() => {
+    if (businessSameAsPrivate) {
+      setBusinessAddress(address || "");
+    }
+  }, [address, businessSameAsPrivate]);
 
   /* --------------------------------------------------------
      Upload to Supabase Storage
@@ -87,7 +128,7 @@ export default function OnboardingPage() {
 
       if (uploadError) throw uploadError;
 
-      // ⚠️ Si besoin on pourra remplacer par supabase.storage.from().getPublicUrl()
+      // Si tu préfères, tu peux remplacer par .getPublicUrl plus tard
       return `${supabase.storageUrl}/object/public/glossed-media/${filePath}`;
     } catch (err) {
       alert("Error uploading image: " + err.message);
@@ -104,12 +145,37 @@ export default function OnboardingPage() {
     if (!username.trim()) return alert("Please choose a username.");
     if (!phone.trim()) return alert("Please provide a phone number.");
     if (!address.trim()) return alert("Please select a valid address.");
-    if (!roleChoice) return alert("Please select Client or Pro.");
+
+    // Si aucune contrainte, roleChoice peut rester "client" sans souci
+    if (!forcedRole && !roleChoice) {
+      return alert("Please select Client or Pro.");
+    }
+
+    // 🔐 Si on est en flux pro (upgrade ou signup pro)
+    if (isProFlow) {
+      if (!businessName.trim()) {
+        return alert("Please provide your business name.");
+      }
+
+      const finalBusinessAddress = businessSameAsPrivate ? address : businessAddress;
+
+      if (!finalBusinessAddress || !finalBusinessAddress.trim()) {
+        return alert("Please provide your business address.");
+      }
+    }
 
     setSaving(true);
 
     try {
       const imageUrl = await handleUpload();
+
+      const finalRole = forcedRole || roleChoice || user?.role || "client";
+
+      const finalBusinessAddress = isProFlow
+        ? businessSameAsPrivate
+          ? address
+          : businessAddress
+        : user?.business_address || null;
 
       const payload = {
         username: username.trim().toLowerCase(),
@@ -118,16 +184,17 @@ export default function OnboardingPage() {
         latitude: lat,
         longitude: lng,
         profile_photo: imageUrl,
-        active_role: roleChoice,
-        role: roleChoice,
+        role: finalRole,
+        active_role: finalRole,
         onboarding_completed: true,
       };
 
-      if (roleChoice === "pro") {
-        payload.business_name = businessName || null;
-        payload.company_number = companyNumber || null;
-        payload.vat_number = vatNumber || null;
-        payload.professional_email = proEmail || null;
+      if (isProFlow) {
+        payload.business_name = businessName.trim();
+        payload.business_address = finalBusinessAddress;
+        payload.company_number = companyNumber.trim() || null;
+        payload.vat_number = vatNumber.trim() || null;
+        payload.professional_email = proEmail.trim() || null;
       }
 
       const { error } = await supabase.from("users").update(payload).eq("id", user.id);
@@ -135,7 +202,7 @@ export default function OnboardingPage() {
 
       await fetchUserProfile({ id: user.id, email: user.email });
 
-      navigate(roleChoice === "pro" ? "/prodashboard" : "/dashboard");
+      navigate(finalRole === "pro" ? "/prodashboard" : "/dashboard");
     } catch (err) {
       alert("Error saving: " + err.message);
     } finally {
@@ -144,9 +211,8 @@ export default function OnboardingPage() {
   };
 
   /* --------------------------------------------------------
-     UI
+     UI: états de chargement Google
   -------------------------------------------------------- */
-
   if (loadError) {
     return (
       <div className="max-w-3xl mx-auto py-12 px-6 text-center text-red-600">
@@ -158,11 +224,14 @@ export default function OnboardingPage() {
   if (!isLoaded) {
     return (
       <div className="max-w-3xl mx-auto py-12 px-6 text-center text-gray-500">
-        Loading map tools…
+        Loading location tools…
       </div>
     );
   }
 
+  /* --------------------------------------------------------
+     RENDER
+  -------------------------------------------------------- */
   return (
     <div className="max-w-3xl mx-auto py-12 px-6">
       <motion.div
@@ -172,26 +241,34 @@ export default function OnboardingPage() {
       >
         <h1 className="text-3xl font-bold mb-6 text-center">Complete Your Profile</h1>
 
-        {/* Choix Client / Pro */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <button
-            onClick={() => setRoleChoice("client")}
-            className={`p-4 rounded-xl border-2 ${
-              roleChoice === "client" ? "border-rose-500 bg-rose-50" : "border-gray-300"
-            }`}
-          >
-            Client
-          </button>
+        {/* Choix Client / Pro — masqué si rôle déjà PRO en base */}
+        {!forcedRole && (
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <button
+              onClick={() => setRoleChoice("client")}
+              className={`p-4 rounded-xl border-2 ${
+                roleChoice === "client" ? "border-rose-500 bg-rose-50" : "border-gray-300"
+              }`}
+            >
+              Client
+            </button>
 
-          <button
-            onClick={() => setRoleChoice("pro")}
-            className={`p-4 rounded-xl border-2 ${
-              roleChoice === "pro" ? "border-rose-500 bg-rose-50" : "border-gray-300"
-            }`}
-          >
-            Beauty Professional
-          </button>
-        </div>
+            <button
+              onClick={() => setRoleChoice("pro")}
+              className={`p-4 rounded-xl border-2 ${
+                roleChoice === "pro" ? "border-rose-500 bg-rose-50" : "border-gray-300"
+              }`}
+            >
+              Beauty Professional
+            </button>
+          </div>
+        )}
+
+        {forcedRole === "pro" && (
+          <div className="p-4 mb-8 rounded-xl border-2 border-rose-500 bg-rose-50 text-center">
+            <strong>You are completing your Professional profile</strong>
+          </div>
+        )}
 
         {/* Photo */}
         <div className="mb-6">
@@ -202,7 +279,7 @@ export default function OnboardingPage() {
             type="file"
             accept="image/*"
             className="mt-2"
-            onChange={(e) => setProfileFile(e.target.files[0])}
+            onChange={(e) => setProfileFile(e.target.files?.[0] || null)}
           />
         </div>
 
@@ -234,26 +311,26 @@ export default function OnboardingPage() {
           />
         </div>
 
-        {/* Address */}
+        {/* Adresse privée */}
         <div className="mb-6">
           <label className="font-medium flex items-center gap-2">
-            <MapPin size={18} /> Address
+            <MapPin size={18} /> Private address
           </label>
           <input
             id="autocomplete-address"
             type="text"
             value={address}
-            placeholder="Enter your address"
+            placeholder="Enter your private address"
             onChange={(e) => setAddress(e.target.value)}
             className="w-full mt-2 px-4 py-2 border rounded-lg"
           />
         </div>
 
         {/* Champs PRO */}
-        {roleChoice === "pro" && (
+        {isProFlow && (
           <div className="space-y-6 mt-8 border-t pt-8">
             <h2 className="text-xl font-bold flex items-center gap-2">
-              <Building2 size={20} /> Your Business Details
+              <Building2 size={20} /> Business details
             </h2>
 
             <div>
@@ -263,6 +340,33 @@ export default function OnboardingPage() {
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
                 className="w-full mt-2 px-4 py-2 border rounded-lg"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 mt-4">
+              <input
+                id="same-as-private"
+                type="checkbox"
+                checked={businessSameAsPrivate}
+                onChange={(e) => setBusinessSameAsPrivate(e.target.checked)}
+              />
+              <label htmlFor="same-as-private" className="text-sm text-gray-700">
+                Business address is the same as my private address
+              </label>
+            </div>
+
+            <div>
+              <label className="font-medium">Business address</label>
+              <input
+                id="autocomplete-business-address"
+                type="text"
+                value={businessAddress}
+                placeholder="Enter your business address"
+                onChange={(e) => setBusinessAddress(e.target.value)}
+                disabled={businessSameAsPrivate}
+                className={`w-full mt-2 px-4 py-2 border rounded-lg ${
+                  businessSameAsPrivate ? "bg-gray-100 cursor-not-allowed" : ""
+                }`}
               />
             </div>
 
@@ -287,11 +391,14 @@ export default function OnboardingPage() {
             </div>
 
             <div>
-              <label className="font-medium">Professional email</label>
+              <label className="font-medium flex items-center gap-2">
+                <Mail size={18} /> Professional email
+              </label>
               <input
                 type="email"
                 value={proEmail}
                 onChange={(e) => setProEmail(e.target.value)}
+                placeholder="yourbusiness@email.com"
                 className="w-full mt-2 px-4 py-2 border rounded-lg"
               />
             </div>

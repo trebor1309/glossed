@@ -41,9 +41,13 @@ export function UserProvider({ children }) {
           active_role,
           role,
           theme,
-          onboarding_completed
+          onboarding_completed,
+          stripe_account_id,
+          stripe_account_ready,
+          stripe_payouts_enabled
         `
         )
+
         .eq("id", supaUser.id)
         .maybeSingle();
 
@@ -66,6 +70,10 @@ export function UserProvider({ children }) {
         address: profile.address || "",
         latitude: profile.latitude ?? null,
         longitude: profile.longitude ?? null,
+        stripe_account_id: profile.stripe_account_id || null,
+        payouts_enabled: profile.payouts_enabled || false,
+        stripe_account_ready: profile.stripe_account_ready || false,
+        stripe_details_submitted: profile.stripe_details_submitted || false,
 
         // ⚠️ Le vrai rôle — ne change jamais
         role: profile.role || "client",

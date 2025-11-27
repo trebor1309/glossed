@@ -23,7 +23,7 @@ const buildDate = (item) => {
 };
 
 export default function ProDashboardMissions() {
-  const { session, setProBadge } = useUser();
+  const { session } = useUser();
   const { notifications } = useNotifications();
 
   const [missions, setMissions] = useState([]);
@@ -131,7 +131,6 @@ export default function ProDashboardMissions() {
       const finalList = [...taggedDirect, ...taggedNotified, ...taggedMissions];
 
       setMissions(finalList);
-      setProBadge(notifications.proBookings || 0);
     } catch (err) {
       console.error("❌ fetchMissions error:", err);
       setToast({ message: `❌ ${err.message}`, type: "error" });
