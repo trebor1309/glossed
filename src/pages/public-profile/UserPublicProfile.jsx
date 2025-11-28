@@ -7,29 +7,30 @@ import { ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
 
 import ProProfileView from "./ProProfileView";
 import ClientProfileView from "./ClientProfileView";
-import ProfilePortfolio from "./ProfilePortfolio";
-import ProfileReviews from "./ProfileReviews";
-import ProfileMap from "./ProfileMap";
-
 import Toast from "@/components/ui/Toast";
 
 export default function UserPublicProfile() {
-  const { user_id } = useParams();
+  const { user_id } = useParams(); // ❗️NE PAS RETURN ICI
   const navigate = useNavigate();
   const { user: currentUser } = useUser();
 
+  // 🔥 Tous les hooks EN PREMIER — ordre garanti, plus d'erreur
   const [profile, setProfile] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
+  // 📌 Load profile
   useEffect(() => {
-    if (!user_id) return;
+    if (!user_id) {
+      setLoading(false);
+      return;
+    }
 
     const loadProfile = async () => {
       setLoading(true);
       try {
-        // 1️⃣ Charger le user
+        // 1️⃣ Fetch user
         const { data, error } = await supabase
           .from("users")
           .select(
@@ -68,7 +69,7 @@ export default function UserPublicProfile() {
           return;
         }
 
-        // 2️⃣ Normaliser services (business_type) → array propre
+        // 2️⃣ Normalize business_type
         let services = [];
         try {
           if (Array.isArray(data.business_type)) {
@@ -88,9 +89,10 @@ export default function UserPublicProfile() {
             }
           }
         } catch (e) {
-          console.warn("⚠️ Impossible de parser business_type pour le profil:", e);
+          console.warn("⚠️ Impossible de parser business_type:", e);
         }
 
+        // 3️⃣ Build normalized profile
         const normalizedProfile = {
           ...data,
           services,
@@ -104,21 +106,15 @@ export default function UserPublicProfile() {
 
         setProfile(normalizedProfile);
 
-        // 3️⃣ Charger les reviews (pro ou client)
-        try {
-          const { data: reviewRows, error: reviewError } = await supabase
-            .from("reviews")
-            .select("*")
-            .or(`pro_id.eq.${user_id},client_id.eq.${user_id}`)
-            .order("created_at", { ascending: false });
+        // 4️⃣ Load reviews
+        const { data: reviewRows, error: reviewError } = await supabase
+          .from("reviews")
+          .select("*")
+          .or(`pro_id.eq.${user_id},client_id.eq.${user_id}`)
+          .order("created_at", { ascending: false });
 
-          if (reviewError) {
-            console.warn("⚠️ reviews load error:", reviewError.message);
-          } else if (reviewRows) {
-            setReviews(reviewRows);
-          }
-        } catch (e) {
-          console.warn("⚠️ reviews table seems missing or inaccessible:", e.message);
+        if (!reviewError && reviewRows) {
+          setReviews(reviewRows);
         }
 
         setLoading(false);
@@ -132,7 +128,27 @@ export default function UserPublicProfile() {
     loadProfile();
   }, [user_id]);
 
-  // 🧱 états intermédiaires
+  // 📌 Maintenant on peut gérer les retours conditionnels
+
+  // 1️⃣ Pas d'ID → page d’erreur propre
+  if (!user_id) {
+    return (
+      <main className="max-w-4xl mx-auto mt-10 p-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-4"
+        >
+          <ArrowLeft size={16} /> Back
+        </button>
+        <div className="flex items-center justify-center h-48 text-gray-600 gap-3">
+          <AlertTriangle size={24} className="text-amber-500" />
+          <span>Invalid profile URL.</span>
+        </div>
+      </main>
+    );
+  }
+
+  // 2️⃣ Loading
   if (loading) {
     return (
       <main className="max-w-4xl mx-auto mt-10 p-4">
@@ -150,6 +166,7 @@ export default function UserPublicProfile() {
     );
   }
 
+  // 3️⃣ No profile
   if (!profile) {
     return (
       <main className="max-w-4xl mx-auto mt-10 p-4">
@@ -167,12 +184,12 @@ export default function UserPublicProfile() {
     );
   }
 
+  // 4️⃣ Final display
   const isOwnProfile = currentUser?.id === profile.id;
   const isProProfile = profile.role === "pro";
 
   return (
     <main className="max-w-4xl mx-auto mt-10 p-4 space-y-6">
-      {/* Header / back / info mini */}
       <div className="flex items-center justify-between gap-4">
         <button
           onClick={() => navigate(-1)}

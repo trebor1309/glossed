@@ -79,6 +79,9 @@ export default function AppRouter() {
       <Route path="/contact" element={<Contact />} />
       <Route path="/safety" element={<Safety />} />
 
+      {/* 🌍 Public profile pages */}
+      <Route path="/profile/:user_id" element={<UserPublicProfile />} />
+
       {/* 📧 Email verification flow */}
       <Route
         path="/auth/check-email"

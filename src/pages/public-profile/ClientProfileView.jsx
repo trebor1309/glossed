@@ -1,3 +1,6 @@
+// 📄 src/pages/public-profile/ClientProfileView.jsx
+import ProfileReviews from "./ProfileReviews";
+
 export default function ClientProfileView({ profile, reviews }) {
   return (
     <div className="space-y-8">
