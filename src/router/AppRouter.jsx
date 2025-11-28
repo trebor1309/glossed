@@ -57,6 +57,9 @@ import ProRoute from "./ProRoute";
 import PublicOnlyRoute from "./PublicOnlyRoute";
 import OnboardingGuard from "./OnboardingGuard";
 
+// Profiles
+import UserPublicProfile from "@/pages/public-profile/UserPublicProfile";
+
 export default function AppRouter() {
   return (
     <Routes>
@@ -95,6 +98,18 @@ export default function AppRouter() {
           <ProtectedRoute>
             <OnboardingGuard>
               <OnboardingPage />
+            </OnboardingGuard>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* 👤 Public user profile (only logged-in users can view it) */}
+      <Route
+        path="/profile/:user_id"
+        element={
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <UserPublicProfile />
             </OnboardingGuard>
           </ProtectedRoute>
         }
