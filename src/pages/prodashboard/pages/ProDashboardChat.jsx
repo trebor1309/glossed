@@ -27,7 +27,9 @@ export default function ProDashboardChat() {
         pro_id,
         client_id,
         missions:mission_id ( service ),
-        partner:client_id (
+        client:client_id (
+          id,
+          username,
           first_name,
           last_name,
           profile_photo
@@ -63,7 +65,7 @@ export default function ProDashboardChat() {
 
   return (
     <div className="max-w-5xl mx-auto h-[calc(100vh-6rem)] flex flex-col">
-      <ChatHeader onBack={() => navigate("/prodashboard/messages")} partner={chatInfo.partner} />
+      <ChatHeader onBack={() => navigate("/prodashboard/messages")} partner={chatInfo.client} />
       <ChatRoom chatId={chat_id} user={user} /> {/* ✅ FIX */}
     </div>
   );

@@ -26,7 +26,9 @@ export default function DashboardChat() {
         pro_id,
         client_id,
         missions:mission_id ( service ),
-        partner:pro_id (
+        pro:pro_id (
+          id,
+          username,
           first_name,
           last_name,
           business_name,
@@ -65,7 +67,7 @@ export default function DashboardChat() {
     <div className="max-w-5xl mx-auto h-[calc(100vh-6rem)] flex flex-col">
       <ChatHeader
         onBack={() => navigate("/dashboard/messages")}
-        partner={chatInfo.partner}
+        partner={chatInfo.pro}
         service={chatInfo.missions?.service}
       />
       <ChatRoom chatId={chat_id} user={user} /> {/* ✅ FIX */}
