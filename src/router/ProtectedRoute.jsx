@@ -5,15 +5,15 @@ import { useUser } from "@/context/UserContext";
 export default function ProtectedRoute({ children }) {
   const { session, user, loading } = useUser();
 
-  // ⏳ Tant que user pas prêt, on attend
+  // ⏳ Tant qu’on ne sait pas, on bloque
   if (loading) return null;
 
-  // ❌ Si pas de session → redirection
+  // ❌ Pas de session → redirection
   if (!session) return <Navigate to="/" replace />;
 
-  // 🕗 La session existe, mais le profil pas encore fetch → on attend
-  if (session && !user) return null;
+  // 🕗 Session OK mais user pas encore chargé → on attend
+  if (!user) return null;
 
-  // 🎉 User + session OK
+  // 🎉 OK
   return children;
 }

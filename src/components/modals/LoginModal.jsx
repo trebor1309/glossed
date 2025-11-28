@@ -2,10 +2,24 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 
 export default function LoginModal({ onClose, onSignup }) {
-  const { login } = useUser();
+  const { login, user, loading } = useUser();
   const navigate = useNavigate();
+
+  // 🔥 Dès que user est chargé → redirection automatique
+  useEffect(() => {
+    if (!loading && user) {
+      onClose();
+
+      if (user.activeRole === "pro") {
+        navigate("/prodashboard");
+      } else {
+        navigate("/dashboard");
+      }
+    }
+  }, [user, loading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,8 +29,7 @@ export default function LoginModal({ onClose, onSignup }) {
 
     try {
       await login(identifier, password);
-      onClose();
-      navigate("/dashboard");
+      // 🟡 Ne rien faire ici : on attend que le UserContext mette user à jour
     } catch (error) {
       alert("Login failed: " + error.message);
     }
@@ -50,12 +63,12 @@ export default function LoginModal({ onClose, onSignup }) {
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email or username</label>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
                 type="text"
                 name="identifier"
                 className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                placeholder="you@example.com or yourname"
+                placeholder="you@example.com"
                 required
               />
             </div>

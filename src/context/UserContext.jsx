@@ -10,7 +10,6 @@ export function UserProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // 🔒 Quand user disparaît → reset modal
@@ -47,7 +46,6 @@ export function UserProvider({ children }) {
           stripe_payouts_enabled
         `
         )
-
         .eq("id", supaUser.id)
         .maybeSingle();
 
@@ -58,11 +56,9 @@ export function UserProvider({ children }) {
         return;
       }
 
-      // 🟢 VRAI rôle + rôle actif bien séparés
       const fullUser = {
         id: profile.id,
         email: profile.email,
-
         username: profile.username || null,
         first_name: profile.first_name || "",
         last_name: profile.last_name || "",
@@ -74,21 +70,13 @@ export function UserProvider({ children }) {
         payouts_enabled: profile.payouts_enabled || false,
         stripe_account_ready: profile.stripe_account_ready || false,
         stripe_details_submitted: profile.stripe_details_submitted || false,
-
-        // ⚠️ Le vrai rôle — ne change jamais
         role: profile.role || "client",
-
-        // ⚠️ rôle actif (dashboard courant)
         activeRole: profile.active_role || profile.role || "client",
-
         theme: profile.theme || "light",
-
-        // ⚠️ Maintenant correctement présent !
         onboardingCompleted: profile.onboarding_completed === true,
       };
 
       setUser(fullUser);
-      setLoading(false);
       localStorage.setItem("glossed_user", JSON.stringify(fullUser));
     } catch (err) {
       console.error("❌ fetchUserProfile failed:", err.message);
@@ -106,16 +94,19 @@ export function UserProvider({ children }) {
 
       if (data?.session) {
         setSession(data.session);
-        // ❌ on ne met PAS setLoading(false) ici
+        await fetchUserProfile(data.session.user);
       } else {
         setUser(null);
-        setLoading(false); // OK seulement si pas de session
       }
+
+      setLoading(false); // ⭐ LÀ SEULEMENT
     };
 
     init();
 
-    // Auth listener
+    /* -----------------------------------------------------------
+      AUTH LISTENER
+    ----------------------------------------------------------- */
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("🔄 Auth change:", event);
 
@@ -128,20 +119,25 @@ export function UserProvider({ children }) {
         setLoading(true);
         setSession(session);
         await fetchUserProfile(session.user);
+        setLoading(false);
         return;
       }
 
       if (event === "INITIAL_SESSION") {
         if (session?.user) {
+          setLoading(true);
           setSession(session);
           await fetchUserProfile(session.user);
+          setLoading(false);
         }
         return;
       }
 
       if (event === "PASSWORD_RECOVERY" && session?.user) {
+        setLoading(true);
         setSession(session);
         await fetchUserProfile(session.user);
+        setLoading(false);
         return;
       }
 
@@ -181,7 +177,10 @@ export function UserProvider({ children }) {
     if (error) throw error;
 
     if (data.session?.user) {
+      setLoading(true);
       setSession(data.session);
+      await fetchUserProfile(data.session.user);
+      setLoading(false);
     }
   };
 
@@ -200,19 +199,16 @@ export function UserProvider({ children }) {
   };
 
   /* -----------------------------------------------------------
-    SWITCH ROLE (client <-> pro actif)
+    SWITCH ROLE
   ----------------------------------------------------------- */
   const switchRole = async () => {
     if (!user) return;
 
-    // 🛑 CLIENT → PRO ?
-    // interdit → ouvrir modal
     if (user.role !== "pro") {
       setShowUpgradeModal(true);
       return;
     }
 
-    // 🟢 PRO → peut changer activeRole
     const nextActive = user.activeRole === "client" ? "pro" : "client";
 
     const { error } = await supabase
@@ -241,13 +237,9 @@ export function UserProvider({ children }) {
     logout,
     switchRole,
     fetchUserProfile,
-
     isAuthenticated: !!user,
-
-    // ⚠️ Important → basé sur activeRole
     isPro: user?.activeRole === "pro",
     isClient: user?.activeRole === "client",
-
     showUpgradeModal,
     setShowUpgradeModal,
   };
