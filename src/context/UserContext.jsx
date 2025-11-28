@@ -88,6 +88,7 @@ export function UserProvider({ children }) {
       };
 
       setUser(fullUser);
+      setLoading(false);
       localStorage.setItem("glossed_user", JSON.stringify(fullUser));
     } catch (err) {
       console.error("❌ fetchUserProfile failed:", err.message);
@@ -105,12 +106,11 @@ export function UserProvider({ children }) {
 
       if (data?.session) {
         setSession(data.session);
-        await fetchUserProfile(data.session.user);
+        // ❌ on ne met PAS setLoading(false) ici
       } else {
         setUser(null);
+        setLoading(false); // OK seulement si pas de session
       }
-
-      setLoading(false);
     };
 
     init();
@@ -125,6 +125,7 @@ export function UserProvider({ children }) {
       }
 
       if (event === "SIGNED_IN" && session?.user) {
+        setLoading(true);
         setSession(session);
         await fetchUserProfile(session.user);
         return;
@@ -181,7 +182,6 @@ export function UserProvider({ children }) {
 
     if (data.session?.user) {
       setSession(data.session);
-      await fetchUserProfile(data.session.user);
     }
   };
 

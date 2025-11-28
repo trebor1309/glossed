@@ -20,9 +20,10 @@ function useIsMobile(breakpoint = 768) {
 }
 
 export default function App() {
-  const { user, isAuthenticated, isPro, logout, showUpgradeModal, setShowUpgradeModal } = useUser();
+  const { user, isAuthenticated, isPro, logout, showUpgradeModal, setShowUpgradeModal, loading } =
+    useUser();
 
-  const location = useLocation();
+  const location = useLocation(); // <— on met les hooks AVANT tout return
   const isMobile = useIsMobile(768);
 
   const [showLogin, setShowLogin] = useState(false);
@@ -32,6 +33,9 @@ export default function App() {
 
   const isDashboardRoute =
     location.pathname.startsWith("/dashboard") || location.pathname.startsWith("/prodashboard");
+
+  // ❗️Le return conditionnel ne vient qu'après TOUS les hooks
+  if (loading) return null;
 
   return (
     <div className="min-h-screen flex flex-col text-gray-900">
@@ -57,7 +61,6 @@ export default function App() {
 
       {!isDashboardRoute && <Footer />}
 
-      {/* 🌸 MODALES */}
       {showLogin && (
         <LoginModal
           onClose={() => setShowLogin(false)}
@@ -94,7 +97,6 @@ export default function App() {
 
       {showDownload && <DownloadModal onClose={() => setShowDownload(false)} />}
 
-      {/* 🛠 Le modal Pro correctement conditionné */}
       {showUpgradeModal && <UpgradeToProModal onClose={() => setShowUpgradeModal(false)} />}
     </div>
   );
