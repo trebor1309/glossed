@@ -1,4 +1,3 @@
-// 📄 src/pages/prodashboard/pages/ProDashboardMessages.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -42,9 +41,10 @@ export default function ProDashboardMessages() {
   };
 
   // -------------------------------------------------------------
-  // 📌 Charger les chats + dernier message (last_message_obj)
+  // 📌 Charger les chats + dernier message
   // -------------------------------------------------------------
   const fetchChats = async () => {
+    if (!proId) return;
     setLoading(true);
 
     const { data, error } = await supabase
@@ -56,9 +56,28 @@ export default function ProDashboardMessages() {
         pro_id,
         client_id,
         updated_at,
+
         missions:mission_id ( service ),
-        client:client_id ( first_name, last_name, profile_photo ),
-        last_msg:messages!messages_chat_id_fkey (
+
+        pro:pro_id (
+          id,
+          username,
+          first_name,
+          last_name,
+          business_name,
+          profile_photo
+        ),
+
+        client:client_id (
+          id,
+          username,
+          first_name,
+          last_name,
+          profile_photo
+        ),
+
+        messages (
+          id,
           content,
           attachment_url,
           created_at,
@@ -78,10 +97,15 @@ export default function ProDashboardMessages() {
       return;
     }
 
+    // 🔥 Normaliser le dernier message
     const normalized = (data || []).map((chat) => {
-      const msgs = chat.last_msg || [];
-      const lastMessage = msgs.length ? msgs[msgs.length - 1] : null;
-      return { ...chat, last_message_obj: lastMessage };
+      const sorted = [...(chat.messages || [])].sort(
+        (a, b) => new Date(b.created_at) - new Date(a.created_at)
+      );
+      return {
+        ...chat,
+        last_message_obj: sorted[0] || null,
+      };
     });
 
     setChats(normalized);
@@ -136,7 +160,9 @@ export default function ProDashboardMessages() {
       })
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [proId]);
 
   const openChat = (chat) => navigate(`/prodashboard/messages/${chat.id}`);

@@ -1,4 +1,3 @@
-// 📄 src/pages/dashboard/pages/DashboardMessages.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -45,6 +44,7 @@ export default function DashboardMessages() {
   // 📌 Charger les chats + dernier message
   // -------------------------------------------------------------
   const fetchChats = async () => {
+    if (!userId) return;
     setLoading(true);
 
     const { data, error } = await supabase
@@ -56,9 +56,28 @@ export default function DashboardMessages() {
         pro_id,
         client_id,
         updated_at,
+
         missions:mission_id ( service ),
-        pro:pro_id ( first_name, last_name, business_name, profile_photo ),
-        last_msg:messages!messages_chat_id_fkey (
+
+        pro:pro_id (
+          id,
+          username,
+          first_name,
+          last_name,
+          business_name,
+          profile_photo
+        ),
+
+        client:client_id (
+          id,
+          username,
+          first_name,
+          last_name,
+          profile_photo
+        ),
+
+        messages (
+          id,
           content,
           attachment_url,
           created_at,
@@ -78,10 +97,15 @@ export default function DashboardMessages() {
       return;
     }
 
+    // 🔥 Normaliser le dernier message
     const normalized = (data || []).map((chat) => {
-      const msgs = chat.last_msg || [];
-      const lastMessage = msgs.length ? msgs[msgs.length - 1] : null;
-      return { ...chat, last_message_obj: lastMessage };
+      const sorted = [...(chat.messages || [])].sort(
+        (a, b) => new Date(b.created_at) - new Date(a.created_at)
+      );
+      return {
+        ...chat,
+        last_message_obj: sorted[0] || null,
+      };
     });
 
     setChats(normalized);
@@ -103,20 +127,27 @@ export default function DashboardMessages() {
         const msg = payload.new;
         const chatId = msg.chat_id;
 
+        // 🔁 met à jour le dernier message localement
         setChats((prev) =>
           prev.map((chat) =>
             chat.id === chatId
-              ? { ...chat, updated_at: msg.created_at, last_message_obj: msg }
+              ? {
+                  ...chat,
+                  updated_at: msg.created_at,
+                  last_message_obj: msg,
+                }
               : chat
           )
         );
 
+        // --- INSERT : nouveau message ---
         if (payload.eventType === "INSERT") {
           if (msg.sender_id !== userId) {
             setUnreadMap((prev) => ({ ...prev, [chatId]: true }));
           }
         }
 
+        // --- UPDATE : read_at vient d'être modifié ---
         if (payload.eventType === "UPDATE") {
           if (msg.sender_id !== userId && msg.read_at !== null) {
             setUnreadMap((prev) => {
@@ -129,7 +160,9 @@ export default function DashboardMessages() {
       })
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userId]);
 
   const openChat = (chat) => navigate(`/dashboard/messages/${chat.id}`);
