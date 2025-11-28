@@ -21,20 +21,27 @@ export default function DashboardChat() {
       .from("chats")
       .select(
         `
-        id,
-        mission_id,
-        pro_id,
-        client_id,
-        missions:mission_id ( service ),
-        pro:pro_id (
-          id,
-          username,
-          first_name,
-          last_name,
-          business_name,
-          profile_photo
-        )
-      `
+    id,
+    mission_id,
+    pro_id,
+    client_id,
+    missions:mission_id ( service ),
+    pro:pro_id (
+      id,
+      username,
+      first_name,
+      last_name,
+      business_name,
+      profile_photo
+    ),
+    client:client_id (
+      id,
+      username,
+      first_name,
+      last_name,
+      profile_photo
+    )
+  `
       )
       .eq("id", chat_id)
       .single();
@@ -67,7 +74,7 @@ export default function DashboardChat() {
     <div className="max-w-5xl mx-auto h-[calc(100vh-6rem)] flex flex-col">
       <ChatHeader
         onBack={() => navigate("/dashboard/messages")}
-        partner={chatInfo.pro}
+        partner={chatInfo.pro} // pour un client, le partenaire = le pro
         service={chatInfo.missions?.service}
       />
       <ChatRoom chatId={chat_id} user={user} /> {/* ✅ FIX */}

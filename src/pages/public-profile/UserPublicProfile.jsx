@@ -1,5 +1,5 @@
 // 📄 src/pages/profile/UserPublicProfile.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -10,27 +10,34 @@ import ClientProfileView from "./ClientProfileView";
 import Toast from "@/components/ui/Toast";
 
 export default function UserPublicProfile() {
-  const { user_id } = useParams(); // ❗️NE PAS RETURN ICI
+  const { user_id } = useParams();
   const navigate = useNavigate();
   const { user: currentUser } = useUser();
 
-  // 🔥 Tous les hooks EN PREMIER — ordre garanti, plus d'erreur
   const [profile, setProfile] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
-  // 📌 Load profile
+  // 🔒 Normalisation de l'ID (évite "undefined", "null", etc.)
+  const normalizedUserId = useMemo(() => {
+    if (!user_id) return null;
+    if (user_id === "undefined" || user_id === "null") return null;
+    return user_id;
+  }, [user_id]);
+
   useEffect(() => {
-    if (!user_id) {
+    // Si l'ID est invalide → on ne touche pas à Supabase
+    if (!normalizedUserId) {
       setLoading(false);
+      setProfile(null);
       return;
     }
 
     const loadProfile = async () => {
       setLoading(true);
       try {
-        // 1️⃣ Fetch user
+        // 1️⃣ Charger le user
         const { data, error } = await supabase
           .from("users")
           .select(
@@ -53,7 +60,7 @@ export default function UserPublicProfile() {
             country
           `
           )
-          .eq("id", user_id)
+          .eq("id", normalizedUserId)
           .maybeSingle();
 
         if (error) {
@@ -69,7 +76,7 @@ export default function UserPublicProfile() {
           return;
         }
 
-        // 2️⃣ Normalize business_type
+        // 2️⃣ Normaliser services (business_type) → array propre
         let services = [];
         try {
           if (Array.isArray(data.business_type)) {
@@ -89,10 +96,9 @@ export default function UserPublicProfile() {
             }
           }
         } catch (e) {
-          console.warn("⚠️ Impossible de parser business_type:", e);
+          console.warn("⚠️ Impossible de parser business_type pour le profil:", e);
         }
 
-        // 3️⃣ Build normalized profile
         const normalizedProfile = {
           ...data,
           services,
@@ -106,15 +112,21 @@ export default function UserPublicProfile() {
 
         setProfile(normalizedProfile);
 
-        // 4️⃣ Load reviews
-        const { data: reviewRows, error: reviewError } = await supabase
-          .from("reviews")
-          .select("*")
-          .or(`pro_id.eq.${user_id},client_id.eq.${user_id}`)
-          .order("created_at", { ascending: false });
+        // 3️⃣ Charger les reviews (pro ou client)
+        try {
+          const { data: reviewRows, error: reviewError } = await supabase
+            .from("reviews")
+            .select("*")
+            .or(`pro_id.eq.${normalizedUserId},client_id.eq.${normalizedUserId}`)
+            .order("created_at", { ascending: false });
 
-        if (!reviewError && reviewRows) {
-          setReviews(reviewRows);
+          if (reviewError) {
+            console.warn("⚠️ reviews load error:", reviewError.message);
+          } else if (reviewRows) {
+            setReviews(reviewRows);
+          }
+        } catch (e) {
+          console.warn("⚠️ reviews table seems missing or inaccessible:", e.message);
         }
 
         setLoading(false);
@@ -126,12 +138,10 @@ export default function UserPublicProfile() {
     };
 
     loadProfile();
-  }, [user_id]);
+  }, [normalizedUserId]);
 
-  // 📌 Maintenant on peut gérer les retours conditionnels
-
-  // 1️⃣ Pas d'ID → page d’erreur propre
-  if (!user_id) {
+  // 🧱 états intermédiaires
+  if (!normalizedUserId) {
     return (
       <main className="max-w-4xl mx-auto mt-10 p-4">
         <button
@@ -140,15 +150,14 @@ export default function UserPublicProfile() {
         >
           <ArrowLeft size={16} /> Back
         </button>
-        <div className="flex items-center justify-center h-48 text-gray-600 gap-3">
+        <div className="flex flex-col items-center justify-center h-48 text-gray-500 gap-3">
           <AlertTriangle size={24} className="text-amber-500" />
-          <span>Invalid profile URL.</span>
+          <span>Invalid profile link.</span>
         </div>
       </main>
     );
   }
 
-  // 2️⃣ Loading
   if (loading) {
     return (
       <main className="max-w-4xl mx-auto mt-10 p-4">
@@ -166,7 +175,6 @@ export default function UserPublicProfile() {
     );
   }
 
-  // 3️⃣ No profile
   if (!profile) {
     return (
       <main className="max-w-4xl mx-auto mt-10 p-4">
@@ -184,12 +192,12 @@ export default function UserPublicProfile() {
     );
   }
 
-  // 4️⃣ Final display
   const isOwnProfile = currentUser?.id === profile.id;
   const isProProfile = profile.role === "pro";
 
   return (
     <main className="max-w-4xl mx-auto mt-10 p-4 space-y-6">
+      {/* Header / back / info mini */}
       <div className="flex items-center justify-between gap-4">
         <button
           onClick={() => navigate(-1)}
