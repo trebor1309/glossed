@@ -1,8 +1,0 @@
-# Ignorer les fonctions Supabase (Deno)
-supabase/functions/**
-supabase/tsconfig.json
-
-# Dossiers classiques à ignorer
-node_modules/
-dist/
-build/

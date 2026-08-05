@@ -1,188 +1,89 @@
-// /supabase/functions/refund-mission/index.ts
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { errorResponse, handleOptions, HttpError, json } from "../_shared/http.ts";
+import { admin, requireUser } from "../_shared/supabase.ts";
 
-// Stripe client
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
-  apiVersion: "2023-10-16",
-});
+const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2023-10-16" });
+const refundModes = new Set(["pro_cancel", "client_cancel_approved"]);
 
-// Supabase (service role, comme dans le webhook)
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  {
-    global: {
-      headers: {
-        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-      },
-    },
-  }
-);
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-serve(async (req) => {
-  // Preflight
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return handleOptions(req);
+  if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
 
   try {
+    const authUser = await requireUser(req);
     const body = await req.json();
     const missionId = body?.mission_id as string | undefined;
-    const mode = body?.mode as string | undefined; // "pro_cancel" | "client_cancel_approved"
+    const mode = body?.mode as string | undefined;
+    if (!missionId || !mode) throw new HttpError(400, "Missing mission_id or mode");
+    if (!refundModes.has(mode)) throw new HttpError(400, "Invalid refund mode");
 
-    if (!missionId || !mode) {
-      throw new Error("Missing mission_id or mode");
-    }
-
-    if (!["pro_cancel", "client_cancel_approved"].includes(mode)) {
-      throw new Error("Invalid mode");
-    }
-
-    // 1️⃣ Récupérer la mission
-    const { data: mission, error: missionError } = await supabase
+    const { data: mission, error: missionError } = await admin
       .from("missions")
       .select("id, status, client_id, pro_id")
       .eq("id", missionId)
-      .single();
+      .maybeSingle();
+    if (missionError) throw missionError;
+    if (!mission) throw new HttpError(404, "Mission not found");
+    if (mission.pro_id !== authUser.id) throw new HttpError(403, "You cannot refund this mission");
 
-    if (missionError || !mission) {
-      console.error("❌ Mission error:", missionError);
-      throw new Error("Mission not found");
+    const expectedStatus = mode === "pro_cancel" ? "confirmed" : "cancel_requested";
+    if (mission.status !== expectedStatus) {
+      throw new HttpError(409, `Mission must be ${expectedStatus} for this operation`);
     }
 
-    if (!["confirmed", "cancel_requested"].includes(mission.status)) {
-      throw new Error(`Mission is not refundable from current status: ${mission.status}`);
-    }
-
-    // 2️⃣ Récupérer le paiement lié (le plus récent, status='paid')
-    const { data: payment, error: paymentError } = await supabase
+    const { data: payment, error: paymentError } = await admin
       .from("payments")
-      .select("id, status, amount, amount_net, application_fee, stripe_payment_id")
+      .select("id, status, amount_net, stripe_payment_id")
       .eq("mission_id", missionId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+    if (paymentError) throw paymentError;
+    if (!payment) throw new HttpError(404, "Payment not found");
+    if (payment.status !== "paid") throw new HttpError(409, "Payment is not refundable");
+    if (!payment.stripe_payment_id) throw new HttpError(422, "Payment has no Stripe identifier");
 
-    if (paymentError) {
-      console.error("❌ Payment fetch error:", paymentError);
-      throw new Error("Could not fetch payment");
+    const refundParams: Stripe.RefundCreateParams = {
+      payment_intent: payment.stripe_payment_id,
+      reverse_transfer: true,
+      refund_application_fee: mode === "pro_cancel",
+      metadata: { mission_id: missionId, mode, requested_by: authUser.id },
+    };
+    if (mode === "client_cancel_approved") {
+      const netCents = Math.round(Number(payment.amount_net) * 100);
+      if (!Number.isSafeInteger(netCents) || netCents <= 0) {
+        throw new HttpError(422, "Payment has an invalid refundable amount");
+      }
+      refundParams.amount = netCents;
     }
 
-    if (!payment) {
-      throw new Error("No payment found for this mission");
-    }
-
-    if (payment.status !== "paid") {
-      throw new Error(`Payment is not refundable (status = ${payment.status})`);
-    }
-
-    const stripePaymentId = payment.stripe_payment_id as string | null;
-    if (!stripePaymentId) {
-      throw new Error("Missing Stripe payment id");
-    }
-
-    // ⚠️ Dans ton webhook actuel :
-    // - amount = montant total en CENTS (data.amount_total)
-    // - amount_net = montant net pro en EUROS
-    // - application_fee = frais plateforme en EUROS
-    const amountTotalCents = Number(payment.amount ?? 0);
-    const amountNetEuros = Number(payment.amount_net ?? 0); // net pour le pro, en €
-    const applicationFeeEuros = Number(payment.application_fee ?? 0); // en €
-
-    const netCents = Math.round(amountNetEuros * 100);
-
-    console.log("💶 refund-mission debug:", {
-      mode,
-      missionId,
-      amountTotalCents,
-      amountNetEuros,
-      applicationFeeEuros,
-      netCents,
+    const refund = await stripe.refunds.create(refundParams, {
+      idempotencyKey: `mission:${missionId}:${mode}`,
     });
-
-    // 3️⃣ Créer le refund Stripe
-    let refund;
-    if (mode === "pro_cancel") {
-      // 👉 Cas A : annulation initiée côté pro -> remboursement TOTAL
-      // On rembourse TOUT, on reverse aussi le transfert et les frais d'application.
-      refund = await stripe.refunds.create({
-        payment_intent: stripePaymentId,
-        // full refund (pas de amount -> 100%)
-        refund_application_fee: true,
-        reverse_transfer: true,
-      });
-    } else {
-      // 👉 Cas B : annulation demandée par le client et APPROUVÉE par le pro
-      // On rembourse uniquement la part pro (net), on garde les frais Glossed.
-      refund = await stripe.refunds.create({
-        payment_intent: stripePaymentId,
-        amount: netCents, // uniquement le net pro
-        reverse_transfer: true,
-        refund_application_fee: false, // on garde l'application_fee
-      });
-    }
-
-    const newPaymentStatus = mode === "pro_cancel" ? "refunded" : "partially_refunded";
-
+    const paymentStatus = mode === "pro_cancel" ? "refunded" : "partially_refunded";
     const now = new Date().toISOString();
 
-    // 4️⃣ Mettre à jour le paiement
-    const { error: updatePaymentError } = await supabase
+    const { error: updatePaymentError } = await admin
       .from("payments")
-      .update({
-        status: newPaymentStatus,
-        refunded_at: now,
-      })
-      .eq("id", payment.id);
+      .update({ status: paymentStatus, refunded_at: now })
+      .eq("id", payment.id)
+      .eq("status", "paid");
+    if (updatePaymentError) throw updatePaymentError;
 
-    if (updatePaymentError) {
-      console.error("❌ Error updating payment after refund:", updatePaymentError);
-    }
-
-    // 5️⃣ Mettre à jour la mission
-    const { error: updateMissionError } = await supabase
+    const { error: updateMissionError } = await admin
       .from("missions")
-      .update({
-        status: "cancelled",
-      })
-      .eq("id", missionId);
+      .update({ status: "cancelled", updated_at: now })
+      .eq("id", missionId)
+      .eq("status", expectedStatus);
+    if (updateMissionError) throw updateMissionError;
 
-    if (updateMissionError) {
-      console.error("❌ Error updating mission after refund:", updateMissionError);
-    }
-
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        mode,
-        payment_status: newPaymentStatus,
-        stripe_refund_id: refund.id,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-  } catch (err: any) {
-    console.error("❌ refund-mission error:", err?.message || err);
-    return new Response(JSON.stringify({ error: err?.message || "Unknown error" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return json(req, {
+      ok: true,
+      mode,
+      payment_status: paymentStatus,
+      stripe_refund_id: refund.id,
     });
+  } catch (error) {
+    return errorResponse(req, error);
   }
 });

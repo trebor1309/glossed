@@ -1,63 +1,42 @@
-// /supabase/functions/check-stripe-account/index.ts
 import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { errorResponse, handleOptions, HttpError, json } from "../_shared/http.ts";
+import { admin, requireUser } from "../_shared/supabase.ts";
 
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
-  apiVersion: "2023-10-16",
-});
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-);
+const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2023-10-16" });
 
 Deno.serve(async (req) => {
-  // ✅ Gérer le preflight CORS (OPTIONS)
-  if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    });
-  }
+  if (req.method === "OPTIONS") return handleOptions(req);
+  if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
 
   try {
-    const { user_id } = await req.json();
-    if (!user_id) throw new Error("Missing user_id");
-
-    // Récupère l'utilisateur pour avoir son stripe_account_id
-    const { data: user, error } = await supabase
+    const authUser = await requireUser(req);
+    const { data: profile, error } = await admin
       .from("users")
       .select("stripe_account_id")
-      .eq("id", user_id)
+      .eq("id", authUser.id)
       .maybeSingle();
 
     if (error) throw error;
-    if (!user?.stripe_account_id) {
-      return new Response(JSON.stringify({ connected: false, reason: "no_account_id" }), {
-        headers: { "Access-Control-Allow-Origin": "*" },
-      });
-    }
+    if (!profile) throw new HttpError(404, "Profile not found");
+    if (!profile.stripe_account_id) return json(req, { connected: false, reason: "no_account_id" });
 
-    // Vérifie le statut du compte Stripe
-    const account = await stripe.accounts.retrieve(user.stripe_account_id);
+    const account = await stripe.accounts.retrieve(profile.stripe_account_id);
+    const connected = !account.deleted;
+    const payoutsEnabled = connected && account.payouts_enabled;
+    const detailsSubmitted = connected && account.details_submitted;
 
-    return new Response(
-      JSON.stringify({
-        connected: true,
-        payouts_enabled: account.payouts_enabled,
-        details_submitted: account.details_submitted,
-      }),
-      {
-        headers: { "Access-Control-Allow-Origin": "*" },
-      }
-    );
-  } catch (err) {
-    console.error("❌ Stripe check error:", err);
-    return new Response(JSON.stringify({ connected: false, error: err.message }), {
-      status: 400,
-      headers: { "Access-Control-Allow-Origin": "*" },
+    const { error: updateError } = await admin
+      .from("users")
+      .update({ stripe_account_ready: detailsSubmitted, payouts_enabled: payoutsEnabled })
+      .eq("id", authUser.id);
+    if (updateError) throw updateError;
+
+    return json(req, {
+      connected,
+      payouts_enabled: payoutsEnabled,
+      details_submitted: detailsSubmitted,
     });
+  } catch (error) {
+    return errorResponse(req, error);
   }
 });

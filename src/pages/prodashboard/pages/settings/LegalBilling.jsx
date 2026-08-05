@@ -99,25 +99,28 @@ export default function LegalBilling() {
   /* -------------------------------------------------------------------
      🔗 STRIPE — CONNECT
   ------------------------------------------------------------------- */
-  const handleStripeConnect = () => {
-    window.location.href = "/prodashboard/stripe/refresh";
+  const handleStripeConnect = async () => {
+    setSaving(true);
+    const { data, error } = await supabase.functions.invoke("create-stripe-account", { body: {} });
+    setSaving(false);
+
+    if (error || !data?.url) {
+      setToast({ type: "error", message: data?.error || error?.message || "Stripe connection failed." });
+      return;
+    }
+    window.location.assign(data.url);
   };
 
   /* -------------------------------------------------------------------
      ❌ STRIPE — DISCONNECT
   ------------------------------------------------------------------- */
   const handleStripeDisconnect = async () => {
-    const { error } = await supabase
-      .from("users")
-      .update({
-        stripe_account_id: null,
-        stripe_account_ready: false,
-        stripe_payouts_enabled: false,
-      })
-      .eq("id", user.id);
+    setSaving(true);
+    const { data, error } = await supabase.functions.invoke("disconnect-stripe-account", { body: {} });
+    setSaving(false);
 
-    if (error) {
-      setToast({ type: "error", message: error.message });
+    if (error || !data?.success) {
+      setToast({ type: "error", message: data?.error || error?.message || "Stripe disconnection failed." });
     } else {
       setToast({ type: "success", message: "Stripe account disconnected." });
       setForm((f) => ({

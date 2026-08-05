@@ -1,3 +1,0 @@
-# Désactive la vérification JWT (indispensable pour Stripe)
-[functions.stripe-payment-webhook]
-verify_jwt = false
