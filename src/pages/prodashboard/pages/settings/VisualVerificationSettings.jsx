@@ -27,7 +27,7 @@ const MAX_PROFILE_SIZE = 1 * 1024 * 1024; // 1 Mo
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 Mo
 
 export default function VisualVerificationSettings() {
-  const { user } = useUser();
+  const { user, fetchUserProfile } = useUser();
 
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -35,6 +35,7 @@ export default function VisualVerificationSettings() {
   const [profileUrl, setProfileUrl] = useState("");
   const [portfolio, setPortfolio] = useState([]);
   const [verificationStatus, setVerificationStatus] = useState("unverified");
+  const [verificationRejectionReason, setVerificationRejectionReason] = useState(null);
   const [idDocumentUrl, setIdDocumentUrl] = useState(null);
   const [certificateUrl, setCertificateUrl] = useState(null);
   const [idDocumentRef, setIdDocumentRef] = useState(null);
@@ -102,6 +103,7 @@ export default function VisualVerificationSettings() {
           profile_photo,
           portfolio,
           verification_status,
+          verification_rejection_reason,
           id_document,
           certificate_document
         `
@@ -120,6 +122,7 @@ export default function VisualVerificationSettings() {
         setProfileUrl(data.profile_photo || "");
         setPortfolio(Array.isArray(data.portfolio) ? data.portfolio : []);
         setVerificationStatus(data.verification_status || "unverified");
+        setVerificationRejectionReason(data.verification_rejection_reason || null);
         setIdDocumentRef(data.id_document || null);
         setCertificateRef(data.certificate_document || null);
 
@@ -363,9 +366,13 @@ export default function VisualVerificationSettings() {
   };
 
   const uploadDoc = async (file, type) => {
+    let uploadedPath = null;
+    let profileUpdated = false;
     try {
       const safeName = sanitizeFileName(file.name);
       const path = `verification/${type}/${user.id}_${Date.now()}_${safeName}`;
+      uploadedPath = path;
+      const previousReference = type === "id" ? idDocumentRef : certificateRef;
 
       const { error: uploadError } = await supabase.storage
         .from(VERIFICATION_BUCKET)
@@ -377,26 +384,28 @@ export default function VisualVerificationSettings() {
 
       const url = await createSignedStorageUrl(VERIFICATION_BUCKET, path, 900);
 
-      const payload =
-        type === "id"
-          ? {
-              id_document: path,
-              verification_status: "pending",
-            }
-          : {
-              certificate_document: path,
-              verification_status: "pending",
-            };
+      const payload = type === "id" ? { id_document: path } : { certificate_document: path };
 
-      const { error } = await supabase
+      const { data: updatedProfile, error } = await supabase
         .from("users")
         .update({
           ...payload,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", user.id);
+        .eq("id", user.id)
+        .select("verification_status, verification_rejection_reason")
+        .single();
 
       if (error) throw error;
+      profileUpdated = true;
+
+      if (previousReference && previousReference !== path) {
+        try {
+          await removeStorageObject(VERIFICATION_BUCKET, previousReference);
+        } catch {
+          // The old private object is now unreferenced and can be cleaned up later.
+        }
+      }
 
       if (type === "id") {
         setIdDocumentRef(path);
@@ -406,12 +415,24 @@ export default function VisualVerificationSettings() {
         setCertificateUrl(url);
       }
 
-      setVerificationStatus("pending");
+      setVerificationStatus(updatedProfile.verification_status || "unverified");
+      setVerificationRejectionReason(updatedProfile.verification_rejection_reason || null);
+      await fetchUserProfile(user);
       setToast({
         type: "success",
-        message: "✅ Document uploaded. It will be reviewed within 72 hours.",
+        message:
+          updatedProfile.verification_status === "pending"
+            ? "Document uploaded. It will be reviewed within 72 hours."
+            : "Document uploaded. Add an ID document to request verification.",
       });
     } catch (err) {
+      if (uploadedPath && !profileUpdated) {
+        try {
+          await removeStorageObject(VERIFICATION_BUCKET, uploadedPath);
+        } catch {
+          // Best-effort cleanup; an unreferenced private object is safer than a bad profile state.
+        }
+      }
       console.error("❌ Document upload error:", err);
       setToast({ type: "error", message: "Error uploading document." });
     }
@@ -420,19 +441,27 @@ export default function VisualVerificationSettings() {
   const handleDocDelete = async (type) => {
     try {
       const reference = type === "id" ? idDocumentRef : certificateRef;
-      if (reference) await removeStorageObject(VERIFICATION_BUCKET, reference);
-
       const payload = type === "id" ? { id_document: null } : { certificate_document: null };
 
-      const { error } = await supabase
+      const { data: updatedProfile, error } = await supabase
         .from("users")
         .update({
           ...payload,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", user.id);
+        .eq("id", user.id)
+        .select("verification_status, verification_rejection_reason")
+        .single();
 
       if (error) throw error;
+
+      if (reference) {
+        try {
+          await removeStorageObject(VERIFICATION_BUCKET, reference);
+        } catch {
+          // The database state is already safe; a private orphan can be reconciled later.
+        }
+      }
 
       if (type === "id") {
         setIdDocumentRef(null);
@@ -442,6 +471,9 @@ export default function VisualVerificationSettings() {
         setCertificateUrl(null);
       }
 
+      setVerificationStatus(updatedProfile.verification_status || "unverified");
+      setVerificationRejectionReason(updatedProfile.verification_rejection_reason || null);
+      await fetchUserProfile(user);
       setToast({ type: "success", message: "Document removed." });
     } catch (err) {
       setToast({ type: "error", message: "Error removing document." });
@@ -583,12 +615,20 @@ export default function VisualVerificationSettings() {
                 ? "bg-green-50 text-green-700 border border-green-200"
                 : verificationStatus === "pending"
                   ? "bg-amber-50 text-amber-700 border border-amber-200"
-                  : "bg-gray-50 text-gray-500 border border-gray-200"
+                  : verificationStatus === "rejected"
+                    ? "bg-red-50 text-red-700 border border-red-200"
+                    : "bg-gray-50 text-gray-500 border border-gray-200"
             }`}
           >
             {verificationStatus}
           </span>
         </div>
+
+        {verificationStatus === "rejected" && verificationRejectionReason && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <strong>Reason for rejection:</strong> {verificationRejectionReason}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4">
           {/* ID Document */}

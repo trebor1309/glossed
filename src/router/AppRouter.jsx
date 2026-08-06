@@ -21,6 +21,7 @@ import Safety from "@/pages/Safety";
 import CheckEmail from "@/pages/auth/CheckEmail";
 import EmailVerified from "@/pages/auth/EmailVerified";
 import OnboardingPage from "@/pages/auth/OnboardingPage";
+import VerificationReviewPage from "@/pages/admin/VerificationReviewPage";
 
 // Dashboard — Client
 import DashboardLayout from "@/pages/dashboard/DashboardLayout";
@@ -56,6 +57,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import ProRoute from "./ProRoute";
 import PublicOnlyRoute from "./PublicOnlyRoute";
 import OnboardingGuard from "./OnboardingGuard";
+import AdminRoute from "./AdminRoute";
 
 // Profiles
 import UserPublicProfile from "@/pages/public-profile/UserPublicProfile";
@@ -132,6 +134,17 @@ export default function AppRouter() {
       </Route>
 
       <Route path="/payment/success" element={<PaymentSuccess />} />
+
+      <Route
+        path="/admin/verifications"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <VerificationReviewPage />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
 
       {/* 💼 Dashboard Pro */}
       <Route

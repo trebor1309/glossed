@@ -15,7 +15,7 @@ export default function UnifiedProfileSection() {
 
   const profilePhoto = user.profile_photo || null;
 
-  const verificationStatus = user.verification_status || "verified"; // default: verified
+  const verificationStatus = user.verification_status || "unverified";
   const portfolio = Array.isArray(user.portfolio) ? user.portfolio : [];
 
   return (

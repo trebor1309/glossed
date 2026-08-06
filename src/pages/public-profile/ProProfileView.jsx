@@ -1,4 +1,4 @@
-import { Briefcase, MapPin, MessageCircle, Calendar } from "lucide-react";
+import { MessageCircle, Calendar, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import useStartChat from "@/components/chat/hooks/useStartChat";
@@ -10,7 +10,7 @@ import ProfileMap from "./ProfileMap";
 export default function ProProfileView({ profile, reviews }) {
   const navigate = useNavigate();
   const startChat = useStartChat();
-  const { user, isClient, isPro } = useUser();
+  const { user, isPro } = useUser();
 
   /* -------------------------------------------------------------
      CONTACT BUTTON
@@ -52,7 +52,14 @@ export default function ProProfileView({ profile, reviews }) {
           className="w-28 h-28 rounded-full mx-auto object-cover"
         />
 
-        <h1 className="text-2xl font-bold">{profile.business_name || profile.username}</h1>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <h1 className="text-2xl font-bold">{profile.business_name || profile.username}</h1>
+          {profile.verification_status === "verified" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+              <CheckCircle2 size={14} /> Verified
+            </span>
+          )}
+        </div>
 
         {profile.description && (
           <p className="text-gray-600 max-w-xl mx-auto">{profile.description}</p>
