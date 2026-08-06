@@ -86,10 +86,11 @@ function PaymentsList({ payments, onView, onDownloadInvoice }) {
   return (
     <ul className="divide-y divide-gray-100">
       {payments.map((p) => {
-        const net = p.amount_net != null ? toNumber(p.amount_net) : centsToEuros(p.amount || 0);
+        const net = centsToEuros(p.amount_net_cents ?? p.amount_total_cents ?? 0);
 
-        const servicePrice = p.pro_service_price ?? null;
-        const travelFee = p.travel_fee ?? null;
+        const servicePrice =
+          p.pro_service_price_cents != null ? centsToEuros(p.pro_service_price_cents) : null;
+        const travelFee = p.travel_fee_cents != null ? centsToEuros(p.travel_fee_cents) : null;
 
         return (
           <li key={p.id} className="py-4 flex justify-between items-center">
@@ -211,7 +212,7 @@ export default function ProDashboardPayments() {
     () =>
       filteredPayments.reduce(
         (acc, p) =>
-          acc + (p.amount_net != null ? toNumber(p.amount_net) : centsToEuros(p.amount || 0)),
+          acc + centsToEuros(p.amount_net_cents ?? p.amount_total_cents ?? 0),
         0
       ),
     [filteredPayments]
@@ -282,10 +283,12 @@ export default function ProDashboardPayments() {
 
     // Table
     const tableData = filteredPayments.map((p) => {
-      const net = p.amount_net != null ? toNumber(p.amount_net) : centsToEuros(p.amount || 0);
-      const servicePrice = p.pro_service_price ?? null;
-      const travelFee = p.travel_fee ?? null;
-      const totalPro = p.pro_total_price ?? net;
+      const net = centsToEuros(p.amount_net_cents ?? p.amount_total_cents ?? 0);
+      const servicePrice =
+        p.pro_service_price_cents != null ? centsToEuros(p.pro_service_price_cents) : null;
+      const travelFee = p.travel_fee_cents != null ? centsToEuros(p.travel_fee_cents) : null;
+      const totalPro =
+        p.pro_total_price_cents != null ? centsToEuros(p.pro_total_price_cents) : net;
 
       return [
         p.mission_id ? p.mission_id.slice(0, 8) : "—",
@@ -353,11 +356,13 @@ export default function ProDashboardPayments() {
       console.error("❌ Error fetching client for invoice:", err);
     }
 
-    const net = p.amount_net != null ? toNumber(p.amount_net) : centsToEuros(p.amount || 0);
+    const net = centsToEuros(p.amount_net_cents ?? p.amount_total_cents ?? 0);
 
-    const servicePrice = p.pro_service_price ?? null;
-    const travelFee = p.travel_fee ?? null;
-    const totalPro = p.pro_total_price ?? net;
+    const servicePrice =
+      p.pro_service_price_cents != null ? centsToEuros(p.pro_service_price_cents) : null;
+    const travelFee = p.travel_fee_cents != null ? centsToEuros(p.travel_fee_cents) : null;
+    const totalPro =
+      p.pro_total_price_cents != null ? centsToEuros(p.pro_total_price_cents) : net;
 
     // Header
     doc.setFont("helvetica", "bold");

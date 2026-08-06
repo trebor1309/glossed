@@ -14,19 +14,17 @@ export default function ClientPaymentDetailsModal({
 }) {
   if (!payment) return null;
 
-  const gross =
-    payment.amount_gross != null
-      ? typeof payment.amount_gross === "number"
-        ? payment.amount_gross
-        : parseFloat(payment.amount_gross)
-      : (payment.amount || 0) / 100;
-
-  const proServicePrice = payment.pro_service_price != null ? payment.pro_service_price : null;
-  const travelFee = payment.travel_fee != null ? payment.travel_fee : null;
-  const glossedFee = payment.application_fee != null ? payment.application_fee : null;
+  const gross = (payment.amount_total_cents || 0) / 100;
+  const proServicePrice =
+    payment.pro_service_price_cents != null ? payment.pro_service_price_cents / 100 : null;
+  const travelFee = payment.travel_fee_cents != null ? payment.travel_fee_cents / 100 : null;
+  const glossedFee =
+    payment.application_fee_cents != null ? payment.application_fee_cents / 100 : null;
 
   const totalPro =
-    payment.pro_total_price != null ? payment.pro_total_price : gross - (glossedFee || 0);
+    payment.pro_total_price_cents != null
+      ? payment.pro_total_price_cents / 100
+      : gross - (glossedFee || 0);
 
   return (
     <motion.div

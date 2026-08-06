@@ -43,7 +43,7 @@ export function UserProvider({ children }) {
           onboarding_completed,
           stripe_account_id,
           stripe_account_ready,
-          stripe_payouts_enabled
+          payouts_enabled
         `
         )
         .eq("id", supaUser.id)

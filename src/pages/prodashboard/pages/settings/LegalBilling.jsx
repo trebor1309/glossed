@@ -20,7 +20,7 @@ export default function LegalBilling() {
     iban: "",
 
     stripe_account_ready: false,
-    stripe_payouts_enabled: false,
+    payouts_enabled: false,
     stripe_account_id: null,
   });
 
@@ -41,7 +41,7 @@ export default function LegalBilling() {
           professional_email,
           iban,
           stripe_account_ready,
-          stripe_payouts_enabled,
+          payouts_enabled,
           stripe_account_id
         `
         )
@@ -59,7 +59,7 @@ export default function LegalBilling() {
           iban: data.iban || "",
 
           stripe_account_ready: !!data.stripe_account_ready,
-          stripe_payouts_enabled: !!data.stripe_payouts_enabled,
+          payouts_enabled: !!data.payouts_enabled,
           stripe_account_id: data.stripe_account_id || null,
         });
       }
@@ -126,7 +126,7 @@ export default function LegalBilling() {
       setForm((f) => ({
         ...f,
         stripe_account_ready: false,
-        stripe_payouts_enabled: false,
+        payouts_enabled: false,
         stripe_account_id: null,
       }));
 
