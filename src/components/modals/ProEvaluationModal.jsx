@@ -2,11 +2,13 @@ import { motion } from "framer-motion";
 import { X, Star } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useUser } from "@/context/UserContext";
 
 /* ---------------------------------------------------------
    ⭐ Modal d'évaluation client (Pro)
 --------------------------------------------------------- */
 export default function ProEvaluationModal({ booking, onClose, onSuccess }) {
+  const { user } = useUser();
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState("");
@@ -22,9 +24,9 @@ export default function ProEvaluationModal({ booking, onClose, onSuccess }) {
       // ✅ insertion dans table reviews
       const { error } = await supabase.from("reviews").insert([
         {
-          booking_id: booking.id,
-          pro_id: booking.pro_id,
-          client_id: booking.client_id,
+          mission_id: booking.id,
+          reviewer_id: user.id,
+          target_id: booking.client_id,
           rating,
           comment,
         },

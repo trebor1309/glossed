@@ -1,6 +1,34 @@
 // 📄 src/components/chat/ChatBubble.jsx
+import { useEffect, useState } from "react";
+import { createSignedStorageUrl } from "@/lib/storageUrls";
+
 export default function ChatBubble({ msg, isOwn, onImageClick }) {
   const isImage = !!msg.attachment_url;
+  const [attachmentUrl, setAttachmentUrl] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!msg.attachment_url) {
+      setAttachmentUrl(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    createSignedStorageUrl("chat_attachments", msg.attachment_url)
+      .then((url) => {
+        if (active) setAttachmentUrl(url);
+      })
+      .catch((error) => {
+        console.error("Unable to sign chat attachment:", error);
+        if (active) setAttachmentUrl(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [msg.attachment_url]);
 
   const createdAt = msg.created_at ? new Date(msg.created_at) : null;
   const timeLabel = createdAt
@@ -35,11 +63,11 @@ export default function ChatBubble({ msg, isOwn, onImageClick }) {
         }`}
       >
         {/* IMAGE */}
-        {isImage && (
+        {isImage && attachmentUrl && (
           <img
-            src={msg.attachment_url}
+            src={attachmentUrl}
             alt="Attachment"
-            onClick={() => onImageClick?.(msg.attachment_url)}
+            onClick={() => onImageClick?.(attachmentUrl)}
             className="rounded-xl shadow-md max-h-64 mb-2 object-cover cursor-pointer hover:opacity-90 transition"
           />
         )}

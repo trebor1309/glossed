@@ -13,8 +13,14 @@ import {
 } from "lucide-react";
 import Toast from "@/components/ui/Toast";
 import Cropper from "react-easy-crop";
+import {
+  createSignedStorageUrl,
+  parseStorageReference,
+  removeStorageObject,
+} from "@/lib/storageUrls";
 
 const BUCKET = "glossed-media";
+const VERIFICATION_BUCKET = "verification-documents";
 
 // Limites de taille (en octets)
 const MAX_PROFILE_SIZE = 1 * 1024 * 1024; // 1 Mo
@@ -31,6 +37,8 @@ export default function VisualVerificationSettings() {
   const [verificationStatus, setVerificationStatus] = useState("unverified");
   const [idDocumentUrl, setIdDocumentUrl] = useState(null);
   const [certificateUrl, setCertificateUrl] = useState(null);
+  const [idDocumentRef, setIdDocumentRef] = useState(null);
+  const [certificateRef, setCertificateRef] = useState(null);
 
   // ---- Cropper state pour photo de profil
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -65,15 +73,19 @@ export default function VisualVerificationSettings() {
   const removeFromBucketByUrl = async (url) => {
     if (!url) return;
     try {
-      const parts = url.split("/object/public/");
-      if (parts.length < 2) return;
-      // ex: glossed-media/portfolio/userid_xxx.jpg
-      const pathWithBucket = parts[1]; // "glossed-media/portfolio/..."
-      const path = pathWithBucket.replace(`${BUCKET}/`, ""); // "portfolio/..."
-      await supabase.storage.from(BUCKET).remove([path]);
+      await removeStorageObject(BUCKET, url);
     } catch (err) {
       console.warn("⚠️ Failed to remove from bucket:", err);
     }
+  };
+
+  const resolveVerificationDocument = async (value) => {
+    if (!value) return null;
+    const reference = parseStorageReference(value, VERIFICATION_BUCKET);
+
+    // Compatibility while historical public documents are moved to private storage.
+    if (reference?.bucket === BUCKET) return value;
+    return createSignedStorageUrl(VERIFICATION_BUCKET, value, 900);
   };
 
   // ---------- LOAD INITIAL DATA ----------
@@ -108,8 +120,21 @@ export default function VisualVerificationSettings() {
         setProfileUrl(data.profile_photo || "");
         setPortfolio(Array.isArray(data.portfolio) ? data.portfolio : []);
         setVerificationStatus(data.verification_status || "unverified");
-        setIdDocumentUrl(data.id_document || null);
-        setCertificateUrl(data.certificate_document || null);
+        setIdDocumentRef(data.id_document || null);
+        setCertificateRef(data.certificate_document || null);
+
+        try {
+          const [idUrl, certificateViewUrl] = await Promise.all([
+            resolveVerificationDocument(data.id_document),
+            resolveVerificationDocument(data.certificate_document),
+          ]);
+          setIdDocumentUrl(idUrl);
+          setCertificateUrl(certificateViewUrl);
+        } catch (signError) {
+          console.error("Unable to sign verification documents:", signError);
+          setIdDocumentUrl(null);
+          setCertificateUrl(null);
+        }
       }
 
       setLoading(false);
@@ -342,16 +367,24 @@ export default function VisualVerificationSettings() {
       const safeName = sanitizeFileName(file.name);
       const path = `verification/${type}/${user.id}_${Date.now()}_${safeName}`;
 
-      const url = await uploadToBucket(path, file);
+      const { error: uploadError } = await supabase.storage
+        .from(VERIFICATION_BUCKET)
+        .upload(path, file, {
+          upsert: false,
+          contentType: file.type,
+        });
+      if (uploadError) throw uploadError;
+
+      const url = await createSignedStorageUrl(VERIFICATION_BUCKET, path, 900);
 
       const payload =
         type === "id"
           ? {
-              id_document: url,
+              id_document: path,
               verification_status: "pending",
             }
           : {
-              certificate_document: url,
+              certificate_document: path,
               verification_status: "pending",
             };
 
@@ -365,8 +398,13 @@ export default function VisualVerificationSettings() {
 
       if (error) throw error;
 
-      if (type === "id") setIdDocumentUrl(url);
-      else setCertificateUrl(url);
+      if (type === "id") {
+        setIdDocumentRef(path);
+        setIdDocumentUrl(url);
+      } else {
+        setCertificateRef(path);
+        setCertificateUrl(url);
+      }
 
       setVerificationStatus("pending");
       setToast({
@@ -381,8 +419,8 @@ export default function VisualVerificationSettings() {
 
   const handleDocDelete = async (type) => {
     try {
-      const url = type === "id" ? idDocumentUrl : certificateUrl;
-      await removeFromBucketByUrl(url);
+      const reference = type === "id" ? idDocumentRef : certificateRef;
+      if (reference) await removeStorageObject(VERIFICATION_BUCKET, reference);
 
       const payload = type === "id" ? { id_document: null } : { certificate_document: null };
 
@@ -396,8 +434,13 @@ export default function VisualVerificationSettings() {
 
       if (error) throw error;
 
-      if (type === "id") setIdDocumentUrl(null);
-      else setCertificateUrl(null);
+      if (type === "id") {
+        setIdDocumentRef(null);
+        setIdDocumentUrl(null);
+      } else {
+        setCertificateRef(null);
+        setCertificateUrl(null);
+      }
 
       setToast({ type: "success", message: "Document removed." });
     } catch (err) {

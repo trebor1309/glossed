@@ -32,7 +32,7 @@ export default function ChatInput({ chatId, user }) {
 
   // --- Upload image ---
   const uploadImage = async (file) => {
-    const filename = `${Date.now()}_${user.id}.jpg`;
+    const filename = `${user.id}_${Date.now()}.jpg`;
     const path = `${chatId}/${filename}`;
 
     const compressed = await compressImage(file);
@@ -48,8 +48,7 @@ export default function ChatInput({ chatId, user }) {
       return null;
     }
 
-    const { data: publicUrl } = supabase.storage.from("chat_attachments").getPublicUrl(path);
-    return publicUrl.publicUrl;
+    return path;
   };
 
   // --- Envoyer message (texte / image) ---

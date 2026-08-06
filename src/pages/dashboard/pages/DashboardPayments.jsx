@@ -237,12 +237,8 @@ export default function DashboardPayments() {
     // Pro info
     if (mission?.pro_id || payment.pro_id) {
       const proId = mission?.pro_id || payment.pro_id;
-      const { data } = await supabase
-        .from("users")
-        .select("first_name, last_name, full_name, email")
-        .eq("id", proId)
-        .maybeSingle();
-      setSelectedPro(data || null);
+      const { data } = await supabase.rpc("get_user_summary", { p_user_id: proId });
+      setSelectedPro(data?.[0] || null);
     } else {
       setSelectedPro(null);
     }
@@ -338,12 +334,8 @@ export default function DashboardPayments() {
     let pro = null;
     if (mission?.pro_id || p.pro_id) {
       const proId = mission?.pro_id || p.pro_id;
-      const { data } = await supabase
-        .from("users")
-        .select("first_name, last_name, full_name, email")
-        .eq("id", proId)
-        .maybeSingle();
-      pro = data || null;
+      const { data } = await supabase.rpc("get_user_summary", { p_user_id: proId });
+      pro = data?.[0] || null;
     }
 
     const gross = centsToEuros(p.amount_total_cents || 0);
