@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { supabase } from "@/lib/supabaseClient";
+import { getOrCreateChat } from "@/lib/chat";
 import { openConfirmModal } from "@/components/ui/openConfirmModal";
 
 const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
@@ -50,36 +51,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
   const ensureChatAndSendMessage = async (message) => {
     if (!booking?.id || !user?.id) return;
 
-    // 1) Check for existing chat
-    const { data: existing } = await supabase
-      .from("chats")
-      .select("id")
-      .eq("mission_id", booking.id)
-      .maybeSingle();
-
-    let chatId = existing?.id;
-
-    // 2) Create chat if missing
-    if (!chatId) {
-      const { data: created, error: createError } = await supabase
-        .from("chats")
-        .insert([
-          {
-            mission_id: booking.id,
-            pro_id: booking.pro_id,
-            client_id: booking.client_id,
-          },
-        ])
-        .select("id")
-        .single();
-
-      if (createError) {
-        console.error("Error creating chat:", createError);
-        return;
-      }
-
-      chatId = created.id;
-    }
+    const chatId = await getOrCreateChat({ missionId: booking.id });
 
     // 3) Send system-like message
     const { error: msgError } = await supabase.from("messages").insert({
@@ -101,36 +73,7 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
     if (!booking?.id) return;
 
     try {
-      let chatId;
-
-      const { data: existing } = await supabase
-        .from("chats")
-        .select("id")
-        .eq("mission_id", booking.id)
-        .maybeSingle();
-
-      chatId = existing?.id;
-
-      if (!chatId) {
-        const { data: created, error: createError } = await supabase
-          .from("chats")
-          .insert([
-            {
-              mission_id: booking.id,
-              pro_id: booking.pro_id,
-              client_id: booking.client_id,
-            },
-          ])
-          .select("id")
-          .single();
-
-        if (createError) {
-          console.error("Error creating chat:", createError);
-          return;
-        }
-
-        chatId = created.id;
-      }
+      const chatId = await getOrCreateChat({ missionId: booking.id });
 
       if (isPro) {
         navigate(`/prodashboard/messages/${chatId}`);

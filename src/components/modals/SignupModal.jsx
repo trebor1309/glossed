@@ -13,9 +13,9 @@ export default function SignupModal({ onClose, onLogin }) {
     const password = e.target.password.value.trim();
 
     try {
-      await signup(email, password);
+      const { session } = await signup(email, password);
       onClose();
-      navigate("/auth/check-email", { state: { email } });
+      navigate(session ? "/onboarding" : "/auth/check-email", { state: { email } });
     } catch (err) {
       alert("Signup failed: " + err.message);
     }

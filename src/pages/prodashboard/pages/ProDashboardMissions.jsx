@@ -74,7 +74,7 @@ export default function ProDashboardMissions() {
           .from("bookings")
           .select("*")
           .in("id", bookingIds)
-          .eq("status", "pending")
+          .in("status", ["pending", "offers"])
           .order("date", { ascending: true });
 
         if (error) throw error;
@@ -100,16 +100,19 @@ export default function ProDashboardMissions() {
 
       const missionsWithNet = (proMissions || []).map((m) => ({
         ...m,
-        net_amount: Math.round(m.price * 0.9 * 100) / 100, // 10% fee Glossed
+        net_amount: Number(m.price), // Glossed's fee is added to the client's total.
       }));
 
       // 4️⃣ Ne pas montrer de bookings déjà confirmés ou cancel_requested
       const confirmedBookingIds = missionsWithNet
         .filter((m) => m.status === "confirmed" || m.status === "cancel_requested")
         .map((m) => m.booking_id);
+      const proposedBookingIds = missionsWithNet
+        .filter((m) => m.status === "proposed")
+        .map((m) => m.booking_id);
 
       const cleanedBookings = (directBookings || []).filter(
-        (b) => !confirmedBookingIds.includes(b.id)
+        (b) => !confirmedBookingIds.includes(b.id) && !proposedBookingIds.includes(b.id)
       );
 
       // 5️⃣ Taguer les sources
@@ -217,7 +220,11 @@ export default function ProDashboardMissions() {
   const sourceList = selectedDayMissions ? selectedDayMissions.dayMissions : missions;
 
   const grouped = {
-    pending: sortMissions(sourceList.filter((m) => m.status === "pending")),
+    pending: sortMissions(
+      sourceList.filter(
+        (m) => m.type === "booking" && (m.status === "pending" || m.status === "offers")
+      )
+    ),
     proposed: sortMissions(sourceList.filter((m) => m.status === "proposed")),
     confirmed: sortMissions(
       sourceList.filter((m) => m.status === "confirmed" || m.status === "cancel_requested")
@@ -292,7 +299,6 @@ export default function ProDashboardMissions() {
       {proposalTarget && (
         <ProProposalModal
           booking={proposalTarget}
-          session={session}
           onClose={() => setProposalTarget(null)}
           onSuccess={() => {
             setProposalTarget(null);

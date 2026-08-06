@@ -211,8 +211,7 @@ export default function ProDashboardPayments() {
   const totalNet = useMemo(
     () =>
       filteredPayments.reduce(
-        (acc, p) =>
-          acc + centsToEuros(p.amount_net_cents ?? p.amount_total_cents ?? 0),
+        (acc, p) => acc + centsToEuros(p.amount_net_cents ?? p.amount_total_cents ?? 0),
         0
       ),
     [filteredPayments]
@@ -237,12 +236,10 @@ export default function ProDashboardPayments() {
     setSelectedMission(mission);
 
     if (mission?.client_id) {
-      const { data } = await supabase
-        .from("users")
-        .select("first_name, last_name, email")
-        .eq("id", mission.client_id)
-        .maybeSingle();
-      setSelectedClient(data);
+      const { data } = await supabase.rpc("get_user_summary", {
+        p_user_id: mission.client_id,
+      });
+      setSelectedClient(data?.[0] || null);
     }
   };
 
@@ -345,12 +342,10 @@ export default function ProDashboardPayments() {
     let client = null;
     try {
       if (mission?.client_id) {
-        const { data } = await supabase
-          .from("users")
-          .select("first_name, last_name, email")
-          .eq("id", mission.client_id)
-          .maybeSingle();
-        client = data || null;
+        const { data } = await supabase.rpc("get_user_summary", {
+          p_user_id: mission.client_id,
+        });
+        client = data?.[0] || null;
       }
     } catch (err) {
       console.error("❌ Error fetching client for invoice:", err);
@@ -361,8 +356,7 @@ export default function ProDashboardPayments() {
     const servicePrice =
       p.pro_service_price_cents != null ? centsToEuros(p.pro_service_price_cents) : null;
     const travelFee = p.travel_fee_cents != null ? centsToEuros(p.travel_fee_cents) : null;
-    const totalPro =
-      p.pro_total_price_cents != null ? centsToEuros(p.pro_total_price_cents) : net;
+    const totalPro = p.pro_total_price_cents != null ? centsToEuros(p.pro_total_price_cents) : net;
 
     // Header
     doc.setFont("helvetica", "bold");

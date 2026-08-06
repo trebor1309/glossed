@@ -20,15 +20,27 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
         setLoading(true);
         console.log("🎯 Fetching offers for:", booking.id, "client:", booking.client_id);
 
-        const { data, error } = await supabase
+        const { data: missionRows, error } = await supabase
           .from("missions")
-          .select("*, pro:users!missions_pro_id_fkey(first_name, last_name, profile_photo)")
+          .select("*")
           .eq("client_id", booking.client_id)
-          .or(`booking_id.eq.${booking.id},id.eq.${booking.id}`)
+          .eq("booking_id", booking.id)
           .order("created_at", { ascending: true });
 
         if (error) throw error;
-        setOffers(data || []);
+        const profileEntries = await Promise.all(
+          [...new Set((missionRows || []).map((mission) => mission.pro_id))].map(async (proId) => {
+            const { data } = await supabase.rpc("get_user_summary", { p_user_id: proId });
+            return [proId, data?.[0] || null];
+          })
+        );
+        const profiles = new Map(profileEntries);
+        setOffers(
+          (missionRows || []).map((mission) => ({
+            ...mission,
+            pro: profiles.get(mission.pro_id),
+          }))
+        );
       } catch (err) {
         console.error("❌ Error loading offers:", err);
         setToast({
@@ -56,7 +68,8 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
 
       if (error || !result?.url) {
         alert(
-          result?.error || error?.message ||
+          result?.error ||
+            error?.message ||
             result?.message ||
             "Impossible de démarrer le paiement, réessayez plus tard."
         );

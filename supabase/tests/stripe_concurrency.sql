@@ -66,6 +66,8 @@ select set_config(
   '{"sub":"10000000-0000-0000-0000-000000000010","role":"authenticated"}',
   true
 );
+select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000010', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
 do $$
 begin
   begin
@@ -198,6 +200,8 @@ select set_config(
   '{"sub":"10000000-0000-0000-0000-000000000020","role":"authenticated"}',
   true
 );
+select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000020', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
 delete from public.missions
 where id = '10000000-0000-0000-0000-000000000002';
 do $$
@@ -303,6 +307,8 @@ select set_config(
   '{"sub":"10000000-0000-0000-0000-000000000020","role":"authenticated"}',
   true
 );
+select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000020', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
 update public.missions set status = 'confirmed'
 where id = '10000000-0000-0000-0000-000000000003';
 rollback;
@@ -384,6 +390,8 @@ select set_config(
   '{"sub":"10000000-0000-0000-0000-000000000020","role":"authenticated"}',
   true
 );
+select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000020', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
 do $$
 begin
   begin

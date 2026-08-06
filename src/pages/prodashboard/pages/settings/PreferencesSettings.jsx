@@ -160,28 +160,13 @@ export default function PreferencesSettings() {
       return setToast({ type: "error", message: `Auth email update failed: ${authErr.message}` });
     }
 
-    // 2) mirror into users.email for convenience (facultatif mais propre)
-    const { error: userErr } = await supabase
-      .from("users")
-      .update({ email: emailForm.new_email, updated_at: new Date().toISOString() })
-      .eq("id", user.id);
-
     setSavingEmail(false);
 
-    if (userErr) {
-      return setToast({
-        type: "error",
-        message: `Email saved in profile with a warning: ${userErr.message}`,
-      });
-    }
-
-    // refresh UI
-    setPrefs((p) => ({ ...p, email_current: emailForm.new_email }));
     setEmailForm({ new_email: "", confirm_email: "" });
     setToast({
       type: "success",
       message:
-        "✅ Login email updated. You may need to confirm this change via the verification link.",
+        "✅ Check both mailboxes to confirm the email change. Your profile will update after confirmation.",
     });
   };
 

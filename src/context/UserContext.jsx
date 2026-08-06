@@ -10,6 +10,7 @@ export function UserProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // 🔒 Quand user disparaît → reset modal
@@ -21,9 +22,10 @@ export function UserProvider({ children }) {
     FETCH USER PROFILE
   ----------------------------------------------------------- */
   const fetchUserProfile = async (supaUser) => {
-    if (!supaUser) return;
+    if (!supaUser) return null;
 
     try {
+      setProfileError(null);
       const { data: profile, error } = await supabase
         .from("users")
         .select(
@@ -37,6 +39,12 @@ export function UserProvider({ children }) {
           address,
           latitude,
           longitude,
+          profile_photo,
+          business_name,
+          company_number,
+          vat_number,
+          professional_email,
+          business_address,
           active_role,
           role,
           theme,
@@ -49,11 +57,10 @@ export function UserProvider({ children }) {
         .eq("id", supaUser.id)
         .maybeSingle();
 
-      console.log("🔍 RAW SUPABASE PROFILE RESULT", { profile, error });
+      if (error) throw error;
 
       if (!profile) {
-        console.warn("⚠️ fetchUserProfile returned NULL — RLS issue?");
-        return;
+        throw new Error("Your account profile is unavailable. Please retry or sign out.");
       }
 
       const fullUser = {
@@ -66,10 +73,15 @@ export function UserProvider({ children }) {
         address: profile.address || "",
         latitude: profile.latitude ?? null,
         longitude: profile.longitude ?? null,
+        profile_photo: profile.profile_photo || null,
+        business_name: profile.business_name || "",
+        company_number: profile.company_number || "",
+        vat_number: profile.vat_number || "",
+        professional_email: profile.professional_email || "",
+        business_address: profile.business_address || "",
         stripe_account_id: profile.stripe_account_id || null,
         payouts_enabled: profile.payouts_enabled || false,
         stripe_account_ready: profile.stripe_account_ready || false,
-        stripe_details_submitted: profile.stripe_details_submitted || false,
         role: profile.role || "client",
         activeRole: profile.active_role || profile.role || "client",
         theme: profile.theme || "light",
@@ -78,8 +90,12 @@ export function UserProvider({ children }) {
 
       setUser(fullUser);
       localStorage.setItem("glossed_user", JSON.stringify(fullUser));
+      return fullUser;
     } catch (err) {
       console.error("❌ fetchUserProfile failed:", err.message);
+      setUser(null);
+      setProfileError(err.message || "Unable to load your account profile.");
+      return null;
     }
   };
 
@@ -144,6 +160,7 @@ export function UserProvider({ children }) {
       if (event === "SIGNED_OUT") {
         setUser(null);
         setSession(null);
+        setProfileError(null);
         localStorage.removeItem("glossed_user");
         setShowUpgradeModal(false);
         return;
@@ -160,6 +177,7 @@ export function UserProvider({ children }) {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
+    setProfileError(null);
     localStorage.removeItem("glossed_user");
     setShowUpgradeModal(false);
     window.location.assign("/");
@@ -187,15 +205,34 @@ export function UserProvider({ children }) {
   /* -----------------------------------------------------------
     SIGNUP
   ----------------------------------------------------------- */
-  const signup = async (email, password) => {
+  const signup = async (email, password, options = {}) => {
+    const normalizedEmail = email.trim();
+    const requestedRole = options.role === "pro" ? "pro" : "client";
     const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: normalizedEmail,
       password: password.trim(),
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/email-verified`,
+        data: {
+          requested_role: requestedRole,
+          username: options.username?.trim().toLowerCase() || null,
+          business_name: options.businessName?.trim() || null,
+        },
+      },
     });
 
     if (error) throw error;
 
-    return { user: data.user };
+    localStorage.setItem("pending_signup_email", normalizedEmail);
+    return { user: data.user, session: data.session };
+  };
+
+  const retryProfile = async () => {
+    if (!session?.user) return null;
+    setLoading(true);
+    const result = await fetchUserProfile(session.user);
+    setLoading(false);
+    return result;
   };
 
   /* -----------------------------------------------------------
@@ -232,11 +269,13 @@ export function UserProvider({ children }) {
     session,
     user,
     loading,
+    profileError,
     login,
     signup,
     logout,
     switchRole,
     fetchUserProfile,
+    retryProfile,
     isAuthenticated: !!user,
     isPro: user?.activeRole === "pro",
     isClient: user?.activeRole === "client",

@@ -1,15 +1,17 @@
 // 📄 src/pages/auth/CheckEmail.jsx
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { motion } from "framer-motion";
 import { Mail, RefreshCcw } from "lucide-react";
 
 export default function CheckEmail() {
+  const location = useLocation();
   const [resending, setResending] = useState(false);
   const [done, setDone] = useState(false);
 
   const resendEmail = async () => {
-    const storedEmail = localStorage.getItem("pending_signup_email");
+    const storedEmail = location.state?.email || localStorage.getItem("pending_signup_email");
     if (!storedEmail) {
       alert("No email detected.");
       return;
@@ -21,6 +23,7 @@ export default function CheckEmail() {
       const { error } = await supabase.auth.resend({
         type: "signup",
         email: storedEmail,
+        options: { emailRedirectTo: `${window.location.origin}/auth/email-verified` },
       });
 
       if (error) throw error;
@@ -33,7 +36,7 @@ export default function CheckEmail() {
     }
   };
 
-  const email = localStorage.getItem("pending_signup_email");
+  const email = location.state?.email || localStorage.getItem("pending_signup_email");
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-50 via-white to-amber-50">

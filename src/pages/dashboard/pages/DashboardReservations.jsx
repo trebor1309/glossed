@@ -80,10 +80,12 @@ export default function DashboardReservations() {
         type: "booking",
       }));
 
-      const missionsTagged = (missionsData || []).map((m) => ({
-        ...m,
-        type: "mission",
-      }));
+      const missionsTagged = (missionsData || [])
+        .map((m) => ({
+          ...m,
+          type: "mission",
+        }))
+        .filter((m) => m.status !== "proposed" || !m.booking_id);
 
       setBookings([...bookingsTagged, ...missionsTagged]);
     } catch (err) {
@@ -111,7 +113,7 @@ export default function DashboardReservations() {
       ) {
         setNewItems((prev) => {
           const next = new Set(prev);
-          next.add(`mission_${payload.new.id}`);
+          next.add(`booking_${payload.new.booking_id || payload.new.id}`);
           return next;
         });
       }
@@ -264,7 +266,7 @@ export default function DashboardReservations() {
 
           setNewItems((prev) => {
             const next = new Set(prev);
-            next.delete(`mission_${b.id}`);
+            next.delete(`booking_${b.id}`);
             return next;
           });
         }}
@@ -365,7 +367,7 @@ function ReservationSection({
         <ul className="divide-y divide-gray-100">
           {data.map((b) => {
             const isNew =
-              newItems?.has(`mission_${b.id}`) && ["proposed", "offers"].includes(b.status);
+              newItems?.has(`booking_${b.id}`) && ["proposed", "offers"].includes(b.status);
             const isCancelRequested = b.status === "cancel_requested";
 
             return (

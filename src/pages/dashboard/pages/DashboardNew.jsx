@@ -348,7 +348,7 @@ function StepRecap({ bookingData, onPrev, onConfirm, loading, targetedPro }) {
 /* ---------------------------------------------------------
    MAIN COMPONENT
 --------------------------------------------------------- */
-export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
+export default function DashboardNew({ isModal = false, editBooking = null, onClose, onSuccess }) {
   const { session, user } = useUser();
   const navigate = useNavigate();
 
@@ -358,15 +358,25 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
   const [targetedPro, setTargetedPro] = useState(null);
 
   const [step, setStep] = useState(1);
-  const [bookingData, setBookingData] = useState({
-    services: [],
-    date: "",
-    timeSlots: [],
-    address: "",
-    notes: "",
-    latitude: null,
-    longitude: null,
-  });
+  const [bookingData, setBookingData] = useState(() => ({
+    services: editBooking?.service
+      ? editBooking.service
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [],
+    date: editBooking?.date || "",
+    timeSlots: editBooking?.time_slot
+      ? editBooking.time_slot
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [],
+    address: editBooking?.address || "",
+    notes: editBooking?.notes || "",
+    latitude: editBooking?.client_lat ?? null,
+    longitude: editBooking?.client_lng ?? null,
+  }));
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
@@ -378,11 +388,10 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
     if (!targetedProId) return;
 
     (async () => {
-      const { data, error } = await supabase
-        .from("users")
-        .select("id, business_type, business_name, latitude, longitude, radius_km, mobile_service")
-        .eq("id", targetedProId)
-        .maybeSingle();
+      const { data: rows, error } = await supabase.rpc("get_public_profile", {
+        p_user_id: targetedProId,
+      });
+      const data = rows?.[0] || null;
 
       if (!error && data) {
         let services = [];
@@ -435,6 +444,31 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
     setToast(null);
 
     try {
+      if (editBooking) {
+        const { error } = await supabase
+          .from("bookings")
+          .update({
+            service: bookingData.services.join(", "),
+            date: bookingData.date,
+            time_slot: bookingData.timeSlots.join(", "),
+            address: bookingData.address,
+            notes: bookingData.notes,
+            client_lat: bookingData.latitude,
+            client_lng: bookingData.longitude,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editBooking.id)
+          .eq("client_id", session.user.id)
+          .eq("status", "pending")
+          .select("id")
+          .single();
+
+        if (error) throw error;
+        setToast({ message: "Booking updated!", type: "success" });
+        setTimeout(() => onSuccess?.(), 600);
+        return;
+      }
+
       const bookingId = uuid();
 
       /* --------------------------------------------
@@ -487,68 +521,15 @@ export default function DashboardNew({ isModal = false, onClose, onSuccess }) {
 
       if (bookingError) throw bookingError;
 
-      // TON LOGICIEL EXISTANT DE MATCHING FONCTIONNE TEL QUEL
-      const { data: pros, error: prosError } = await supabase
-        .from("users")
-        .select(
-          "id, first_name, last_name, email, latitude, longitude, business_type, radius_km, role"
-        )
-        .eq("role", "pro");
+      const { data: matchingPros, error: prosError } = await supabase.rpc("find_matching_pro_ids", {
+        p_services: bookingData.services,
+        p_client_lat: bookingData.latitude,
+        p_client_lng: bookingData.longitude,
+      });
 
       if (prosError) throw prosError;
 
-      const distanceKm = (lat1, lon1, lat2, lon2) => {
-        const R = 6371;
-        const dLat = ((lat2 - lat1) * Math.PI) / 180;
-        const dLon = ((lon2 - lon1) * Math.PI) / 180;
-        const a =
-          Math.sin(dLat / 2) ** 2 +
-          Math.cos((lat1 * Math.PI) / 180) *
-            Math.cos((lat2 * Math.PI) / 180) *
-            Math.sin(dLon / 2) ** 2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      };
-
-      const matchingPros = pros.filter((p) => {
-        if (!p.latitude || !p.longitude) return false;
-
-        const dist = distanceKm(
-          bookingData.latitude,
-          bookingData.longitude,
-          p.latitude,
-          p.longitude
-        );
-
-        let proServices = [];
-        try {
-          if (Array.isArray(p.business_type)) {
-            proServices = p.business_type.map((s) => s.trim());
-          } else if (typeof p.business_type === "string") {
-            if (p.business_type.startsWith("{")) {
-              proServices = p.business_type
-                .replace(/^{|}$/g, "")
-                .split(",")
-                .map((s) => s.replace(/"/g, "").trim());
-            } else {
-              proServices = p.business_type.split(",").map((s) => s.trim());
-            }
-          }
-        } catch (_) {
-          // ignore parse errors
-        }
-
-        const offersService = proServices.some((s) =>
-          bookingData.services.some(
-            (c) =>
-              s.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(s.toLowerCase())
-          )
-        );
-
-        const isInRange = dist <= (p.radius_km || 20);
-        return isInRange && offersService;
-      });
-
-      if (matchingPros.length > 0) {
+      if (matchingPros?.length > 0) {
         const notifRows = matchingPros.map((p) => ({
           booking_id: bookingId,
           pro_id: p.id,

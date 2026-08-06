@@ -5,7 +5,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Toast from "@/components/ui/Toast";
 
-export default function ProProposalModal({ booking, onClose, onSuccess, session }) {
+export default function ProProposalModal({ booking, onClose, onSuccess }) {
   // 🧠 Extract "HH:mm" from a slot like "Afternoon (13–18)" → "13:00"
   const extractTimeFromSlot = (slot) => {
     if (!slot) return "";
@@ -32,52 +32,19 @@ export default function ProProposalModal({ booking, onClose, onSuccess, session 
 
     const servicePrice = parseFloat(form.service_price || 0);
     const travelFee = parseFloat(form.travel_fee || 0);
-    const total = servicePrice + travelFee;
 
     setLoading(true);
     try {
-      // 1) Create mission (status = proposed). We store TOTAL in price.
-      //    (Keep it simple for now; later we can add meta or dedicated columns)
-      const insertPayload = {
-        client_id: booking.client_id,
-        pro_id: session.user.id,
-        service: booking.service,
-        description: form.note || booking.notes || null,
-
-        date: form.date, // YYYY-MM-DD
-        time: form.time, // HH:mm
-        duration: 60,
-
-        // 🔥 valeurs séparées
-        service_price: servicePrice,
-        travel_fee: travelFee,
-        price: total, // total à payer (service + déplacement)
-        total_price: total, // pour cohérence + lisibilité
-
-        status: "proposed",
-        booking_id: booking.id,
-      };
-
-      const { data: created, error: missionError } = await supabase
-        .from("missions")
-        .insert([insertPayload])
-        .select()
-        .single();
+      const { data, error: missionError } = await supabase.rpc("create_mission_proposal", {
+        p_booking_id: booking.id,
+        p_service_price: servicePrice,
+        p_travel_fee: travelFee,
+        p_date: form.date,
+        p_time: form.time,
+        p_note: form.note || null,
+      });
       if (missionError) throw missionError;
-
-      // 2) Update booking so client sees "Offers Received"
-      const { error: updateBookingErr } = await supabase
-        .from("bookings")
-        .update({ status: "offers", pro_id: session.user.id })
-        .eq("id", booking.id);
-      if (updateBookingErr) throw updateBookingErr;
-
-      // 3) Remove this pro’s notification for that booking
-      await supabase
-        .from("booking_notifications")
-        .delete()
-        .eq("booking_id", booking.id)
-        .eq("pro_id", session.user.id);
+      const created = Array.isArray(data) ? data[0] : data;
 
       setToast({ message: "✅ Proposal sent successfully!", type: "success" });
       setTimeout(() => {

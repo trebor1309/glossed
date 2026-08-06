@@ -128,8 +128,8 @@ export default function OnboardingPage() {
 
       if (uploadError) throw uploadError;
 
-      // Si tu préfères, tu peux remplacer par .getPublicUrl plus tard
-      return `${supabase.storageUrl}/object/public/glossed-media/${filePath}`;
+      const { data } = supabase.storage.from("glossed-media").getPublicUrl(filePath);
+      return data.publicUrl;
     } catch (err) {
       alert("Error uploading image: " + err.message);
       return null;

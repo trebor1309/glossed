@@ -1,40 +1,21 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { X, Calendar, Clock, MapPin, FileText, Image, User, Trash2, Send } from "lucide-react";
+import { X, Calendar, Clock, MapPin, FileText, User, Trash2, Send } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function ProBookingDetailsModal({ booking, onClose, onMakeProposal, onDelete }) {
-  const [images, setImages] = useState([]);
   const [client, setClient] = useState(null);
 
   useEffect(() => {
     if (!booking?.id) return;
 
     // 🖼️ Charger les photos jointes
-    (async () => {
-      const { data } = await supabase
-        .from("booking_files")
-        .select("path")
-        .eq("booking_id", booking.id);
-      if (data?.length) {
-        const { data: signed } = await supabase.storage
-          .from("booking-attachments")
-          .createSignedUrls(
-            data.map((f) => f.path),
-            3600
-          );
-        setImages(signed?.map((s) => s.signedUrl) || []);
-      }
-    })();
-
     // 👤 Charger les infos du client
     (async () => {
-      const { data } = await supabase
-        .from("users")
-        .select("first_name, last_name, profile_photo")
-        .eq("id", booking.client_id)
-        .maybeSingle();
-      setClient(data || null);
+      const { data } = await supabase.rpc("get_user_summary", {
+        p_user_id: booking.client_id,
+      });
+      setClient(data?.[0] || null);
     })();
   }, [booking?.id]);
 
@@ -116,36 +97,6 @@ export default function ProBookingDetailsModal({ booking, onClose, onMakeProposa
           )}
 
           {/* 🖼️ Images jointes */}
-          {images.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm font-medium mb-2 flex items-center gap-1 text-gray-700">
-                <Image size={14} className="text-rose-500" /> Attached photos
-              </p>
-              <motion.div
-                className="grid grid-cols-2 gap-2"
-                initial="hidden"
-                animate="visible"
-                variants={{
-                  hidden: { opacity: 0 },
-                  visible: {
-                    opacity: 1,
-                    transition: { staggerChildren: 0.1 },
-                  },
-                }}
-              >
-                {images.map((url, i) => (
-                  <motion.img
-                    key={i}
-                    src={url}
-                    alt="attachment"
-                    className="rounded-2xl object-cover w-full h-32 border shadow-sm hover:scale-[1.03] transition-transform"
-                    variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}
-                  />
-                ))}
-              </motion.div>
-            </div>
-          )}
-
           {/* 👤 Client */}
           {client && (
             <motion.div

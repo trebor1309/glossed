@@ -38,30 +38,10 @@ export default function UserPublicProfile() {
       setLoading(true);
       try {
         // 1️⃣ Charger le user
-        const { data, error } = await supabase
-          .from("users")
-          .select(
-            `
-            id,
-            email,
-            role,
-            username,
-            first_name,
-            last_name,
-            business_name,
-            description,
-            profile_photo,
-            portfolio,
-            business_type,
-            latitude,
-            longitude,
-            radius_km,
-            city,
-            country
-          `
-          )
-          .eq("id", normalizedUserId)
-          .maybeSingle();
+        const { data: profileRows, error } = await supabase.rpc("get_public_profile", {
+          p_user_id: normalizedUserId,
+        });
+        const data = profileRows?.[0] || null;
 
         if (error) {
           console.error("❌ loadProfile error:", error.message);
@@ -114,16 +94,23 @@ export default function UserPublicProfile() {
 
         // 3️⃣ Charger les reviews (pro ou client)
         try {
-          const { data: reviewRows, error: reviewError } = await supabase
-            .from("reviews")
-            .select("*")
-            .or(`pro_id.eq.${normalizedUserId},client_id.eq.${normalizedUserId}`)
-            .order("created_at", { ascending: false });
+          const { data: reviewRows, error: reviewError } = await supabase.rpc(
+            "get_public_reviews",
+            { p_target_id: normalizedUserId }
+          );
 
           if (reviewError) {
             console.warn("⚠️ reviews load error:", reviewError.message);
           } else if (reviewRows) {
-            setReviews(reviewRows);
+            setReviews(
+              reviewRows.map((review) => ({
+                ...review,
+                reviewer: {
+                  username: review.reviewer_username,
+                  profile_photo: review.reviewer_profile_photo,
+                },
+              }))
+            );
           }
         } catch (e) {
           console.warn("⚠️ reviews table seems missing or inaccessible:", e.message);
