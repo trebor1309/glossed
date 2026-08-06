@@ -106,18 +106,6 @@ export default function AppRouter() {
         }
       />
 
-      {/* 👤 Public user profile (only logged-in users can view it) */}
-      <Route
-        path="/profile/:user_id"
-        element={
-          <ProtectedRoute>
-            <OnboardingGuard>
-              <UserPublicProfile />
-            </OnboardingGuard>
-          </ProtectedRoute>
-        }
-      />
-
       {/* 👤 Dashboard Client */}
       <Route
         path="/dashboard"

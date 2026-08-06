@@ -34,9 +34,7 @@ export default function PaymentDetailsModal({ payment, mission, client, onClose,
         <div className="space-y-3 text-gray-700">
           <p>
             <strong>Amount received:</strong>{" "}
-            {payment.amount_net != null
-              ? `${payment.amount_net.toFixed(2)} €`
-              : `${(payment.amount / 100).toFixed(2)} €`}
+            {`${((payment.amount_net_cents ?? payment.amount_total_cents) / 100).toFixed(2)} €`}
           </p>
 
           <p>
@@ -102,23 +100,23 @@ export default function PaymentDetailsModal({ payment, mission, client, onClose,
           <hr className="my-2" />
           <p className="text-gray-900 font-semibold">Amounts</p>
 
-          {payment.pro_service_price != null && (
+          {payment.pro_service_price_cents != null && (
             <p>
-              <strong>Service:</strong> {payment.pro_service_price.toFixed(2)} €
+              <strong>Service:</strong> {(payment.pro_service_price_cents / 100).toFixed(2)} €
             </p>
           )}
 
-          {payment.travel_fee != null && (
+          {payment.travel_fee_cents != null && (
             <p>
-              <strong>Travel:</strong> {payment.travel_fee.toFixed(2)} €
+              <strong>Travel:</strong> {(payment.travel_fee_cents / 100).toFixed(2)} €
             </p>
           )}
 
           <p>
             <strong>Total (pro):</strong>{" "}
-            {payment.pro_total_price != null
-              ? `${payment.pro_total_price.toFixed(2)} €`
-              : `${(payment.amount_net ?? payment.amount / 100).toFixed(2)} €`}
+            {payment.pro_total_price_cents != null
+              ? `${(payment.pro_total_price_cents / 100).toFixed(2)} €`
+              : `${((payment.amount_net_cents ?? payment.amount_total_cents) / 100).toFixed(2)} €`}
           </p>
         </div>
 

@@ -1,13 +1,19 @@
-import fetch from "node-fetch";
+const functionUrl = process.env.SUPABASE_CREATE_STRIPE_ACCOUNT_URL;
+const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
+
+if (!functionUrl || !accessToken) {
+  throw new Error(
+    "Set SUPABASE_CREATE_STRIPE_ACCOUNT_URL and SUPABASE_ACCESS_TOKEN before running this script."
+  );
+}
 
 const res = await fetch(
-  "https://cdcnylgokphyltkctymi.functions.supabase.co/create-stripe-account",
+  functionUrl,
   {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization:
-        "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkY255bGdva3BoeWx0a2N0eW1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA0NTgyNzAsImV4cCI6MjA3NjAzNDI3MH0.VUSKEifF-53dPAYxA14mkLSmfVK9aGO3IMCgBDQigCQ",
+      Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
       user_id: "test_user",

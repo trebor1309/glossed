@@ -163,10 +163,10 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
       // 1) Appel de la fonction Edge refund-mission
       const { data, error } = await supabase.functions.invoke("refund-mission", {
-        body: JSON.stringify({
+        body: {
           mission_id: booking.id,
           mode: "client_cancel_approved",
-        }),
+        },
       });
 
       if (error || data?.error) {
@@ -248,10 +248,10 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
       // 1) Appel de la fonction Edge refund-mission (full refund)
       const { data, error } = await supabase.functions.invoke("refund-mission", {
-        body: JSON.stringify({
+        body: {
           mission_id: booking.id,
           mode: "pro_cancel",
-        }),
+        },
       });
 
       if (error || data?.error) {

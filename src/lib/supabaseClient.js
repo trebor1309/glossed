@@ -14,11 +14,3 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     flowType: "pkce",
   },
 });
-
-// ---------------------------------------------------------
-// 🔍 DEBUG : Expose supabase to window (browser only)
-// ---------------------------------------------------------
-if (typeof window !== "undefined") {
-  window.supabase = supabase;
-  console.log("🔗 Supabase client attached to window");
-}

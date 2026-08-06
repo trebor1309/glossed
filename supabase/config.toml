@@ -1,0 +1,4 @@
+[functions.stripe-payment-webhook]
+# Stripe does not send a Supabase JWT. The handler verifies the raw-body
+# signature with STRIPE_WEBHOOK_SECRET before processing an event.
+verify_jwt = false

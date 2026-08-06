@@ -20,7 +20,7 @@ export default function LegalBilling() {
     iban: "",
 
     stripe_account_ready: false,
-    stripe_payouts_enabled: false,
+    payouts_enabled: false,
     stripe_account_id: null,
   });
 
@@ -41,7 +41,7 @@ export default function LegalBilling() {
           professional_email,
           iban,
           stripe_account_ready,
-          stripe_payouts_enabled,
+          payouts_enabled,
           stripe_account_id
         `
         )
@@ -59,7 +59,7 @@ export default function LegalBilling() {
           iban: data.iban || "",
 
           stripe_account_ready: !!data.stripe_account_ready,
-          stripe_payouts_enabled: !!data.stripe_payouts_enabled,
+          payouts_enabled: !!data.payouts_enabled,
           stripe_account_id: data.stripe_account_id || null,
         });
       }
@@ -99,31 +99,34 @@ export default function LegalBilling() {
   /* -------------------------------------------------------------------
      🔗 STRIPE — CONNECT
   ------------------------------------------------------------------- */
-  const handleStripeConnect = () => {
-    window.location.href = "/prodashboard/stripe/refresh";
+  const handleStripeConnect = async () => {
+    setSaving(true);
+    const { data, error } = await supabase.functions.invoke("create-stripe-account", { body: {} });
+    setSaving(false);
+
+    if (error || !data?.url) {
+      setToast({ type: "error", message: data?.error || error?.message || "Stripe connection failed." });
+      return;
+    }
+    window.location.assign(data.url);
   };
 
   /* -------------------------------------------------------------------
      ❌ STRIPE — DISCONNECT
   ------------------------------------------------------------------- */
   const handleStripeDisconnect = async () => {
-    const { error } = await supabase
-      .from("users")
-      .update({
-        stripe_account_id: null,
-        stripe_account_ready: false,
-        stripe_payouts_enabled: false,
-      })
-      .eq("id", user.id);
+    setSaving(true);
+    const { data, error } = await supabase.functions.invoke("disconnect-stripe-account", { body: {} });
+    setSaving(false);
 
-    if (error) {
-      setToast({ type: "error", message: error.message });
+    if (error || !data?.success) {
+      setToast({ type: "error", message: data?.error || error?.message || "Stripe disconnection failed." });
     } else {
       setToast({ type: "success", message: "Stripe account disconnected." });
       setForm((f) => ({
         ...f,
         stripe_account_ready: false,
-        stripe_payouts_enabled: false,
+        payouts_enabled: false,
         stripe_account_id: null,
       }));
 

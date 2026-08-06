@@ -1,55 +1,37 @@
-// ✅ version compatible Deno pour Supabase Edge Functions
 import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { errorResponse, handleOptions, HttpError, json } from "../_shared/http.ts";
+import { admin, requireUser } from "../_shared/supabase.ts";
 
-// Initialiser Stripe et Supabase
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
-  apiVersion: "2023-10-16",
-});
-
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-);
+const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2023-10-16" });
 
 Deno.serve(async (req) => {
-  try {
-    const { user_id } = await req.json();
-    if (!user_id) return new Response("Missing user_id", { status: 400 });
+  if (req.method === "OPTIONS") return handleOptions(req);
+  if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
 
-    // 🔹 Récupérer le compte Stripe associé
-    const { data: user } = await supabase
+  try {
+    const authUser = await requireUser(req);
+    const { data: profile, error } = await admin
       .from("users")
       .select("stripe_account_id")
-      .eq("id", user_id)
-      .single();
+      .eq("id", authUser.id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!profile) throw new HttpError(404, "Profile not found");
 
-    if (user?.stripe_account_id) {
-      try {
-        // (Optionnel) marquer le compte comme déconnecté côté Stripe
-        await stripe.accounts.update(user.stripe_account_id, {
-          metadata: { disconnected_at: new Date().toISOString() },
-        });
-      } catch (err) {
-        console.warn("⚠️ Unable to update Stripe account:", err.message);
-      }
+    if (profile.stripe_account_id) {
+      await stripe.accounts.update(profile.stripe_account_id, {
+        metadata: { disconnected_at: new Date().toISOString() },
+      });
     }
 
-    // 🔹 Supprimer les champs Stripe côté Supabase
-    await supabase
+    const { error: updateError } = await admin
       .from("users")
-      .update({
-        stripe_account_id: null,
-        stripe_account_ready: false,
-        payouts_enabled: false,
-      })
-      .eq("id", user_id);
+      .update({ stripe_account_id: null, stripe_account_ready: false, payouts_enabled: false })
+      .eq("id", authUser.id);
+    if (updateError) throw updateError;
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    console.error("❌ Disconnect error:", err.message);
-    return new Response(JSON.stringify({ error: err.message }), { status: 400 });
+    return json(req, { success: true });
+  } catch (error) {
+    return errorResponse(req, error);
   }
 });

@@ -15,16 +15,11 @@ export default async function handler(req, res) {
 
   try {
     // 🔗 URL de ta fonction Supabase
-    const SUPABASE_FUNCTION_URL =
-      "https://cdcnylgokphyltkctymi.supabase.co/functions/v1/stripe-payment-webhook";
+    const SUPABASE_FUNCTION_URL = process.env.SUPABASE_STRIPE_WEBHOOK_URL;
 
-    // 🔑 Utilisation de la clé SERVICE_ROLE côté serveur (plus de 401)
-    const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!SUPABASE_SERVICE_ROLE_KEY && !SUPABASE_ANON_KEY) {
-      console.error("❌ Missing Supabase keys in environment variables");
-      return res.status(500).json({ error: "Missing Supabase keys" });
+    if (!SUPABASE_FUNCTION_URL) {
+      console.error("Missing SUPABASE_STRIPE_WEBHOOK_URL");
+      return res.status(500).json({ error: "Webhook proxy is not configured" });
     }
 
     // 🧱 Lecture du corps brut (tel que Stripe l’a envoyé)
@@ -40,9 +35,6 @@ export default async function handler(req, res) {
       headers: {
         "Content-Type": req.headers["content-type"] || "application/json",
 
-        // ✅ Utilise Service Role (prioritaire) sinon Anon
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY}`,
-
         // Stripe signature pour vérification côté Supabase
         "Stripe-Signature": req.headers["stripe-signature"] || "",
       },
@@ -55,7 +47,6 @@ export default async function handler(req, res) {
     console.error("❌ Proxy error:", err);
     res.status(500).json({
       error: "Internal Server Error",
-      details: err.message,
     });
   }
 }

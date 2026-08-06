@@ -36,9 +36,9 @@ build/
 
 
 # Les artefacts du front
-.
 .eslintcache
 
 # (Facultatif) ignorer les logs Supabase locaux
 .supabase/
+supabase/.temp/
 

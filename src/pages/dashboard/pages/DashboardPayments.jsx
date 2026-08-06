@@ -89,10 +89,10 @@ function ClientPaymentsList({ payments, onView, onDownloadInvoice }) {
   return (
     <ul className="divide-y divide-gray-100">
       {payments.map((p) => {
-        const gross =
-          p.amount_gross != null ? toNumber(p.amount_gross) : centsToEuros(p.amount || 0);
+        const gross = centsToEuros(p.amount_total_cents || 0);
 
-        const glossedFee = p.application_fee != null ? toNumber(p.application_fee) : null;
+        const glossedFee =
+          p.application_fee_cents != null ? centsToEuros(p.application_fee_cents) : null;
 
         return (
           <li key={p.id} className="py-4 flex justify-between items-center">
@@ -211,8 +211,7 @@ export default function DashboardPayments() {
   const totalGross = useMemo(
     () =>
       filteredPayments.reduce((acc, p) => {
-        if (p.amount_gross != null) return acc + toNumber(p.amount_gross);
-        return acc + centsToEuros(p.amount || 0);
+        return acc + centsToEuros(p.amount_total_cents || 0);
       }, 0),
     [filteredPayments]
   );
@@ -285,8 +284,9 @@ export default function DashboardPayments() {
     }
 
     const tableData = filteredPayments.map((p) => {
-      const gross = p.amount_gross != null ? toNumber(p.amount_gross) : centsToEuros(p.amount || 0);
-      const glossedFee = p.application_fee != null ? toNumber(p.application_fee) : null;
+      const gross = centsToEuros(p.amount_total_cents || 0);
+      const glossedFee =
+        p.application_fee_cents != null ? centsToEuros(p.application_fee_cents) : null;
 
       return [
         p.mission_id ? p.mission_id.slice(0, 8) : "—",
@@ -346,15 +346,19 @@ export default function DashboardPayments() {
       pro = data || null;
     }
 
-    const gross = p.amount_gross != null ? toNumber(p.amount_gross) : centsToEuros(p.amount || 0);
+    const gross = centsToEuros(p.amount_total_cents || 0);
 
-    const glossedFee = p.application_fee != null ? toNumber(p.application_fee) : null;
+    const glossedFee =
+      p.application_fee_cents != null ? centsToEuros(p.application_fee_cents) : null;
 
-    const proServicePrice = p.pro_service_price != null ? toNumber(p.pro_service_price) : null;
-    const travelFee = p.travel_fee != null ? toNumber(p.travel_fee) : null;
+    const proServicePrice =
+      p.pro_service_price_cents != null ? centsToEuros(p.pro_service_price_cents) : null;
+    const travelFee = p.travel_fee_cents != null ? centsToEuros(p.travel_fee_cents) : null;
 
     const totalPro =
-      p.pro_total_price != null ? toNumber(p.pro_total_price) : gross - (glossedFee || 0);
+      p.pro_total_price_cents != null
+        ? centsToEuros(p.pro_total_price_cents)
+        : gross - (glossedFee || 0);
 
     // Header
     doc.setFont("helvetica", "bold");
