@@ -1,9 +1,11 @@
 // src/components/modals/ProSignupModal.jsx
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
+import { useNavigate } from "react-router-dom";
 
 export default function ProSignupModal({ onClose, onClientSignup }) {
   const { signup } = useUser();
+  const navigate = useNavigate();
 
   const handleProSignup = async (e) => {
     e.preventDefault();
@@ -14,13 +16,14 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
     const password = e.target.password.value.trim();
 
     try {
-      await signup(email, password, "pro", {
+      const { session } = await signup(email, password, {
+        role: "pro",
         username,
         businessName,
       });
 
       onClose();
-      window.location.href = "/prodashboard";
+      navigate(session ? "/onboarding" : "/auth/check-email", { state: { email } });
     } catch (err) {
       alert("Pro signup failed: " + err.message);
     }

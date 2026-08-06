@@ -12,44 +12,52 @@ export default function EmailVerified() {
   useEffect(() => {
     const processVerification = async () => {
       try {
-        // 🔍 Le lien Supabase fournit "access_token" et "refresh_token"
+        const queryParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
-
+        const code = queryParams.get("code");
         const access_token = hashParams.get("access_token");
         const refresh_token = hashParams.get("refresh_token");
 
-        if (!access_token || !refresh_token) {
-          setStatus("invalid");
-          return;
+        let { data: sessionData } = await supabase.auth.getSession();
+
+        if (!sessionData.session && code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+          sessionData = { session: data.session };
+        } else if (!sessionData.session && access_token && refresh_token) {
+          const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+          if (error) throw error;
+          sessionData = { session: data.session };
         }
 
-        // 🎫 Connexion automatique via le token fourni
-        const { data, error } = await supabase.auth.setSession({
-          access_token,
-          refresh_token,
-        });
-
-        if (error) throw error;
-
-        const user = data.user;
+        const user = sessionData.session?.user;
+        if (!user) throw new Error("No verified session was returned.");
 
         // ➤ On récupère son profil
         const { data: profile, error: profErr } = await supabase
           .from("users")
-          .select("*")
+          .select("onboarding_completed, active_role, role")
           .eq("id", user.id)
           .single();
 
         if (profErr) throw profErr;
 
         setStatus("success");
+        localStorage.removeItem("pending_signup_email");
 
         // ➤ Redirection selon complétude du profil
         setTimeout(() => {
-          if (!profile.username || !profile.address || !profile.phone_number) {
-            navigate("/auth/onboarding");
+          if (profile.onboarding_completed !== true) {
+            navigate("/onboarding", { replace: true });
           } else {
-            navigate("/dashboard");
+            navigate(
+              profile.active_role === "pro" || profile.role === "pro"
+                ? "/prodashboard"
+                : "/dashboard",
+              {
+                replace: true,
+              }
+            );
           }
         }, 2000);
       } catch (err) {

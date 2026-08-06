@@ -32,6 +32,7 @@ export default function UpgradeToProModal({ onClose }) {
           role: "pro", // rôle permanent
           active_role: "pro", // rôle actif immédiatement
           business_name: businessName.trim(),
+          onboarding_completed: false,
         })
         .eq("id", user.id);
 
@@ -44,7 +45,7 @@ export default function UpgradeToProModal({ onClose }) {
 
       setTimeout(() => {
         onClose();
-        window.location.assign("/prodashboard");
+        window.location.assign("/onboarding");
       }, 1200);
     } catch (err) {
       setError(err.message || "Upgrade failed. Please try again.");
