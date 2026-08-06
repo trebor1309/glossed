@@ -10,13 +10,14 @@ import {
   MessageSquare,
   Repeat,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import NotificationBadge from "@/components/navigation/NotificationBadge";
 
 export default function SidebarPro() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, switchRole } = useUser();
+  const { logout, switchRole, isAdmin } = useUser();
   const { notifications, newMessages } = useNotifications();
 
   const missionsBadge = (notifications.proBookings || 0) + (notifications.proCancellations || 0);
@@ -41,6 +42,9 @@ export default function SidebarPro() {
     { name: "Account", icon: User, path: "/prodashboard/account" },
     { name: "Settings", icon: Settings, path: "/prodashboard/settings" },
     { name: "Payments", icon: CreditCard, path: "/prodashboard/payments" },
+    ...(isAdmin
+      ? [{ name: "Verifications", icon: ShieldCheck, path: "/admin/verifications" }]
+      : []),
   ];
 
   return (

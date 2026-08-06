@@ -9,6 +9,7 @@ import {
   Plus,
   MessageSquare,
   CreditCard,
+  ShieldCheck,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -17,7 +18,7 @@ import NotificationBadge from "@/components/navigation/NotificationBadge";
 
 export default function SidebarClient() {
   const navigate = useNavigate();
-  const { logout, switchRole, isPro } = useUser();
+  const { logout, switchRole, isPro, isAdmin } = useUser();
   const { notifications, newMessages } = useNotifications();
 
   const links = [
@@ -47,6 +48,9 @@ export default function SidebarClient() {
       label: "Payments",
       icon: CreditCard,
     },
+    ...(isAdmin
+      ? [{ to: "/admin/verifications", label: "Verifications", icon: ShieldCheck }]
+      : []),
   ];
 
   return (

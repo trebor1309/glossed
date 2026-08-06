@@ -51,7 +51,11 @@ export function UserProvider({ children }) {
           onboarding_completed,
           stripe_account_id,
           stripe_account_ready,
-          payouts_enabled
+          payouts_enabled,
+          verification_status,
+          verification_submitted_at,
+          verification_rejection_reason,
+          verified_at
         `
         )
         .eq("id", supaUser.id)
@@ -62,6 +66,8 @@ export function UserProvider({ children }) {
       if (!profile) {
         throw new Error("Your account profile is unavailable. Please retry or sign out.");
       }
+
+      const { data: adminFlag, error: adminError } = await supabase.rpc("is_app_admin");
 
       const fullUser = {
         id: profile.id,
@@ -82,6 +88,11 @@ export function UserProvider({ children }) {
         stripe_account_id: profile.stripe_account_id || null,
         payouts_enabled: profile.payouts_enabled || false,
         stripe_account_ready: profile.stripe_account_ready || false,
+        verification_status: profile.verification_status || "unverified",
+        verification_submitted_at: profile.verification_submitted_at || null,
+        verification_rejection_reason: profile.verification_rejection_reason || null,
+        verified_at: profile.verified_at || null,
+        is_admin: !adminError && adminFlag === true,
         role: profile.role || "client",
         activeRole: profile.active_role || profile.role || "client",
         theme: profile.theme || "light",
@@ -279,6 +290,7 @@ export function UserProvider({ children }) {
     isAuthenticated: !!user,
     isPro: user?.activeRole === "pro",
     isClient: user?.activeRole === "client",
+    isAdmin: user?.is_admin === true,
     showUpgradeModal,
     setShowUpgradeModal,
   };
