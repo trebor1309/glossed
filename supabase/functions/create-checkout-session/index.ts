@@ -14,6 +14,17 @@ Deno.serve(async (req) => {
     const { mission_id: missionId } = await req.json();
     if (!missionId) throw new HttpError(400, "Missing mission_id");
 
+    const { data: attempts, error: reservationError } = await admin.rpc(
+      "reserve_checkout_attempt",
+      { p_mission_id: missionId, p_client_id: authUser.id, p_ttl_seconds: 3600 }
+    );
+    if (reservationError) throw reservationError;
+    const attempt = attempts?.[0];
+    if (!attempt) throw new Error("Checkout reservation failed");
+    if (attempt.attempt_status === "open" && attempt.stripe_session_url) {
+      return json(req, { url: attempt.stripe_session_url });
+    }
+
     const { data: mission, error: missionError } = await admin
       .from("missions")
       .select("id, service, description, price, client_id, pro_id, status")
@@ -24,16 +35,6 @@ Deno.serve(async (req) => {
     if (mission.client_id !== authUser.id)
       throw new HttpError(403, "You cannot pay for this mission");
     if (mission.status !== "proposed") throw new HttpError(409, "Mission is not payable");
-
-    const { data: existingPayment, error: paymentError } = await admin
-      .from("payments")
-      .select("id")
-      .eq("mission_id", mission.id)
-      .eq("status", "paid")
-      .limit(1)
-      .maybeSingle();
-    if (paymentError) throw paymentError;
-    if (existingPayment) throw new HttpError(409, "Mission is already paid");
 
     const { data: pro, error: proError } = await admin
       .from("users")
@@ -57,32 +58,45 @@ Deno.serve(async (req) => {
       fee_cents: String(glossedFeeCents),
     };
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "payment",
-      client_reference_id: authUser.id,
-      line_items: [
-        {
-          price_data: {
-            currency: "eur",
-            unit_amount: totalCents,
-            product_data: {
-              name: mission.service || "Glossed booking",
-              description: mission.description || undefined,
+    const session = await stripe.checkout.sessions.create(
+      {
+        payment_method_types: ["card"],
+        mode: "payment",
+        client_reference_id: authUser.id,
+        expires_at: Math.floor(new Date(attempt.expires_at).getTime() / 1000),
+        line_items: [
+          {
+            price_data: {
+              currency: "eur",
+              unit_amount: totalCents,
+              product_data: {
+                name: mission.service || "Glossed booking",
+                description: mission.description || undefined,
+              },
             },
+            quantity: 1,
           },
-          quantity: 1,
+        ],
+        payment_intent_data: {
+          application_fee_amount: glossedFeeCents,
+          transfer_data: { destination: pro.stripe_account_id },
+          metadata,
         },
-      ],
-      payment_intent_data: {
-        application_fee_amount: glossedFeeCents,
-        transfer_data: { destination: pro.stripe_account_id },
         metadata,
+        success_url: `${appUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${appUrl}/dashboard/reservations`,
       },
-      metadata,
-      success_url: `${appUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/dashboard/reservations`,
+      { idempotencyKey: attempt.idempotency_key }
+    );
+
+    if (!session.url) throw new Error("Stripe did not return a Checkout URL");
+    const { error: attachError } = await admin.rpc("attach_checkout_session", {
+      p_attempt_id: attempt.attempt_id,
+      p_stripe_session_id: session.id,
+      p_stripe_session_url: session.url,
+      p_expires_at: new Date(session.expires_at * 1000).toISOString(),
     });
+    if (attachError) throw attachError;
 
     return json(req, { url: session.url });
   } catch (error) {

@@ -47,84 +47,36 @@ Deno.serve(async (req) => {
     if (!missionId || !clientId || !proId)
       return response({ error: "Missing payment metadata" }, 422);
 
-    const { data: mission, error: missionError } = await admin
-      .from("missions")
-      .select("id, status, client_id, pro_id, price, service_price, travel_fee, total_price")
-      .eq("id", missionId)
-      .maybeSingle();
-    if (missionError) throw missionError;
-    if (!mission) return response({ error: "Mission not found" }, 404);
-    if (mission.client_id !== clientId || mission.pro_id !== proId) {
-      return response({ error: "Payment metadata mismatch" }, 422);
-    }
-
-    const baseAmountCents = Math.round(Number(mission.price) * 100);
-    const feeCents = Math.round(baseAmountCents * 0.1);
-    const expectedTotalCents = baseAmountCents + feeCents;
-    if (
-      session.amount_total !== expectedTotalCents ||
-      Number(session.metadata?.fee_cents) !== feeCents
-    ) {
-      return response({ error: "Payment amount mismatch" }, 422);
-    }
-
     const paymentIntentId =
       typeof session.payment_intent === "string"
         ? session.payment_intent
         : session.payment_intent?.id;
     if (!paymentIntentId) return response({ error: "Missing payment intent" }, 422);
-
-    const { data: existing, error: existingError } = await admin
-      .from("payments")
-      .select("id")
-      .eq("stripe_payment_id", paymentIntentId)
-      .limit(1)
-      .maybeSingle();
-    if (existingError) throw existingError;
-    if (existing) {
-      if (mission.status === "proposed") {
-        const now = new Date().toISOString();
-        const { error: updateError } = await admin
-          .from("missions")
-          .update({ status: "confirmed", paid_at: now, updated_at: now })
-          .eq("id", missionId)
-          .eq("status", "proposed");
-        if (updateError) throw updateError;
-      }
-      return response({ ok: true, duplicate: true });
+    if (!Number.isSafeInteger(session.amount_total) || !session.currency) {
+      return response({ error: "Invalid Stripe amount" }, 422);
+    }
+    const feeCents = Number(session.metadata?.fee_cents);
+    if (!Number.isSafeInteger(feeCents) || feeCents < 0) {
+      return response({ error: "Invalid Stripe fee" }, 422);
     }
 
-    if (mission.status !== "proposed") {
-      return response({ error: "Mission is not payable" }, 409);
-    }
-
-    const now = new Date().toISOString();
-    const { error: paymentError } = await admin.from("payments").insert({
-      mission_id: missionId,
-      client_id: clientId,
-      pro_id: proId,
-      amount: expectedTotalCents,
-      currency: session.currency ?? "eur",
-      application_fee: feeCents / 100,
-      amount_net: baseAmountCents / 100,
-      travel_fee: mission.travel_fee ?? null,
-      pro_service_price: mission.service_price ?? null,
-      pro_total_price: mission.total_price ?? null,
-      stripe_payment_id: paymentIntentId,
-      stripe_session_id: session.id,
-      status: "paid",
-      paid_at: now,
+    const { data, error } = await admin.rpc("process_stripe_checkout_completed", {
+      p_event_id: event.id,
+      p_event_type: event.type,
+      p_stripe_created_at: new Date(event.created * 1000).toISOString(),
+      p_livemode: event.livemode,
+      p_mission_id: missionId,
+      p_client_id: clientId,
+      p_pro_id: proId,
+      p_stripe_payment_id: paymentIntentId,
+      p_stripe_session_id: session.id,
+      p_amount_total_cents: session.amount_total,
+      p_application_fee_cents: feeCents,
+      p_currency: session.currency,
     });
-    if (paymentError) throw paymentError;
+    if (error) throw error;
 
-    const { error: updateError } = await admin
-      .from("missions")
-      .update({ status: "confirmed", paid_at: now, updated_at: now })
-      .eq("id", missionId)
-      .eq("status", "proposed");
-    if (updateError) throw updateError;
-
-    return response({ ok: true });
+    return response({ ok: true, duplicate: data?.[0]?.duplicate ?? false });
   } catch (error) {
     console.error("Stripe webhook processing failed", error);
     return response({ error: "Webhook processing failed" }, 500);

@@ -1,0 +1,54 @@
+{
+  "version": "5",
+  "redirects": {
+    "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2.112.1"
+  },
+  "remote": {
+    "https://esm.sh/@supabase/supabase-js@2.112.1": "497e1884f2e760ee816b6081f8e9497f453d35d0b5fb10c0bb898b0debeee58d",
+    "https://esm.sh/stripe@16.5.0?target=deno": "1e8ef518e450bf912d0add4ddd9c5d808a6d471d0daf39e09a117e2ab72ffd73"
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@babel/core@^7.28.4",
+        "npm:@babel/eslint-parser@^7.28.4",
+        "npm:@babel/preset-react@^7.27.1",
+        "npm:@eslint/js@^9.37.0",
+        "npm:@react-google-maps/api@^2.20.7",
+        "npm:@stripe/react-stripe-js@^5.3.0",
+        "npm:@stripe/stripe-js@^8.3.0",
+        "npm:@supabase/supabase-js@^2.75.0",
+        "npm:@types/react-dom@^19.1.9",
+        "npm:@types/react@^19.1.16",
+        "npm:@vitejs/plugin-react@^5.0.4",
+        "npm:autoprefixer@^10.4.21",
+        "npm:bootstrap-icons@^1.13.1",
+        "npm:dayjs@^1.11.18",
+        "npm:eslint-plugin-react-hooks@^5.2.0",
+        "npm:eslint-plugin-react-refresh@~0.4.22",
+        "npm:eslint-plugin-react@^7.37.5",
+        "npm:eslint@^9.37.0",
+        "npm:framer-motion@^12.23.22",
+        "npm:globals@^16.4.0",
+        "npm:husky@^9.1.7",
+        "npm:jspdf-autotable@^5.0.2",
+        "npm:jspdf@^3.0.3",
+        "npm:lucide-react@0.545",
+        "npm:postcss@^8.5.6",
+        "npm:prettier@^3.6.2",
+        "npm:react-calendar@6",
+        "npm:react-dom@^19.1.1",
+        "npm:react-easy-crop@^5.5.6",
+        "npm:react-router-dom@^7.9.4",
+        "npm:react@^19.1.1",
+        "npm:supabase@^2.51.0",
+        "npm:swr@^2.3.6",
+        "npm:tailwindcss@^3.4.14",
+        "npm:uuid@13",
+        "npm:vite-plugin-checker@0.11",
+        "npm:vite@^7.1.7",
+        "npm:zustand@^5.0.8"
+      ]
+    }
+  }
+}

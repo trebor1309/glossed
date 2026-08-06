@@ -1,5 +1,6 @@
 import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
 import { errorResponse, handleOptions, HttpError, json } from "../_shared/http.ts";
+import { connectAccountIdempotencyKey } from "../_shared/idempotency.ts";
 import { admin, requireUser } from "../_shared/supabase.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2023-10-16" });
@@ -22,13 +23,16 @@ Deno.serve(async (req) => {
 
     let accountId = profile.stripe_account_id;
     if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: "express",
-        country: "BE",
-        email: authUser.email,
-        capabilities: { transfers: { requested: true } },
-        metadata: { supabase_user_id: authUser.id },
-      });
+      const account = await stripe.accounts.create(
+        {
+          type: "express",
+          country: "BE",
+          email: authUser.email,
+          capabilities: { transfers: { requested: true } },
+          metadata: { supabase_user_id: authUser.id },
+        },
+        { idempotencyKey: connectAccountIdempotencyKey(authUser.id) }
+      );
       accountId = account.id;
 
       const { error: updateError } = await admin

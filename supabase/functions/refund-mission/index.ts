@@ -1,5 +1,6 @@
 import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
 import { errorResponse, handleOptions, HttpError, json } from "../_shared/http.ts";
+import { refundIdempotencyKey } from "../_shared/idempotency.ts";
 import { admin, requireUser } from "../_shared/supabase.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2023-10-16" });
@@ -33,7 +34,7 @@ Deno.serve(async (req) => {
 
     const { data: payment, error: paymentError } = await admin
       .from("payments")
-      .select("id, status, amount_net, stripe_payment_id")
+      .select("id, status, amount_total_cents, amount_net_cents, stripe_payment_id")
       .eq("mission_id", missionId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -50,7 +51,7 @@ Deno.serve(async (req) => {
       metadata: { mission_id: missionId, mode, requested_by: authUser.id },
     };
     if (mode === "client_cancel_approved") {
-      const netCents = Math.round(Number(payment.amount_net) * 100);
+      const netCents = Number(payment.amount_net_cents);
       if (!Number.isSafeInteger(netCents) || netCents <= 0) {
         throw new HttpError(422, "Payment has an invalid refundable amount");
       }
@@ -58,24 +59,19 @@ Deno.serve(async (req) => {
     }
 
     const refund = await stripe.refunds.create(refundParams, {
-      idempotencyKey: `mission:${missionId}:${mode}`,
+      idempotencyKey: refundIdempotencyKey(missionId, mode),
     });
     const paymentStatus = mode === "pro_cancel" ? "refunded" : "partially_refunded";
-    const now = new Date().toISOString();
 
-    const { error: updatePaymentError } = await admin
-      .from("payments")
-      .update({ status: paymentStatus, refunded_at: now })
-      .eq("id", payment.id)
-      .eq("status", "paid");
-    if (updatePaymentError) throw updatePaymentError;
-
-    const { error: updateMissionError } = await admin
-      .from("missions")
-      .update({ status: "cancelled", updated_at: now })
-      .eq("id", missionId)
-      .eq("status", expectedStatus);
-    if (updateMissionError) throw updateMissionError;
+    const { error: finalizeError } = await admin.rpc("finalize_mission_refund", {
+      p_mission_id: missionId,
+      p_payment_id: payment.id,
+      p_expected_mission_status: expectedStatus,
+      p_payment_status: paymentStatus,
+      p_stripe_refund_id: refund.id,
+      p_refund_amount_cents: refund.amount,
+    });
+    if (finalizeError) throw finalizeError;
 
     return json(req, {
       ok: true,
