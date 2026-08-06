@@ -123,10 +123,16 @@ create table public.refund_attempts (
   stripe_payment_id text not null,
   refund_amount_cents bigint not null check (refund_amount_cents > 0),
   idempotency_key text not null unique,
+  attempt_number integer not null default 1 check (attempt_number > 0),
   stripe_refund_id text unique,
-  status text not null default 'reserved' check (status in ('reserved', 'completed')),
+  status text not null default 'reserved'
+    check (status in ('reserved', 'completed', 'failed')),
+  last_failure_code text check (
+    last_failure_code is null or char_length(last_failure_code) between 1 and 100
+  ),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  last_failed_at timestamptz,
   completed_at timestamptz
 );
 
@@ -264,6 +270,7 @@ create or replace function public.reserve_mission_refund(
 returns table (
   attempt_id uuid,
   attempt_status text,
+  attempt_number integer,
   payment_id uuid,
   stripe_payment_id text,
   refund_amount_cents bigint,
@@ -304,26 +311,40 @@ begin
   select * into v_attempt
   from public.refund_attempts where mission_id = p_mission_id for update;
   if found then
-    if v_attempt.mode <> p_mode or v_attempt.requested_by <> p_requested_by then
-      raise exception 'A different refund operation already exists' using errcode = '23505';
+    if v_attempt.status in ('reserved', 'completed') then
+      if v_attempt.mode <> p_mode or v_attempt.requested_by <> p_requested_by then
+        raise exception 'A different refund operation already exists' using errcode = '23505';
+      end if;
+      return query select v_attempt.id, v_attempt.status, v_attempt.attempt_number,
+        v_attempt.payment_id, v_attempt.stripe_payment_id,
+        v_attempt.refund_amount_cents, v_attempt.idempotency_key,
+        v_attempt.resulting_payment_status, v_attempt.stripe_refund_id;
+      return;
     end if;
-    return query select v_attempt.id, v_attempt.status, v_attempt.payment_id,
-      v_attempt.stripe_payment_id, v_attempt.refund_amount_cents,
-      v_attempt.idempotency_key, v_attempt.resulting_payment_status,
-      v_attempt.stripe_refund_id;
-    return;
+    if v_attempt.status <> 'failed' then
+      raise exception 'Refund attempt has an invalid status' using errcode = '23514';
+    end if;
   end if;
 
   if v_mission.status <> v_expected_status then
     raise exception 'Mission is not refundable in its current status' using errcode = '23514';
   end if;
 
-  select * into v_payment
-  from public.payments
-  where mission_id = p_mission_id and status = 'paid'
-  order by created_at desc
-  limit 1
-  for update;
+  if v_attempt.id is null then
+    select * into v_payment
+    from public.payments
+    where mission_id = p_mission_id and status = 'paid'
+    order by created_at desc
+    limit 1
+    for update;
+  else
+    select * into v_payment
+    from public.payments
+    where id = v_attempt.payment_id
+      and mission_id = p_mission_id
+      and status = 'paid'
+    for update;
+  end if;
   if not found then raise exception 'Paid payment not found' using errcode = 'P0002'; end if;
   if v_payment.stripe_payment_id is null then
     raise exception 'Payment has no Stripe identifier' using errcode = '23514';
@@ -338,20 +359,37 @@ begin
     raise exception 'Payment has an invalid refundable amount' using errcode = '23514';
   end if;
 
-  insert into public.refund_attempts (
-    mission_id, payment_id, requested_by, mode, expected_mission_status,
-    resulting_payment_status, stripe_payment_id, refund_amount_cents,
-    idempotency_key
-  ) values (
-    p_mission_id, v_payment.id, p_requested_by, p_mode, v_expected_status,
-    v_resulting_status, v_payment.stripe_payment_id, v_refund_amount,
-    'refund:' || p_mission_id::text || ':' || p_mode
-  ) returning * into v_attempt;
+  if v_attempt.id is null then
+    insert into public.refund_attempts (
+      mission_id, payment_id, requested_by, mode, expected_mission_status,
+      resulting_payment_status, stripe_payment_id, refund_amount_cents,
+      idempotency_key
+    ) values (
+      p_mission_id, v_payment.id, p_requested_by, p_mode, v_expected_status,
+      v_resulting_status, v_payment.stripe_payment_id, v_refund_amount,
+      'refund:' || p_mission_id::text || ':' || p_mode || ':1'
+    ) returning * into v_attempt;
+  else
+    update public.refund_attempts as ra
+    set status = 'reserved',
+        attempt_number = ra.attempt_number + 1,
+        requested_by = p_requested_by,
+        mode = p_mode,
+        idempotency_key = 'refund:' || p_mission_id::text || ':' || p_mode
+          || ':' || (ra.attempt_number + 1)::text,
+        stripe_payment_id = v_payment.stripe_payment_id,
+        refund_amount_cents = v_refund_amount,
+        expected_mission_status = v_expected_status,
+        resulting_payment_status = v_resulting_status,
+        updated_at = now()
+    where id = v_attempt.id
+    returning * into v_attempt;
+  end if;
 
-  return query select v_attempt.id, v_attempt.status, v_attempt.payment_id,
-    v_attempt.stripe_payment_id, v_attempt.refund_amount_cents,
-    v_attempt.idempotency_key, v_attempt.resulting_payment_status,
-    v_attempt.stripe_refund_id;
+  return query select v_attempt.id, v_attempt.status, v_attempt.attempt_number,
+    v_attempt.payment_id, v_attempt.stripe_payment_id,
+    v_attempt.refund_amount_cents, v_attempt.idempotency_key,
+    v_attempt.resulting_payment_status, v_attempt.stripe_refund_id;
 end
 $$;
 
@@ -553,8 +591,58 @@ begin
 end
 $$;
 
+create or replace function public.fail_mission_refund(
+  p_attempt_id uuid,
+  p_attempt_number integer,
+  p_failure_code text
+)
+returns table (
+  attempt_status text,
+  stripe_refund_id text,
+  resulting_payment_status text
+)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_attempt public.refund_attempts%rowtype;
+begin
+  if p_attempt_number is null or p_attempt_number <= 0 then
+    raise exception 'Invalid refund attempt number' using errcode = '22023';
+  end if;
+  if p_failure_code is null or char_length(p_failure_code) not between 1 and 100 then
+    raise exception 'Invalid refund failure code' using errcode = '22023';
+  end if;
+
+  select * into v_attempt
+  from public.refund_attempts where id = p_attempt_id for update;
+  if not found then raise exception 'Refund attempt not found' using errcode = 'P0002'; end if;
+
+  -- A late failure report must never overwrite a completed refund or a newer
+  -- retry generation. Repeated failure reports are idempotent.
+  if v_attempt.status = 'completed'
+     or v_attempt.attempt_number <> p_attempt_number
+     or v_attempt.status = 'failed' then
+    return query select v_attempt.status, v_attempt.stripe_refund_id,
+      v_attempt.resulting_payment_status;
+    return;
+  end if;
+
+  update public.refund_attempts
+  set status = 'failed', last_failure_code = p_failure_code,
+      updated_at = now(), last_failed_at = now()
+  where id = p_attempt_id
+  returning * into v_attempt;
+
+  return query select v_attempt.status, v_attempt.stripe_refund_id,
+    v_attempt.resulting_payment_status;
+end
+$$;
+
 create or replace function public.finalize_mission_refund(
   p_attempt_id uuid,
+  p_attempt_number integer,
   p_stripe_refund_id text,
   p_refund_amount_cents bigint
 )
@@ -568,6 +656,9 @@ declare
   v_mission_status text;
   v_payment_status text;
 begin
+  if p_attempt_number is null or p_attempt_number <= 0 then
+    raise exception 'Invalid refund attempt number' using errcode = '22023';
+  end if;
   select * into v_attempt
   from public.refund_attempts where id = p_attempt_id for update;
   if not found then raise exception 'Refund attempt not found' using errcode = 'P0002'; end if;
@@ -576,6 +667,9 @@ begin
     if v_attempt.stripe_refund_id = p_stripe_refund_id then return; end if;
     raise exception 'Refund attempt was completed with a different Stripe refund'
       using errcode = '23505';
+  end if;
+  if v_attempt.attempt_number <> p_attempt_number then
+    raise exception 'Refund attempt generation changed concurrently' using errcode = '40001';
   end if;
   if p_refund_amount_cents <> v_attempt.refund_amount_cents then
     raise exception 'Stripe refund amount does not match reservation' using errcode = '23514';
@@ -618,11 +712,13 @@ revoke all on function public.reserve_checkout_attempt(uuid, uuid, integer) from
 revoke all on function public.attach_checkout_session(uuid, text, text, timestamptz) from public, anon, authenticated;
 revoke all on function public.process_stripe_checkout_completed(text, text, timestamptz, boolean, uuid, uuid, uuid, text, text, bigint, bigint, text) from public, anon, authenticated;
 revoke all on function public.reserve_mission_refund(uuid, uuid, text) from public, anon, authenticated;
-revoke all on function public.finalize_mission_refund(uuid, text, bigint) from public, anon, authenticated;
+revoke all on function public.fail_mission_refund(uuid, integer, text) from public, anon, authenticated;
+revoke all on function public.finalize_mission_refund(uuid, integer, text, bigint) from public, anon, authenticated;
 grant execute on function public.reserve_checkout_attempt(uuid, uuid, integer) to service_role;
 grant execute on function public.attach_checkout_session(uuid, text, text, timestamptz) to service_role;
 grant execute on function public.process_stripe_checkout_completed(text, text, timestamptz, boolean, uuid, uuid, uuid, text, text, bigint, bigint, text) to service_role;
 grant execute on function public.reserve_mission_refund(uuid, uuid, text) to service_role;
-grant execute on function public.finalize_mission_refund(uuid, text, bigint) to service_role;
+grant execute on function public.fail_mission_refund(uuid, integer, text) to service_role;
+grant execute on function public.finalize_mission_refund(uuid, integer, text, bigint) to service_role;
 
 commit;

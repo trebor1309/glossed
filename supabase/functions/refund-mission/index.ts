@@ -1,25 +1,40 @@
 import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
-import { errorResponse, handleOptions, HttpError, json } from "../_shared/http.ts";
+import {
+  errorResponse,
+  handleOptions,
+  HttpError,
+  json,
+} from "../_shared/http.ts";
+import {
+  isDefinitiveRefundFailure,
+  refundFailureCode,
+} from "../_shared/stripe_refund_error.ts";
 import { admin, requireUser } from "../_shared/supabase.ts";
 
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2023-10-16" });
+const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
+  apiVersion: "2023-10-16",
+});
 const refundModes = new Set(["pro_cancel", "client_cancel_approved"]);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return handleOptions(req);
-  if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
+  if (req.method !== "POST") {
+    return json(req, { error: "Method not allowed" }, 405);
+  }
 
   try {
     const authUser = await requireUser(req);
     const body = await req.json();
     const missionId = body?.mission_id as string | undefined;
     const mode = body?.mode as string | undefined;
-    if (!missionId || !mode) throw new HttpError(400, "Missing mission_id or mode");
+    if (!missionId || !mode) {
+      throw new HttpError(400, "Missing mission_id or mode");
+    }
     if (!refundModes.has(mode)) throw new HttpError(400, "Invalid refund mode");
 
     const { data: attempts, error: reservationError } = await admin.rpc(
       "reserve_mission_refund",
-      { p_mission_id: missionId, p_requested_by: authUser.id, p_mode: mode }
+      { p_mission_id: missionId, p_requested_by: authUser.id, p_mode: mode },
     );
     if (reservationError) throw reservationError;
     const attempt = attempts?.[0];
@@ -47,15 +62,51 @@ Deno.serve(async (req) => {
       refundParams.amount = refundAmountCents;
     }
 
-    const refund = await stripe.refunds.create(refundParams, {
-      idempotencyKey: attempt.idempotency_key,
-    });
+    let refund: Stripe.Refund;
+    try {
+      refund = await stripe.refunds.create(refundParams, {
+        idempotencyKey: attempt.idempotency_key,
+      });
+    } catch (stripeError) {
+      if (!isDefinitiveRefundFailure(stripeError)) throw stripeError;
 
-    const { error: finalizeError } = await admin.rpc("finalize_mission_refund", {
-      p_attempt_id: attempt.attempt_id,
-      p_stripe_refund_id: refund.id,
-      p_refund_amount_cents: refund.amount,
-    });
+      const { data: failureStates, error: failureStateError } = await admin.rpc(
+        "fail_mission_refund",
+        {
+          p_attempt_id: attempt.attempt_id,
+          p_attempt_number: attempt.attempt_number,
+          p_failure_code: refundFailureCode(stripeError),
+        },
+      );
+      if (failureStateError) throw failureStateError;
+      const failureState = failureStates?.[0];
+
+      // A concurrent invocation may have completed the same idempotent Stripe
+      // operation before this rejection was recorded.
+      if (failureState?.attempt_status === "completed") {
+        return json(req, {
+          ok: true,
+          mode,
+          payment_status: failureState.resulting_payment_status,
+          stripe_refund_id: failureState.stripe_refund_id,
+        });
+      }
+
+      throw new HttpError(
+        422,
+        "Stripe rejected the refund and no refund was created. You can retry.",
+      );
+    }
+
+    const { error: finalizeError } = await admin.rpc(
+      "finalize_mission_refund",
+      {
+        p_attempt_id: attempt.attempt_id,
+        p_attempt_number: attempt.attempt_number,
+        p_stripe_refund_id: refund.id,
+        p_refund_amount_cents: refund.amount,
+      },
+    );
     if (finalizeError) throw finalizeError;
 
     return json(req, {

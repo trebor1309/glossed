@@ -238,31 +238,31 @@ select extensions.dblink_send_query('refund_2', $$
     'client_cancel_approved')
 $$);
 create temporary table refund_reservations (
-  attempt_id uuid, attempt_status text, payment_id uuid, stripe_payment_id text,
-  refund_amount_cents bigint, idempotency_key text,
+  attempt_id uuid, attempt_status text, attempt_number integer,
+  payment_id uuid, stripe_payment_id text, refund_amount_cents bigint, idempotency_key text,
   resulting_payment_status text, stripe_refund_id text
 );
 insert into refund_reservations
 select * from extensions.dblink_get_result('refund_1') as t(
-  attempt_id uuid, attempt_status text, payment_id uuid, stripe_payment_id text,
-  refund_amount_cents bigint, idempotency_key text,
+  attempt_id uuid, attempt_status text, attempt_number integer,
+  payment_id uuid, stripe_payment_id text, refund_amount_cents bigint, idempotency_key text,
   resulting_payment_status text, stripe_refund_id text
 );
 insert into refund_reservations
 select * from extensions.dblink_get_result('refund_2') as t(
-  attempt_id uuid, attempt_status text, payment_id uuid, stripe_payment_id text,
-  refund_amount_cents bigint, idempotency_key text,
+  attempt_id uuid, attempt_status text, attempt_number integer,
+  payment_id uuid, stripe_payment_id text, refund_amount_cents bigint, idempotency_key text,
   resulting_payment_status text, stripe_refund_id text
 );
 -- Fully drain both asynchronous result queues before reusing the connections.
 select * from extensions.dblink_get_result('refund_1') as t(
-  attempt_id uuid, attempt_status text, payment_id uuid, stripe_payment_id text,
-  refund_amount_cents bigint, idempotency_key text,
+  attempt_id uuid, attempt_status text, attempt_number integer,
+  payment_id uuid, stripe_payment_id text, refund_amount_cents bigint, idempotency_key text,
   resulting_payment_status text, stripe_refund_id text
 );
 select * from extensions.dblink_get_result('refund_2') as t(
-  attempt_id uuid, attempt_status text, payment_id uuid, stripe_payment_id text,
-  refund_amount_cents bigint, idempotency_key text,
+  attempt_id uuid, attempt_status text, attempt_number integer,
+  payment_id uuid, stripe_payment_id text, refund_amount_cents bigint, idempotency_key text,
   resulting_payment_status text, stripe_refund_id text
 );
 do $$
@@ -273,6 +273,106 @@ begin
   end if;
   if (select min(refund_amount_cents) from refund_reservations) <> 10000 then
     raise exception 'Reserved partial refund amount is incorrect';
+  end if;
+end
+$$;
+
+select * from public.fail_mission_refund(
+  (select id from public.refund_attempts
+   where mission_id = '10000000-0000-0000-0000-000000000003'),
+  1,
+  'balance_insufficient'
+);
+do $$
+begin
+  if (select status from public.refund_attempts
+      where mission_id = '10000000-0000-0000-0000-000000000003') <> 'failed'
+     or (select last_failure_code from public.refund_attempts
+         where mission_id = '10000000-0000-0000-0000-000000000003') <> 'balance_insufficient' then
+    raise exception 'Definitive Stripe rejection did not release the refund reservation';
+  end if;
+end
+$$;
+
+-- A definitively failed Stripe request did not create a refund, so the ordinary
+-- professional transition must be available again.
+begin;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000020","role":"authenticated"}',
+  true
+);
+update public.missions set status = 'confirmed'
+where id = '10000000-0000-0000-0000-000000000003';
+rollback;
+
+select extensions.dblink_send_query('refund_1', $$
+  select * from public.reserve_mission_refund(
+    '10000000-0000-0000-0000-000000000003',
+    '10000000-0000-0000-0000-000000000020',
+    'client_cancel_approved')
+$$);
+select extensions.dblink_send_query('refund_2', $$
+  select * from public.reserve_mission_refund(
+    '10000000-0000-0000-0000-000000000003',
+    '10000000-0000-0000-0000-000000000020',
+    'client_cancel_approved')
+$$);
+create temporary table refund_retry_reservations (
+  attempt_id uuid, attempt_status text, attempt_number integer,
+  payment_id uuid, stripe_payment_id text, refund_amount_cents bigint, idempotency_key text,
+  resulting_payment_status text, stripe_refund_id text
+);
+insert into refund_retry_reservations
+select * from extensions.dblink_get_result('refund_1') as t(
+  attempt_id uuid, attempt_status text, attempt_number integer,
+  payment_id uuid, stripe_payment_id text, refund_amount_cents bigint, idempotency_key text,
+  resulting_payment_status text, stripe_refund_id text
+);
+insert into refund_retry_reservations
+select * from extensions.dblink_get_result('refund_2') as t(
+  attempt_id uuid, attempt_status text, attempt_number integer,
+  payment_id uuid, stripe_payment_id text, refund_amount_cents bigint, idempotency_key text,
+  resulting_payment_status text, stripe_refund_id text
+);
+select * from extensions.dblink_get_result('refund_1') as t(
+  attempt_id uuid, attempt_status text, attempt_number integer,
+  payment_id uuid, stripe_payment_id text, refund_amount_cents bigint, idempotency_key text,
+  resulting_payment_status text, stripe_refund_id text
+);
+select * from extensions.dblink_get_result('refund_2') as t(
+  attempt_id uuid, attempt_status text, attempt_number integer,
+  payment_id uuid, stripe_payment_id text, refund_amount_cents bigint, idempotency_key text,
+  resulting_payment_status text, stripe_refund_id text
+);
+do $$
+begin
+  if (select count(distinct attempt_id) from refund_retry_reservations) <> 1
+     or (select count(distinct idempotency_key) from refund_retry_reservations) <> 1
+     or (select min(attempt_number) from refund_retry_reservations) <> 2 then
+    raise exception 'Concurrent retry did not share one second-generation reservation';
+  end if;
+  if (select min(r.idempotency_key) from refund_retry_reservations r)
+     = (select min(r.idempotency_key) from refund_reservations r) then
+    raise exception 'Definitively failed refund reused its rejected Stripe key';
+  end if;
+end
+$$;
+
+select * from public.fail_mission_refund(
+  (select id from public.refund_attempts
+   where mission_id = '10000000-0000-0000-0000-000000000003'),
+  1,
+  'late_first_generation_failure'
+);
+do $$
+begin
+  if (select status from public.refund_attempts
+      where mission_id = '10000000-0000-0000-0000-000000000003') <> 'reserved'
+     or (select attempt_number from public.refund_attempts
+         where mission_id = '10000000-0000-0000-0000-000000000003') <> 2 then
+    raise exception 'Stale failure report overwrote a newer refund generation';
   end if;
 end
 $$;
@@ -300,16 +400,24 @@ select extensions.dblink_send_query('refund_1', $$
   select public.finalize_mission_refund(
     (select id from public.refund_attempts
      where mission_id = '10000000-0000-0000-0000-000000000003'),
+    2,
     're_concurrency_test_1', 10000)
 $$);
 select extensions.dblink_send_query('refund_2', $$
   select public.finalize_mission_refund(
     (select id from public.refund_attempts
      where mission_id = '10000000-0000-0000-0000-000000000003'),
+    2,
     're_concurrency_test_1', 10000)
 $$);
 select * from extensions.dblink_get_result('refund_1') as t(result text);
 select * from extensions.dblink_get_result('refund_2') as t(result text);
+select * from public.fail_mission_refund(
+  (select id from public.refund_attempts
+   where mission_id = '10000000-0000-0000-0000-000000000003'),
+  2,
+  'late_rejection'
+);
 do $$
 begin
   if (select count(*) from public.payments where stripe_refund_id = 're_concurrency_test_1') <> 1 then
@@ -317,7 +425,8 @@ begin
   end if;
   if (select status from public.missions where id = '10000000-0000-0000-0000-000000000003') <> 'cancelled'
      or (select status from public.payments where id = '10000000-0000-0000-0000-000000000030') <> 'partially_refunded'
-     or (select status from public.refund_attempts where mission_id = '10000000-0000-0000-0000-000000000003') <> 'completed' then
+     or (select status from public.refund_attempts where mission_id = '10000000-0000-0000-0000-000000000003') <> 'completed'
+     or (select attempt_number from public.refund_attempts where mission_id = '10000000-0000-0000-0000-000000000003') <> 2 then
     raise exception 'Refund payment and mission writes were not atomic';
   end if;
 end
