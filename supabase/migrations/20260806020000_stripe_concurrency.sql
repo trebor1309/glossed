@@ -79,6 +79,12 @@ alter table public.users drop column stripe_payouts_enabled;
 
 alter table public.missions alter column paid_at drop default;
 
+-- Financial records must survive mission deletion attempts.
+alter table public.payments drop constraint payments_mission_id_fkey;
+alter table public.payments
+  add constraint payments_mission_id_fkey
+  foreign key (mission_id) references public.missions(id) on delete restrict;
+
 create table public.checkout_attempts (
   id uuid primary key default gen_random_uuid(),
   mission_id uuid not null unique references public.missions(id) on delete cascade,
@@ -105,12 +111,34 @@ create table public.stripe_webhook_events (
   processed_at timestamptz
 );
 
+create table public.refund_attempts (
+  id uuid primary key default gen_random_uuid(),
+  mission_id uuid not null unique references public.missions(id) on delete restrict,
+  payment_id uuid not null unique references public.payments(id) on delete restrict,
+  requested_by uuid not null references public.users(id) on delete restrict,
+  mode text not null check (mode in ('pro_cancel', 'client_cancel_approved')),
+  expected_mission_status text not null,
+  resulting_payment_status text not null
+    check (resulting_payment_status in ('refunded', 'partially_refunded')),
+  stripe_payment_id text not null,
+  refund_amount_cents bigint not null check (refund_amount_cents > 0),
+  idempotency_key text not null unique,
+  stripe_refund_id text unique,
+  status text not null default 'reserved' check (status in ('reserved', 'completed')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
 alter table public.checkout_attempts enable row level security;
 alter table public.stripe_webhook_events enable row level security;
+alter table public.refund_attempts enable row level security;
 revoke all on public.checkout_attempts from anon, authenticated;
 revoke all on public.stripe_webhook_events from anon, authenticated;
+revoke all on public.refund_attempts from anon, authenticated;
 grant all on public.checkout_attempts to service_role;
 grant all on public.stripe_webhook_events to service_role;
+grant all on public.refund_attempts to service_role;
 
 -- Payment rows are written only by privileged RPCs.
 drop policy if exists "Users can update their own payments" on public.payments;
@@ -119,6 +147,7 @@ drop policy if exists "Users can update their own payments" on public.payments;
 drop policy if exists "Users can manage their own missions" on public.missions;
 drop policy if exists "Allow insert for pros" on public.missions;
 drop policy if exists "allow insert for authenticated" on public.missions;
+drop policy if exists "Allow delete for pro" on public.missions;
 
 create policy "Pros can create assigned proposals"
 on public.missions for insert to authenticated
@@ -167,6 +196,7 @@ for each row execute function public.protect_user_stripe_fields();
 create or replace function public.protect_mission_payment_fields()
 returns trigger
 language plpgsql
+security definer
 set search_path = public, pg_temp
 as $$
 declare
@@ -203,6 +233,13 @@ begin
   end if;
 
   if new.status is distinct from old.status then
+    if exists (
+      select 1 from public.refund_attempts ra
+      where ra.mission_id = old.id and ra.status = 'reserved'
+    ) then
+      raise exception 'Mission status is frozen while a refund is in progress'
+        using errcode = '55000';
+    end if;
     if v_uid = old.client_id
        and old.status = 'confirmed' and new.status = 'cancel_requested' then
       return new;
@@ -216,6 +253,105 @@ begin
   end if;
 
   return new;
+end
+$$;
+
+create or replace function public.reserve_mission_refund(
+  p_mission_id uuid,
+  p_requested_by uuid,
+  p_mode text
+)
+returns table (
+  attempt_id uuid,
+  attempt_status text,
+  payment_id uuid,
+  stripe_payment_id text,
+  refund_amount_cents bigint,
+  idempotency_key text,
+  resulting_payment_status text,
+  stripe_refund_id text
+)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_mission public.missions%rowtype;
+  v_payment public.payments%rowtype;
+  v_attempt public.refund_attempts%rowtype;
+  v_expected_status text;
+  v_resulting_status text;
+  v_refund_amount bigint;
+begin
+  if p_mode = 'pro_cancel' then
+    v_expected_status := 'confirmed';
+    v_resulting_status := 'refunded';
+  elsif p_mode = 'client_cancel_approved' then
+    v_expected_status := 'cancel_requested';
+    v_resulting_status := 'partially_refunded';
+  else
+    raise exception 'Invalid refund mode' using errcode = '22023';
+  end if;
+
+  select * into v_mission
+  from public.missions where id = p_mission_id for update;
+  if not found then raise exception 'Mission not found' using errcode = 'P0002'; end if;
+  if v_mission.pro_id is distinct from p_requested_by then
+    raise exception 'Only the assigned professional may refund this mission'
+      using errcode = '42501';
+  end if;
+
+  select * into v_attempt
+  from public.refund_attempts where mission_id = p_mission_id for update;
+  if found then
+    if v_attempt.mode <> p_mode or v_attempt.requested_by <> p_requested_by then
+      raise exception 'A different refund operation already exists' using errcode = '23505';
+    end if;
+    return query select v_attempt.id, v_attempt.status, v_attempt.payment_id,
+      v_attempt.stripe_payment_id, v_attempt.refund_amount_cents,
+      v_attempt.idempotency_key, v_attempt.resulting_payment_status,
+      v_attempt.stripe_refund_id;
+    return;
+  end if;
+
+  if v_mission.status <> v_expected_status then
+    raise exception 'Mission is not refundable in its current status' using errcode = '23514';
+  end if;
+
+  select * into v_payment
+  from public.payments
+  where mission_id = p_mission_id and status = 'paid'
+  order by created_at desc
+  limit 1
+  for update;
+  if not found then raise exception 'Paid payment not found' using errcode = 'P0002'; end if;
+  if v_payment.stripe_payment_id is null then
+    raise exception 'Payment has no Stripe identifier' using errcode = '23514';
+  end if;
+
+  if p_mode = 'pro_cancel' then
+    v_refund_amount := v_payment.amount_total_cents;
+  else
+    v_refund_amount := v_payment.amount_net_cents;
+  end if;
+  if v_refund_amount is null or v_refund_amount <= 0 then
+    raise exception 'Payment has an invalid refundable amount' using errcode = '23514';
+  end if;
+
+  insert into public.refund_attempts (
+    mission_id, payment_id, requested_by, mode, expected_mission_status,
+    resulting_payment_status, stripe_payment_id, refund_amount_cents,
+    idempotency_key
+  ) values (
+    p_mission_id, v_payment.id, p_requested_by, p_mode, v_expected_status,
+    v_resulting_status, v_payment.stripe_payment_id, v_refund_amount,
+    'refund:' || p_mission_id::text || ':' || p_mode
+  ) returning * into v_attempt;
+
+  return query select v_attempt.id, v_attempt.status, v_attempt.payment_id,
+    v_attempt.stripe_payment_id, v_attempt.refund_amount_cents,
+    v_attempt.idempotency_key, v_attempt.resulting_payment_status,
+    v_attempt.stripe_refund_id;
 end
 $$;
 
@@ -418,10 +554,7 @@ end
 $$;
 
 create or replace function public.finalize_mission_refund(
-  p_mission_id uuid,
-  p_payment_id uuid,
-  p_expected_mission_status text,
-  p_payment_status text,
+  p_attempt_id uuid,
   p_stripe_refund_id text,
   p_refund_amount_cents bigint
 )
@@ -431,20 +564,34 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
+  v_attempt public.refund_attempts%rowtype;
   v_mission_status text;
   v_payment_status text;
-  v_existing_refund_id text;
 begin
-  select status into v_mission_status from public.missions where id = p_mission_id for update;
+  select * into v_attempt
+  from public.refund_attempts where id = p_attempt_id for update;
+  if not found then raise exception 'Refund attempt not found' using errcode = 'P0002'; end if;
+
+  if v_attempt.status = 'completed' then
+    if v_attempt.stripe_refund_id = p_stripe_refund_id then return; end if;
+    raise exception 'Refund attempt was completed with a different Stripe refund'
+      using errcode = '23505';
+  end if;
+  if p_refund_amount_cents <> v_attempt.refund_amount_cents then
+    raise exception 'Stripe refund amount does not match reservation' using errcode = '23514';
+  end if;
+
+  select status into v_mission_status
+  from public.missions where id = v_attempt.mission_id for update;
   if not found then raise exception 'Mission not found' using errcode = 'P0002'; end if;
 
-  select status, stripe_refund_id into v_payment_status, v_existing_refund_id
-  from public.payments where id = p_payment_id and mission_id = p_mission_id for update;
+  select status into v_payment_status
+  from public.payments
+  where id = v_attempt.payment_id and mission_id = v_attempt.mission_id
+  for update;
   if not found then raise exception 'Payment not found' using errcode = 'P0002'; end if;
 
-  if v_existing_refund_id = p_stripe_refund_id and v_payment_status = p_payment_status
-     and v_mission_status = 'cancelled' then return; end if;
-  if v_mission_status <> p_expected_mission_status then
+  if v_mission_status <> v_attempt.expected_mission_status then
     raise exception 'Mission status changed concurrently' using errcode = '40001';
   end if;
   if v_payment_status <> 'paid' then
@@ -452,23 +599,30 @@ begin
   end if;
 
   update public.payments
-  set status = p_payment_status,
+  set status = v_attempt.resulting_payment_status,
       stripe_refund_id = p_stripe_refund_id,
       refund_amount_cents = p_refund_amount_cents,
       refunded_at = now()
-  where id = p_payment_id;
+  where id = v_attempt.payment_id;
 
-  update public.missions set status = 'cancelled' where id = p_mission_id;
+  update public.missions set status = 'cancelled' where id = v_attempt.mission_id;
+
+  update public.refund_attempts
+  set status = 'completed', stripe_refund_id = p_stripe_refund_id,
+      updated_at = now(), completed_at = now()
+  where id = p_attempt_id;
 end
 $$;
 
 revoke all on function public.reserve_checkout_attempt(uuid, uuid, integer) from public, anon, authenticated;
 revoke all on function public.attach_checkout_session(uuid, text, text, timestamptz) from public, anon, authenticated;
 revoke all on function public.process_stripe_checkout_completed(text, text, timestamptz, boolean, uuid, uuid, uuid, text, text, bigint, bigint, text) from public, anon, authenticated;
-revoke all on function public.finalize_mission_refund(uuid, uuid, text, text, text, bigint) from public, anon, authenticated;
+revoke all on function public.reserve_mission_refund(uuid, uuid, text) from public, anon, authenticated;
+revoke all on function public.finalize_mission_refund(uuid, text, bigint) from public, anon, authenticated;
 grant execute on function public.reserve_checkout_attempt(uuid, uuid, integer) to service_role;
 grant execute on function public.attach_checkout_session(uuid, text, text, timestamptz) to service_role;
 grant execute on function public.process_stripe_checkout_completed(text, text, timestamptz, boolean, uuid, uuid, uuid, text, text, bigint, bigint, text) to service_role;
-grant execute on function public.finalize_mission_refund(uuid, uuid, text, text, text, bigint) to service_role;
+grant execute on function public.reserve_mission_refund(uuid, uuid, text) to service_role;
+grant execute on function public.finalize_mission_refund(uuid, text, bigint) to service_role;
 
 commit;

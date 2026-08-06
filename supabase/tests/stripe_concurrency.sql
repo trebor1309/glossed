@@ -5,6 +5,11 @@ create extension if not exists dblink with schema extensions;
 select set_config('app.test_database_url', :'TEST_DATABASE_URL', false);
 
 delete from public.stripe_webhook_events where event_id like 'evt_concurrency_test_%';
+delete from public.refund_attempts where mission_id in (
+  '10000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-000000000002',
+  '10000000-0000-0000-0000-000000000003'
+);
 delete from public.checkout_attempts where mission_id in (
   '10000000-0000-0000-0000-000000000001',
   '10000000-0000-0000-0000-000000000002',
@@ -41,7 +46,7 @@ insert into public.missions (id, client_id, pro_id, service, date, price, status
   ('10000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000010',
    '10000000-0000-0000-0000-000000000020', 'Concurrency webhook', now(), 100, 'proposed'),
   ('10000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000010',
-   '10000000-0000-0000-0000-000000000020', 'Concurrency refund', now(), 100, 'confirmed');
+   '10000000-0000-0000-0000-000000000020', 'Concurrency refund', now(), 100, 'cancel_requested');
 
 insert into public.payments (
   id, mission_id, client_id, pro_id, amount_total_cents, amount_net_cents,
@@ -186,19 +191,122 @@ begin
 end
 $$;
 
+begin;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000020","role":"authenticated"}',
+  true
+);
+delete from public.missions
+where id = '10000000-0000-0000-0000-000000000002';
+do $$
+begin
+  if not exists (
+    select 1 from public.missions
+    where id = '10000000-0000-0000-0000-000000000002'
+  ) then
+    raise exception 'Professional was allowed to delete a paid mission';
+  end if;
+end
+$$;
+rollback;
+
+do $$
+begin
+  begin
+    delete from public.missions
+    where id = '10000000-0000-0000-0000-000000000002';
+    raise exception 'Payment foreign key allowed mission deletion';
+  exception when foreign_key_violation then null;
+  end;
+end
+$$;
+
 select extensions.dblink_connect('refund_1', current_setting('app.test_database_url'));
 select extensions.dblink_connect('refund_2', current_setting('app.test_database_url'));
 select extensions.dblink_send_query('refund_1', $$
-  select public.finalize_mission_refund(
+  select * from public.reserve_mission_refund(
     '10000000-0000-0000-0000-000000000003',
-    '10000000-0000-0000-0000-000000000030',
-    'confirmed', 'refunded', 're_concurrency_test_1', 11000)
+    '10000000-0000-0000-0000-000000000020',
+    'client_cancel_approved')
+$$);
+select extensions.dblink_send_query('refund_2', $$
+  select * from public.reserve_mission_refund(
+    '10000000-0000-0000-0000-000000000003',
+    '10000000-0000-0000-0000-000000000020',
+    'client_cancel_approved')
+$$);
+create temporary table refund_reservations (
+  attempt_id uuid, attempt_status text, payment_id uuid, stripe_payment_id text,
+  refund_amount_cents bigint, idempotency_key text,
+  resulting_payment_status text, stripe_refund_id text
+);
+insert into refund_reservations
+select * from extensions.dblink_get_result('refund_1') as t(
+  attempt_id uuid, attempt_status text, payment_id uuid, stripe_payment_id text,
+  refund_amount_cents bigint, idempotency_key text,
+  resulting_payment_status text, stripe_refund_id text
+);
+insert into refund_reservations
+select * from extensions.dblink_get_result('refund_2') as t(
+  attempt_id uuid, attempt_status text, payment_id uuid, stripe_payment_id text,
+  refund_amount_cents bigint, idempotency_key text,
+  resulting_payment_status text, stripe_refund_id text
+);
+-- Fully drain both asynchronous result queues before reusing the connections.
+select * from extensions.dblink_get_result('refund_1') as t(
+  attempt_id uuid, attempt_status text, payment_id uuid, stripe_payment_id text,
+  refund_amount_cents bigint, idempotency_key text,
+  resulting_payment_status text, stripe_refund_id text
+);
+select * from extensions.dblink_get_result('refund_2') as t(
+  attempt_id uuid, attempt_status text, payment_id uuid, stripe_payment_id text,
+  refund_amount_cents bigint, idempotency_key text,
+  resulting_payment_status text, stripe_refund_id text
+);
+do $$
+begin
+  if (select count(distinct attempt_id) from refund_reservations) <> 1
+     or (select count(distinct idempotency_key) from refund_reservations) <> 1 then
+    raise exception 'Concurrent refund calls did not share one reservation';
+  end if;
+  if (select min(refund_amount_cents) from refund_reservations) <> 10000 then
+    raise exception 'Reserved partial refund amount is incorrect';
+  end if;
+end
+$$;
+
+begin;
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000020","role":"authenticated"}',
+  true
+);
+do $$
+begin
+  begin
+    update public.missions set status = 'confirmed'
+    where id = '10000000-0000-0000-0000-000000000003';
+    raise exception 'Professional rejected cancellation during a reserved refund';
+  exception when sqlstate '55000' then null;
+  end;
+end
+$$;
+rollback;
+
+select extensions.dblink_send_query('refund_1', $$
+  select public.finalize_mission_refund(
+    (select id from public.refund_attempts
+     where mission_id = '10000000-0000-0000-0000-000000000003'),
+    're_concurrency_test_1', 10000)
 $$);
 select extensions.dblink_send_query('refund_2', $$
   select public.finalize_mission_refund(
-    '10000000-0000-0000-0000-000000000003',
-    '10000000-0000-0000-0000-000000000030',
-    'confirmed', 'refunded', 're_concurrency_test_1', 11000)
+    (select id from public.refund_attempts
+     where mission_id = '10000000-0000-0000-0000-000000000003'),
+    're_concurrency_test_1', 10000)
 $$);
 select * from extensions.dblink_get_result('refund_1') as t(result text);
 select * from extensions.dblink_get_result('refund_2') as t(result text);
@@ -208,7 +316,8 @@ begin
     raise exception 'Concurrent refund finalization was not idempotent';
   end if;
   if (select status from public.missions where id = '10000000-0000-0000-0000-000000000003') <> 'cancelled'
-     or (select status from public.payments where id = '10000000-0000-0000-0000-000000000030') <> 'refunded' then
+     or (select status from public.payments where id = '10000000-0000-0000-0000-000000000030') <> 'partially_refunded'
+     or (select status from public.refund_attempts where mission_id = '10000000-0000-0000-0000-000000000003') <> 'completed' then
     raise exception 'Refund payment and mission writes were not atomic';
   end if;
 end
@@ -222,6 +331,11 @@ select extensions.dblink_disconnect('refund_1');
 select extensions.dblink_disconnect('refund_2');
 
 delete from public.stripe_webhook_events where event_id = 'evt_concurrency_test_1';
+delete from public.refund_attempts where mission_id in (
+  '10000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-000000000002',
+  '10000000-0000-0000-0000-000000000003'
+);
 delete from public.checkout_attempts where mission_id in (
   '10000000-0000-0000-0000-000000000001',
   '10000000-0000-0000-0000-000000000002',

@@ -1,7 +1,4 @@
-import {
-  connectAccountIdempotencyKey,
-  refundIdempotencyKey,
-} from "./idempotency.ts";
+import { connectAccountIdempotencyKey } from "./idempotency.ts";
 
 function assertEquals(actual: unknown, expected: unknown) {
   if (actual !== expected) throw new Error(`Expected ${expected}, received ${actual}`);
@@ -28,11 +25,4 @@ Deno.test("two concurrent account creations use one stable Stripe operation", as
   assertEquals(first, "acct_test");
   assertEquals(second, "acct_test");
   assertEquals(calls, 1);
-});
-
-Deno.test("refund retries use the same Stripe idempotency key", () => {
-  assertEquals(
-    refundIdempotencyKey("mission-1", "pro_cancel"),
-    refundIdempotencyKey("mission-1", "pro_cancel")
-  );
 });
