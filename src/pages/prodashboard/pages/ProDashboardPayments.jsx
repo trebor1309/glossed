@@ -486,7 +486,7 @@ export default function ProDashboardPayments() {
 
           <div className="text-center">
             <button
-              onClick={() => {}}
+              onClick={handleDownloadReport}
               className="px-6 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-medium shadow-md hover:scale-[1.03] transition"
             >
               <Download size={18} className="inline-block mr-2" />
