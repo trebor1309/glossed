@@ -28,10 +28,12 @@ Commandes utiles :
 
 ```powershell
 npm run lint       # contrôle sans modifier les fichiers
+npm run lint:e2e   # contrôle des tests et lanceurs Playwright
 npm run lint:fix   # applique les corrections ESLint disponibles
 npm run build      # build de production dans dist/
 npm run check      # lint puis build
 npm run test:e2e   # tests navigateur Playwright sans données distantes
+npm run test:e2e:auth # tests authentifiés distants en lecture seule
 ```
 
 npm est l'unique gestionnaire de paquets du projet. `package-lock.json` doit être
@@ -53,8 +55,35 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Les futurs tests authentifiés devront utiliser uniquement des comptes et un projet
-de test via des variables `E2E_*` non versionnées.
+Les tests authentifiés utilisent uniquement des comptes et un projet de test via
+des variables `E2E_*` non versionnées.
+
+### Parcours authentifiés en lecture seule
+
+Les parcours client, prestataire et administrateur utilisent un déploiement de test
+réel, mais bloquent toute écriture métier Supabase ainsi que tout appel Stripe. Ils
+vérifient uniquement la connexion, la restauration de session et les autorisations
+des routes.
+
+La connexion peut mettre à jour les métadonnées techniques de Supabase Auth, telles
+que `last_sign_in_at`, mais aucune table métier n’est modifiée.
+
+Copier `.env.e2e.auth.example` vers `.env.e2e.auth`, puis renseigner trois comptes
+de test distincts et déjà onboardés :
+
+```powershell
+Copy-Item .env.e2e.auth.example .env.e2e.auth
+npm run test:e2e:auth
+```
+
+Le compte client doit avoir le rôle actif `client`, le prestataire le rôle permanent
+et actif `pro`, et seul le troisième compte doit être administrateur. Le fichier
+`.env.e2e.auth` et les états de session Playwright sont ignorés par Git.
+
+Le workflow manuel `Authenticated E2E` lit la même configuration depuis les variables
+`E2E_BASE_URL` et `E2E_SUPABASE_URL` de l’environnement GitHub `e2e`, ainsi que les
+six secrets `E2E_*_EMAIL` et `E2E_*_PASSWORD`. Il ne doit être activé qu’avec des
+comptes dédiés au projet de test.
 
 ## Organisation
 
