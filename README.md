@@ -13,10 +13,11 @@ Glossed est une marketplace de prestations mettant en relation des clients et de
 
 ## Démarrage local
 
-Prérequis : une version récente de Node.js compatible avec Vite 7 et un projet Supabase configuré.
+Prérequis : Node.js 24, npm 11 et un projet Supabase configuré. Les versions
+attendues sont déclarées dans `package.json` et `.nvmrc`.
 
 ```powershell
-npm install
+npm ci
 Copy-Item .env.example .env.local
 npm run dev
 ```
@@ -32,7 +33,9 @@ npm run build      # build de production dans dist/
 npm run check      # lint puis build
 ```
 
-Le dépôt contient aussi un `pnpm-lock.yaml` historique. Tant qu'un gestionnaire unique n'a pas été choisi, utiliser npm, qui correspond au `package-lock.json` actuellement installé.
+npm est l'unique gestionnaire de paquets du projet. `package-lock.json` doit être
+mis à jour et committé avec toute modification des dépendances. La CI et Vercel
+installent les dépendances avec `npm ci`.
 
 ## Organisation
 
@@ -60,6 +63,11 @@ Le proxy Vercel `/api/stripe-webhook` nécessite `SUPABASE_STRIPE_WEBHOOK_URL`. 
 
 ## État de la reprise
 
-Le front compile, mais le projet ne contient pas encore les migrations SQL permettant de recréer le schéma, les politiques RLS, les triggers et les buckets Storage. Avant une remise en production, il faut également renforcer l'authentification et les autorisations des Edge Functions qui utilisent la clé `service_role`.
+Les migrations Supabase reproductibles, les politiques RLS, les buckets privés
+et les fonctions Stripe sécurisées sont versionnés dans `supabase/`. Les parcours
+Stripe, les flux fonctionnels principaux et la vérification des professionnels ont
+été validés en environnement de test.
 
-Les parcours prioritaires à valider sont : authentification/onboarding, création d'une réservation, proposition d'un professionnel, paiement, webhook, annulation/remboursement et messagerie.
+Les prochains travaux portent sur l'automatisation des tests navigateur, le
+traitement progressif des avertissements du front et le découpage du bundle de
+production.
