@@ -31,11 +31,30 @@ npm run lint       # contrôle sans modifier les fichiers
 npm run lint:fix   # applique les corrections ESLint disponibles
 npm run build      # build de production dans dist/
 npm run check      # lint puis build
+npm run test:e2e   # tests navigateur Playwright sans données distantes
 ```
 
 npm est l'unique gestionnaire de paquets du projet. `package-lock.json` doit être
 mis à jour et committé avec toute modification des dépendances. La CI et Vercel
 installent les dépendances avec `npm ci`.
+
+## Tests navigateur
+
+Le premier lot Playwright couvre les pages publiques, la navigation principale,
+les routes inconnues et les redirections des routes protégées sans session. Le
+serveur de test reçoit par défaut une configuration Supabase locale factice et les
+requêtes vers Supabase et Stripe sont bloquées : ces tests ne lisent ni ne
+modifient aucune donnée distante.
+
+Après `npm ci`, installer Chromium une fois puis lancer les tests :
+
+```powershell
+npx playwright install chromium
+npm run test:e2e
+```
+
+Les futurs tests authentifiés devront utiliser uniquement des comptes et un projet
+de test via des variables `E2E_*` non versionnées.
 
 ## Organisation
 
