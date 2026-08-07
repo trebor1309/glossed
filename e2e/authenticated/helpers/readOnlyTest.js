@@ -1,0 +1,62 @@
+import { expect, test as base } from "@playwright/test";
+
+const stripeHost = /(^|\.)stripe\.com$/;
+const configuredSupabaseHost = new URL(process.env.E2E_SUPABASE_URL).hostname;
+const allowedSupabasePostPaths = [
+  "/rest/v1/rpc/is_app_admin",
+  "/rest/v1/rpc/list_pending_professional_verifications",
+];
+
+function isAllowedReadOnlySupabasePost(pathname) {
+  return (
+    pathname === "/auth/v1/token" ||
+    allowedSupabasePostPaths.includes(pathname) ||
+    pathname.startsWith("/storage/v1/object/sign/")
+  );
+}
+
+function isSupabaseRequest(request, url) {
+  const headers = request.headers();
+  return url.hostname === configuredSupabaseHost || Boolean(headers.apikey);
+}
+
+export const test = base.extend({
+  readOnlyGuard: [
+    async ({ page }, use) => {
+      const blockedWrites = [];
+
+      await page.route("**/*", async (route) => {
+        const request = route.request();
+        const url = new URL(request.url());
+        const method = request.method();
+
+        if (stripeHost.test(url.hostname)) {
+          await route.abort("blockedbyclient");
+          return;
+        }
+
+        if (
+          isSupabaseRequest(request, url) &&
+          !["GET", "HEAD", "OPTIONS"].includes(method) &&
+          !(method === "POST" && isAllowedReadOnlySupabasePost(url.pathname))
+        ) {
+          blockedWrites.push(`${method} ${url.pathname}`);
+          await route.abort("blockedbyclient");
+          return;
+        }
+
+        await route.continue();
+      });
+
+      await use(blockedWrites);
+
+      expect(
+        blockedWrites,
+        "Authenticated smoke tests must not attempt business-data writes"
+      ).toEqual([]);
+    },
+    { auto: true },
+  ],
+});
+
+export { expect };
