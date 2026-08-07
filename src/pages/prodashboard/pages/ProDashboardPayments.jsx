@@ -6,7 +6,7 @@ import { useUser } from "@/context/UserContext";
 import { Download, FileText, Eye, CheckCircle, XCircle, Clock, Wallet } from "lucide-react";
 
 import dayjs from "dayjs";
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import PaymentDetailsModal from "@/components/modals/PaymentDetailsModal";
