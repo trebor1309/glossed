@@ -17,7 +17,7 @@ export default function ProBookingDetailsModal({ booking, onClose, onMakeProposa
       });
       setClient(data?.[0] || null);
     })();
-  }, [booking?.id]);
+  }, [booking?.client_id, booking?.id]);
 
   if (!booking) return null;
 

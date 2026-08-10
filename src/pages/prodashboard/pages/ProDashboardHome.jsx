@@ -1,5 +1,5 @@
 // 📄 src/pages/prodashboard/pages/ProDashboardHome.jsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -52,7 +52,7 @@ export default function ProDashboardHome() {
   /* ---------------------------------------------------------
      📊 fetchStats() — version propre et unifiée
   --------------------------------------------------------- */
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     if (!proId) return;
 
     try {
@@ -79,7 +79,7 @@ export default function ProDashboardHome() {
     } catch (err) {
       console.error("❌ fetchStats error:", err.message);
     }
-  };
+  }, [proId]);
 
   /* ---------------------------------------------------------
      🔁 Realtime synchronisé
@@ -127,7 +127,7 @@ export default function ProDashboardHome() {
       .subscribe();
 
     return () => supabase.removeChannel(channel);
-  }, [proId]);
+  }, [fetchStats, proId]);
 
   /* ---------------------------------------------------------
      🧱 Cartes du dashboard (même design client)

@@ -10,7 +10,12 @@ export default function AddressAutocomplete({
 }) {
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
+  const onSelectRef = useRef(onSelect);
+  const valueRef = useRef(defaultValue || "");
   const [value, setValue] = useState(defaultValue || "");
+
+  onSelectRef.current = onSelect;
+  valueRef.current = value;
 
   useEffect(() => {
     if (!window.google || !window.google.maps || !window.google.maps.places) {
@@ -43,14 +48,14 @@ export default function AddressAutocomplete({
 
       const postalCode = find("postal_code");
       const country = find("country");
-      const formatted = place.formatted_address || value;
+      const formatted = place.formatted_address || valueRef.current;
 
       const lat = place.geometry.location.lat();
       const lng = place.geometry.location.lng();
 
       setValue(formatted);
 
-      onSelect?.({
+      onSelectRef.current?.({
         address: formatted,
         city,
         postal_code: postalCode,
@@ -65,7 +70,7 @@ export default function AddressAutocomplete({
         window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
-  }, [onSelect]);
+  }, []);
 
   return (
     <div>

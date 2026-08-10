@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
@@ -14,7 +14,7 @@ export default function DashboardChat() {
   const [chatInfo, setChatInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchChatInfo = async () => {
+  const fetchChatInfo = useCallback(async () => {
     setLoading(true);
 
     const { data, error } = await supabase
@@ -48,11 +48,11 @@ export default function DashboardChat() {
 
     if (!error) setChatInfo(data);
     setLoading(false);
-  };
+  }, [chat_id]);
 
   useEffect(() => {
     if (chat_id) fetchChatInfo();
-  }, [chat_id]);
+  }, [chat_id, fetchChatInfo]);
 
   if (loading) return <p className="p-6 text-gray-500">Loading chat...</p>;
 

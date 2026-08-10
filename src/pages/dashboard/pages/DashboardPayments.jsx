@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 
@@ -157,7 +157,7 @@ export default function DashboardPayments() {
   /* ------------------------------------------------------------------
      📡 Fetch payments for client
   ------------------------------------------------------------------ */
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     if (!clientId) return;
 
     const { data, error } = await supabase
@@ -176,7 +176,7 @@ export default function DashboardPayments() {
     const unique = Array.from(new Map(rows.map((p) => [p.stripe_payment_id || p.id, p])).values());
 
     setPayments(unique);
-  };
+  }, [clientId]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -201,7 +201,7 @@ export default function DashboardPayments() {
       .subscribe();
 
     return () => supabase.removeChannel(channel);
-  }, [clientId]);
+  }, [clientId, fetchPayments]);
 
   /* ------------------------------------------------------------------
      🧮 Filters + totals (gross)

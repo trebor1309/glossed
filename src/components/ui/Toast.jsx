@@ -1,22 +1,29 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 export default function Toast({ message, type = "success", onClose }) {
   const [render, setRender] = useState(true);
   const [fadeOut, setFadeOut] = useState(false);
+  const onCloseRef = useRef(onClose);
+
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     // Durée visible
+    let fadeTimer;
     const timer = setTimeout(() => {
       setFadeOut(true);
       // délai animation fade-out
-      setTimeout(() => {
+      fadeTimer = setTimeout(() => {
         setRender(false);
-        onClose?.();
+        onCloseRef.current?.();
       }, 250);
     }, 3000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(fadeTimer);
+    };
   }, []);
 
   if (!render) return null;

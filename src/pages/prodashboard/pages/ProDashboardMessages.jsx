@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
@@ -18,32 +18,35 @@ export default function ProDashboardMessages() {
   // -------------------------------------------------------------
   // 🔢 Non-lus côté PRO
   // -------------------------------------------------------------
-  const fetchUnreadMap = async (chatRows) => {
-    const ids = chatRows.map((c) => c.id);
-    if (!ids.length || !proId) return setUnreadMap({});
+  const fetchUnreadMap = useCallback(
+    async (chatRows) => {
+      const ids = chatRows.map((c) => c.id);
+      if (!ids.length || !proId) return setUnreadMap({});
 
-    const { data, error } = await supabase
-      .from("messages")
-      .select("chat_id")
-      .in("chat_id", ids)
-      .neq("sender_id", proId)
-      .is("read_at", null);
+      const { data, error } = await supabase
+        .from("messages")
+        .select("chat_id")
+        .in("chat_id", ids)
+        .neq("sender_id", proId)
+        .is("read_at", null);
 
-    if (error) {
-      console.error("Unread fetch error (pro):", error);
-      return;
-    }
+      if (error) {
+        console.error("Unread fetch error (pro):", error);
+        return;
+      }
 
-    const map = {};
-    for (const row of data || []) map[row.chat_id] = true;
+      const map = {};
+      for (const row of data || []) map[row.chat_id] = true;
 
-    setUnreadMap(map);
-  };
+      setUnreadMap(map);
+    },
+    [proId]
+  );
 
   // -------------------------------------------------------------
   // 📌 Charger les chats + dernier message
   // -------------------------------------------------------------
-  const fetchChats = async () => {
+  const fetchChats = useCallback(async () => {
     if (!proId) return;
     setLoading(true);
 
@@ -111,7 +114,7 @@ export default function ProDashboardMessages() {
     setChats(normalized);
     await fetchUnreadMap(normalized);
     setLoading(false);
-  };
+  }, [fetchUnreadMap, proId]);
 
   // -------------------------------------------------------------
   // 📡 Realtime : INSERT + UPDATE (read_at)
@@ -163,7 +166,7 @@ export default function ProDashboardMessages() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [proId]);
+  }, [fetchChats, proId]);
 
   const openChat = (chat) => navigate(`/prodashboard/messages/${chat.id}`);
 

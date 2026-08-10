@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -22,6 +22,7 @@ const buildDate = (item) => {
 export default function DashboardReservations() {
   const { session } = useUser();
   const { notifications } = useNotifications();
+  const clientId = session?.user?.id;
 
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,10 +43,11 @@ export default function DashboardReservations() {
   /* -----------------------------------------------------------
      📌 Fetch all bookings & missions (client)
   ----------------------------------------------------------- */
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
+    if (!clientId) return;
+
     try {
       setLoading(true);
-      const clientId = session.user.id;
 
       const { data: bookingsData } = await supabase
         .from("bookings")
@@ -93,13 +95,13 @@ export default function DashboardReservations() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [clientId]);
 
   /* -----------------------------------------------------------
      🔁 Realtime events
   ----------------------------------------------------------- */
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!clientId) return;
     fetchBookings();
 
     const handler = (event) => {
@@ -108,7 +110,7 @@ export default function DashboardReservations() {
       if (
         table === "missions" &&
         ["INSERT", "UPDATE"].includes(action) &&
-        payload?.new?.client_id === session.user.id &&
+        payload?.new?.client_id === clientId &&
         payload?.new?.status === "proposed"
       ) {
         setNewItems((prev) => {
@@ -123,7 +125,7 @@ export default function DashboardReservations() {
 
     window.addEventListener("supabase-update", handler);
     return () => window.removeEventListener("supabase-update", handler);
-  }, [session?.user?.id]);
+  }, [clientId, fetchBookings]);
 
   /* -----------------------------------------------------------
      🗑 Delete booking

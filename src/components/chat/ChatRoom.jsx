@@ -1,11 +1,12 @@
 // 📄 src/components/chat/ChatRoom.jsx
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import ChatBubble from "./ChatBubble";
 import ChatInput from "./ChatInput";
 import ImageViewer from "./ImageViewer";
 
 export default function ChatRoom({ chatId, user }) {
+  const userId = user?.id;
   const [messages, setMessages] = useState([]);
   const [viewerUrl, setViewerUrl] = useState(null);
   const [typingUser, setTypingUser] = useState(null);
@@ -15,23 +16,27 @@ export default function ChatRoom({ chatId, user }) {
   // ------------------------------------------------------
   // 🔥 Mark as read
   // ------------------------------------------------------
-  const markAsRead = async () => {
+  const markAsRead = useCallback(async () => {
+    if (!chatId || !userId) return;
+
     try {
       await supabase
         .from("messages")
         .update({ read_at: new Date().toISOString() })
         .eq("chat_id", chatId)
-        .neq("sender_id", user.id)
+        .neq("sender_id", userId)
         .is("read_at", null);
     } catch (e) {
       console.error("Failed to mark messages as read:", e);
     }
-  };
+  }, [chatId, userId]);
 
   // ------------------------------------------------------
   // 📌 Load messages
   // ------------------------------------------------------
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
+    if (!chatId) return;
+
     const { data, error } = await supabase
       .from("messages")
       .select("*")
@@ -45,13 +50,13 @@ export default function ChatRoom({ chatId, user }) {
     }
 
     setMessages(data || []);
-  };
+  }, [chatId]);
 
   // ------------------------------------------------------
   // 📌 Init + realtime
   // ------------------------------------------------------
   useEffect(() => {
-    if (!chatId || !user?.id) return;
+    if (!chatId || !userId) return;
 
     // 🔔 Signale que ce chat est ouvert
     window.dispatchEvent(new CustomEvent("chat-open", { detail: chatId }));
@@ -75,7 +80,7 @@ export default function ChatRoom({ chatId, user }) {
             setMessages((prev) => [...prev, payload.new]);
 
             // si message reçu → marquer direct comme lu
-            if (payload.new.sender_id !== user.id) {
+            if (payload.new.sender_id !== userId) {
               markAsRead();
             }
           }
@@ -91,7 +96,7 @@ export default function ChatRoom({ chatId, user }) {
     const typingChannel = supabase
       .channel(`typing:${chatId}`)
       .on("broadcast", { event: "typing" }, ({ payload }) => {
-        if (payload.user_id !== user.id) {
+        if (payload.user_id !== userId) {
           setTypingUser(payload.name || "Someone");
           setTimeout(() => setTypingUser(null), 2500);
         }
@@ -104,7 +109,7 @@ export default function ChatRoom({ chatId, user }) {
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(typingChannel);
     };
-  }, [chatId, user?.id]);
+  }, [chatId, loadMessages, markAsRead, userId]);
 
   // ------------------------------------------------------
   // 📌 Auto scroll
@@ -123,7 +128,7 @@ export default function ChatRoom({ chatId, user }) {
           <ChatBubble
             key={msg.id}
             msg={msg}
-            isOwn={msg.sender_id === user.id}
+            isOwn={msg.sender_id === userId}
             onImageClick={setViewerUrl}
           />
         ))}

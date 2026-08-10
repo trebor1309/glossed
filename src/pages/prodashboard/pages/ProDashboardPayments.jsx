@@ -1,5 +1,5 @@
 // 📄 src/pages/prodashboard/pages/ProDashboardPayments.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 
@@ -165,7 +165,7 @@ export default function ProDashboardPayments() {
   /* ------------------------------------------------------------------
      📡 Charger paiements
   ------------------------------------------------------------------ */
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     if (!proId) return;
 
     const { data, error } = await supabase
@@ -179,7 +179,7 @@ export default function ProDashboardPayments() {
     const unique = Array.from(new Map(data.map((p) => [p.stripe_payment_id || p.id, p])).values());
 
     setPayments(unique);
-  };
+  }, [proId]);
 
   useEffect(() => {
     if (!proId) return;
@@ -201,7 +201,7 @@ export default function ProDashboardPayments() {
       .subscribe();
 
     return () => supabase.removeChannel(channel);
-  }, [proId]);
+  }, [fetchPayments, proId]);
 
   /* ------------------------------------------------------------------
      🧮 Filtres + total net
