@@ -2,6 +2,8 @@ import { expect, test as base } from "@playwright/test";
 
 const stripeHost = /(^|\.)stripe\.com$/;
 const configuredSupabaseHost = new URL(process.env.E2E_SUPABASE_URL).hostname;
+const configuredTargetOrigin = new URL(process.env.PLAYWRIGHT_BASE_URL).origin;
+const vercelProtectionBypass = process.env.E2E_VERCEL_BYPASS_SECRET?.trim();
 const allowedSupabasePostPaths = [
   "/rest/v1/rpc/is_app_admin",
   "/rest/v1/rpc/list_pending_professional_verifications",
@@ -42,6 +44,17 @@ export const test = base.extend({
         ) {
           blockedWrites.push(`${method} ${url.pathname}`);
           await route.abort("blockedbyclient");
+          return;
+        }
+
+        if (vercelProtectionBypass && url.origin === configuredTargetOrigin) {
+          await route.continue({
+            headers: {
+              ...request.headers(),
+              "x-vercel-protection-bypass": vercelProtectionBypass,
+              "x-vercel-set-bypass-cookie": "true",
+            },
+          });
           return;
         }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -25,6 +25,7 @@ const buildDate = (item) => {
 export default function ProDashboardMissions() {
   const { session } = useUser();
   const { notifications } = useNotifications();
+  const proId = session?.user?.id;
 
   const [missions, setMissions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,11 +46,11 @@ export default function ProDashboardMissions() {
   /* ------------------------------------------------------------------
      📌 Charger toutes les missions liées au pro
   ------------------------------------------------------------------ */
-  const fetchMissions = async () => {
+  const fetchMissions = useCallback(async () => {
+    if (!proId) return;
+
     setLoading(true);
     try {
-      const proId = session.user.id;
-
       // 1️⃣ BOOKINGS directs
       const { data: directBookings, error: directErr } = await supabase
         .from("bookings")
@@ -140,13 +141,13 @@ export default function ProDashboardMissions() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [proId]);
 
   /* ------------------------------------------------------------------
      🔁 Initialisation + écoute des events globaux
   ------------------------------------------------------------------ */
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!proId) return;
 
     fetchMissions();
 
@@ -158,7 +159,7 @@ export default function ProDashboardMissions() {
       if (
         table === "booking_notifications" &&
         action === "INSERT" &&
-        payload?.new?.pro_id === session.user.id
+        payload?.new?.pro_id === proId
       ) {
         const bookingId = payload.new.booking_id;
         if (bookingId) {
@@ -178,7 +179,7 @@ export default function ProDashboardMissions() {
     return () => {
       window.removeEventListener("supabase-update", handler);
     };
-  }, [session?.user?.id]);
+  }, [fetchMissions, proId]);
 
   /* ------------------------------------------------------------------
      ❌ Supprimer une demande
@@ -189,7 +190,7 @@ export default function ProDashboardMissions() {
         .from("booking_notifications")
         .delete()
         .eq("booking_id", booking.id)
-        .eq("pro_id", session.user.id);
+        .eq("pro_id", proId);
 
       setToast({ message: "❌ Request deleted", type: "info" });
       fetchMissions();

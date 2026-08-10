@@ -2,16 +2,19 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export default function LoginModal({ onClose, onSignup }) {
   const { login, user, loading } = useUser();
   const navigate = useNavigate();
+  const onCloseRef = useRef(onClose);
+
+  onCloseRef.current = onClose;
 
   // 🔥 Dès que user est chargé → redirection automatique
   useEffect(() => {
     if (!loading && user) {
-      onClose();
+      onCloseRef.current();
 
       if (user.activeRole === "pro") {
         navigate("/prodashboard");
@@ -19,7 +22,7 @@ export default function LoginModal({ onClose, onSignup }) {
         navigate("/dashboard");
       }
     }
-  }, [user, loading]);
+  }, [loading, navigate, user]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

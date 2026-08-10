@@ -14,6 +14,7 @@ jobs:
     env:
       E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
       E2E_SUPABASE_URL: ${{ vars.E2E_SUPABASE_URL }}
+      E2E_VERCEL_BYPASS_SECRET: ${{ secrets.E2E_VERCEL_BYPASS_SECRET }}
       E2E_CLIENT_EMAIL: ${{ secrets.E2E_CLIENT_EMAIL }}
       E2E_CLIENT_PASSWORD: ${{ secrets.E2E_CLIENT_PASSWORD }}
       E2E_PRO_EMAIL: ${{ secrets.E2E_PRO_EMAIL }}

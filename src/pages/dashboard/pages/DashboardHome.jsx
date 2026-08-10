@@ -1,5 +1,5 @@
 // 📄 src/pages/dashboard/pages/DashboardHome.jsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -11,6 +11,7 @@ export default function DashboardHome() {
   const { user } = useUser();
   const { notifications } = useNotifications();
   const navigate = useNavigate();
+  const clientId = user?.id;
 
   const [counts, setCounts] = useState({
     pending: 0,
@@ -26,11 +27,11 @@ export default function DashboardHome() {
      📌 fetchStats() – le cœur du dashboard client
      (Fusion bookings + missions identique à Reservations.jsx)
   -------------------------------------------------------------- */
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
+    if (!clientId) return;
+
     try {
       setLoading(true);
-
-      const clientId = user.id;
 
       const { data: bookings } = await supabase
         .from("bookings")
@@ -59,13 +60,13 @@ export default function DashboardHome() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [clientId]);
 
   /* --------------------------------------------------------------
      🔁 Sync avec NotificationContext (réaltime)
   -------------------------------------------------------------- */
   useEffect(() => {
-    if (!user?.id) return;
+    if (!clientId) return;
     fetchStats();
 
     const handler = () => fetchStats();
@@ -74,13 +75,13 @@ export default function DashboardHome() {
     return () => {
       window.removeEventListener("supabase-update", handler);
     };
-  }, [user?.id]);
+  }, [clientId, fetchStats]);
 
   /* --------------------------------------------------------------
      📸 Load profile picture (cache local)
   -------------------------------------------------------------- */
   useEffect(() => {
-    if (!user?.id) return;
+    if (!clientId) return;
 
     const KEY = "glossed_client_photo";
     const cached = localStorage.getItem(KEY);
@@ -93,7 +94,7 @@ export default function DashboardHome() {
     supabase
       .from("users")
       .select("profile_photo")
-      .eq("id", user.id)
+      .eq("id", clientId)
       .single()
       .then(({ data }) => {
         if (data?.profile_photo) {
@@ -101,7 +102,7 @@ export default function DashboardHome() {
           localStorage.setItem(KEY, data.profile_photo);
         }
       });
-  }, [user?.id]);
+  }, [clientId]);
 
   const firstName = user?.first_name || "there";
 
