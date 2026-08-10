@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
+import { useNotifications } from "@/context/NotificationContext";
 import Toast from "@/components/ui/Toast";
 
 const LANGS = [
@@ -30,10 +31,17 @@ const THEMES = [
 
 export default function DashboardSettingsUnified() {
   const { user, isPro } = useUser();
+  const { markEventTypesRead } = useNotifications();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    if (user?.id) {
+      markEventTypesRead(["verification_approved", "verification_rejected"]);
+    }
+  }, [markEventTypesRead, user?.id]);
 
   // 🔧 Préférences d'app (stockées dans public.users)
   const [prefs, setPrefs] = useState({
@@ -200,6 +208,7 @@ export default function DashboardSettingsUnified() {
       console.error("❌ save settings error:", error.message);
       setToast({ type: "error", message: "❌ Error saving your settings." });
     } else {
+      window.dispatchEvent(new CustomEvent("notification-preferences-updated"));
       setToast({ type: "success", message: "✅ Settings updated successfully!" });
     }
   };

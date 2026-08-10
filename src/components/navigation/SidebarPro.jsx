@@ -11,6 +11,7 @@ import {
   Repeat,
   LogOut,
   ShieldCheck,
+  Bell,
 } from "lucide-react";
 import NotificationBadge from "@/components/navigation/NotificationBadge";
 
@@ -40,8 +41,27 @@ export default function SidebarPro() {
     },
 
     { name: "Account", icon: User, path: "/prodashboard/account" },
-    { name: "Settings", icon: Settings, path: "/prodashboard/settings" },
-    { name: "Payments", icon: CreditCard, path: "/prodashboard/payments" },
+    {
+      name: "Notifications",
+      icon: Bell,
+      path: "/prodashboard/notifications",
+      hasBadge: notifications.total > 0,
+      badgeCount: notifications.total,
+    },
+    {
+      name: "Settings",
+      icon: Settings,
+      path: "/prodashboard/settings",
+      hasBadge: notifications.verifications > 0,
+      badgeCount: notifications.verifications,
+    },
+    {
+      name: "Payments",
+      icon: CreditCard,
+      path: "/prodashboard/payments",
+      hasBadge: notifications.payments > 0,
+      badgeCount: notifications.payments,
+    },
     ...(isAdmin
       ? [{ name: "Verifications", icon: ShieldCheck, path: "/admin/verifications" }]
       : []),

@@ -11,6 +11,7 @@ import {
   Info,
   Repeat,
   LogOut,
+  Bell,
 } from "lucide-react";
 
 export default function DashboardMore() {
@@ -23,6 +24,7 @@ export default function DashboardMore() {
       items: [
         { label: "Account", icon: User, to: "/dashboard/account" },
         { label: "Settings", icon: Settings, to: "/dashboard/settings" },
+        { label: "Notifications", icon: Bell, to: "/dashboard/notifications" },
       ],
     },
     {

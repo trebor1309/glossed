@@ -10,6 +10,7 @@ import {
   MessageSquare,
   CreditCard,
   ShieldCheck,
+  Bell,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -41,12 +42,27 @@ export default function SidebarClient() {
     },
 
     { to: "/dashboard/account", label: "Account", icon: User },
-    { to: "/dashboard/settings", label: "Settings", icon: Settings },
+    {
+      to: "/dashboard/notifications",
+      label: "Notifications",
+      icon: Bell,
+      hasBadge: notifications.total > 0,
+      badgeCount: notifications.total,
+    },
+    {
+      to: "/dashboard/settings",
+      label: "Settings",
+      icon: Settings,
+      hasBadge: notifications.verifications > 0,
+      badgeCount: notifications.verifications,
+    },
     // ⭐ NEW: Payments
     {
       to: "/dashboard/payments",
       label: "Payments",
       icon: CreditCard,
+      hasBadge: notifications.payments > 0,
+      badgeCount: notifications.payments,
     },
     ...(isAdmin
       ? [{ to: "/admin/verifications", label: "Verifications", icon: ShieldCheck }]

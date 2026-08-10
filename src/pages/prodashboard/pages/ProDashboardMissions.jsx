@@ -22,9 +22,17 @@ const buildDate = (item) => {
   return d;
 };
 
+const missionNotificationTypes = [
+  "booking_request",
+  "mission_confirmed",
+  "cancellation_requested",
+  "mission_cancelled",
+  "mission_completed",
+];
+
 export default function ProDashboardMissions() {
   const { session } = useUser();
-  const { notifications } = useNotifications();
+  const { markEventTypesRead } = useNotifications();
   const proId = session?.user?.id;
 
   const [missions, setMissions] = useState([]);
@@ -42,6 +50,10 @@ export default function ProDashboardMissions() {
 
   // NEW badges pour nouvelles demandes (booking_notifications)
   const [newItems, setNewItems] = useState(() => new Set());
+
+  useEffect(() => {
+    if (proId) markEventTypesRead(missionNotificationTypes);
+  }, [markEventTypesRead, proId]);
 
   /* ------------------------------------------------------------------
      📌 Charger toutes les missions liées au pro
@@ -155,6 +167,14 @@ export default function ProDashboardMissions() {
       const detail = event?.detail || {};
       const { table, action, payload } = detail;
 
+      if (
+        table === "notifications" &&
+        action === "INSERT" &&
+        missionNotificationTypes.includes(payload?.new?.event_type)
+      ) {
+        markEventTypesRead(missionNotificationTypes);
+      }
+
       // 📩 Nouvelle demande via booking_notifications → badge NEW
       if (
         table === "booking_notifications" &&
@@ -179,7 +199,7 @@ export default function ProDashboardMissions() {
     return () => {
       window.removeEventListener("supabase-update", handler);
     };
-  }, [fetchMissions, proId]);
+  }, [fetchMissions, markEventTypesRead, proId]);
 
   /* ------------------------------------------------------------------
      ❌ Supprimer une demande

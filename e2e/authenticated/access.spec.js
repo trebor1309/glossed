@@ -10,6 +10,10 @@ test("a client session survives reload and cannot enter pro or admin routes", as
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Welcome back");
 
+  await page.goto("/dashboard/notifications", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/dashboard\/notifications$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Notifications" })).toBeVisible();
+
   await page.goto("/prodashboard", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/dashboard$/);
 
@@ -24,6 +28,10 @@ test("a professional can use pro routes but cannot enter the admin review", asyn
   await page.goto("/prodashboard/missions", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/prodashboard\/missions$/);
   await expect(page.getByRole("heading", { level: 1, name: "My Missions" })).toBeVisible();
+
+  await page.goto("/prodashboard/notifications", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/prodashboard\/notifications$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Notifications" })).toBeVisible();
 
   await page.goto("/admin/verifications", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/dashboard$/);

@@ -32,6 +32,7 @@ import DashboardAccount from "@/pages/dashboard/pages/DashboardAccount";
 import DashboardSettings from "@/pages/dashboard/pages/DashboardSettings";
 import DashboardMore from "@/pages/dashboard/pages/DashboardMore";
 import DashboardPayments from "@/pages/dashboard/pages/DashboardPayments";
+import DashboardNotifications from "@/pages/shared/DashboardNotifications";
 import PaymentSuccess from "@/pages/dashboard/payment/Success";
 
 // Dashboard — Pro
@@ -126,6 +127,7 @@ export default function AppRouter() {
         <Route path="settings" element={<DashboardSettings />} />
         <Route path="more" element={<DashboardMore />} />
         <Route path="payments" element={<DashboardPayments />} />
+        <Route path="notifications" element={<DashboardNotifications />} />
 
         {/* 💬 Client Chat */}
         <Route path="messages" element={<ChatLayout leftPanel={<DashboardMessages />} />}>
@@ -165,6 +167,7 @@ export default function AppRouter() {
         <Route path="settings" element={<ProDashboardSettings />} />
         <Route path="account" element={<ProDashboardAccount />} />
         <Route path="more" element={<ProDashboardMore />} />
+        <Route path="notifications" element={<DashboardNotifications />} />
 
         {/* 💬 Pro Chat */}
         <Route path="messages" element={<ChatLayout leftPanel={<ProDashboardMessages />} />}>

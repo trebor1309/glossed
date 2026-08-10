@@ -1,5 +1,4 @@
-// 📄 src/context/NotificationContext.jsx
-import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import Toast from "@/components/ui/Toast";
@@ -7,118 +6,198 @@ import Toast from "@/components/ui/Toast";
 const NotificationContext = createContext();
 export const useNotifications = () => useContext(NotificationContext);
 
+const emptyNotifications = {
+  total: 0,
+  clientOffers: 0,
+  proBookings: 0,
+  proCancellations: 0,
+  payments: 0,
+  verifications: 0,
+};
+
+const defaultPreferences = {
+  notifications_push: true,
+  notif_new_messages: true,
+  notif_job_alerts: true,
+  notif_booking_updates: true,
+};
+
+function toastEnabled(preferences, eventType) {
+  if (!preferences.notifications_push) return false;
+  if (eventType === "new_message") return preferences.notif_new_messages;
+  if (eventType === "booking_request") return preferences.notif_job_alerts;
+  if (
+    [
+      "offer_received",
+      "mission_confirmed",
+      "cancellation_requested",
+      "mission_cancelled",
+      "mission_completed",
+      "payment_confirmed",
+      "refund_completed",
+    ].includes(eventType)
+  ) {
+    return preferences.notif_booking_updates;
+  }
+  return true;
+}
+
 export function NotificationProvider({ children }) {
   const { user } = useUser();
-
-  const [notifications, setNotifications] = useState({
-    clientOffers: 0,
-    proBookings: 0,
-    payments: 0,
-  });
-
-  // 🔔 Nouveau compteur global
+  const userId = user?.id;
+  const [notifications, setNotifications] = useState(emptyNotifications);
   const [newMessages, setNewMessages] = useState(0);
-
-  // Chat actuellement ouvert
-  const [chatOpenId, setChatOpenId] = useState(null);
-
   const [toast, setToast] = useState(null);
-  const channelsRef = useRef([]);
+  const preferencesRef = useRef(defaultPreferences);
 
-  const pushNotification = (message, type = "info") => {
+  const pushNotification = useCallback((message, type = "info") => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+  }, []);
 
-  const broadcast = (table, action, payload) => {
+  const broadcast = useCallback((table, action, payload) => {
     window.dispatchEvent(
       new CustomEvent("supabase-update", {
         detail: { table, action, payload },
       })
     );
-  };
-
-  const resetNotification = (type) => {
-    setNotifications((prev) => ({ ...prev, [type]: 0 }));
-  };
-
-  // Écoute : quel chat est ouvert ?
-  useEffect(() => {
-    const handler = (e) => setChatOpenId(e.detail);
-    window.addEventListener("chat-open", handler);
-    return () => window.removeEventListener("chat-open", handler);
   }, []);
 
-  // Reset du badge messages quand on ouvre un chat
-  useEffect(() => {
-    if (chatOpenId) setNewMessages(0);
-  }, [chatOpenId]);
+  const refreshPreferences = useCallback(async () => {
+    if (!userId) {
+      preferencesRef.current = defaultPreferences;
+      return;
+    }
 
-  // ------------------------------------------------------
-  // 🔥 Main realtime logic
-  // ------------------------------------------------------
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const userId = user.id;
-
-    // Nettoyage
-    channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
-    channelsRef.current = [];
-
-    // -------------------------------
-    // 🔥 Realtime messages
-    // -------------------------------
-    const msgChannel = supabase
-      .channel(`messages_rt_${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-        },
-        (payload) => {
-          const msg = payload.new;
-
-          // Ignorer mes propres messages
-          if (msg.sender_id === userId) return;
-
-          // Si je suis dans ce chat → ne pas notifier
-          if (msg.chat_id === chatOpenId) return;
-
-          // Sinon : badge + toast
-          setNewMessages((n) => n + 1);
-
-          pushNotification("💬 New message received", "success");
-        }
+    const { data, error } = await supabase
+      .from("users")
+      .select(
+        "notifications_push, notif_push, notif_new_messages, notif_job_alerts, notif_booking_updates"
       )
-      .subscribe();
+      .eq("id", userId)
+      .maybeSingle();
 
-    channelsRef.current.push(msgChannel);
+    if (error) {
+      console.error("Unable to load notification preferences:", error);
+      return;
+    }
 
-    // -------------------------------
-    // CLIENT realtime
-    // -------------------------------
-    const clientChannel = supabase
-      .channel(`client_realtime_${userId}`)
+    preferencesRef.current = {
+      notifications_push: data?.notifications_push ?? data?.notif_push ?? true,
+      notif_new_messages: data?.notif_new_messages ?? true,
+      notif_job_alerts: data?.notif_job_alerts ?? true,
+      notif_booking_updates: data?.notif_booking_updates ?? true,
+    };
+  }, [userId]);
+
+  const refreshSummary = useCallback(async () => {
+    if (!userId) {
+      setNotifications(emptyNotifications);
+      setNewMessages(0);
+      return;
+    }
+
+    const { data, error } = await supabase.rpc("get_notification_summary");
+    if (error) {
+      console.error("Unable to load notification summary:", error);
+      return;
+    }
+
+    const summary = Array.isArray(data) ? data[0] : data;
+    setNotifications({
+      total: Number(summary?.unread_total || 0),
+      clientOffers: Number(summary?.client_offers || 0),
+      proBookings: Number(summary?.pro_bookings || 0),
+      proCancellations: Number(summary?.pro_cancellations || 0),
+      payments: Number(summary?.payments || 0),
+      verifications: Number(summary?.verifications || 0),
+    });
+    setNewMessages(Number(summary?.unread_messages || 0));
+  }, [userId]);
+
+  const markEventTypesRead = useCallback(
+    async (eventTypes) => {
+      if (!userId || !eventTypes?.length) return false;
+      const { error } = await supabase.rpc("mark_notifications_read", {
+        p_event_types: eventTypes,
+        p_entity_type: null,
+        p_entity_id: null,
+        p_mark_all: false,
+      });
+      if (error) {
+        console.error("Unable to mark notifications as read:", error);
+        return false;
+      }
+      await refreshSummary();
+      return true;
+    },
+    [refreshSummary, userId]
+  );
+
+  const markEntityRead = useCallback(
+    async (entityType, entityId) => {
+      if (!userId || !entityType || !entityId) return false;
+      const { error } = await supabase.rpc("mark_notifications_read", {
+        p_event_types: null,
+        p_entity_type: entityType,
+        p_entity_id: entityId,
+        p_mark_all: false,
+      });
+      if (error) {
+        console.error("Unable to mark entity notifications as read:", error);
+        return false;
+      }
+      await refreshSummary();
+      return true;
+    },
+    [refreshSummary, userId]
+  );
+
+  const markAllRead = useCallback(async () => {
+    if (!userId) return false;
+    const { error } = await supabase.rpc("mark_notifications_read", {
+      p_event_types: null,
+      p_entity_type: null,
+      p_entity_id: null,
+      p_mark_all: true,
+    });
+    if (error) {
+      console.error("Unable to mark all notifications as read:", error);
+      return false;
+    }
+    await refreshSummary();
+    return true;
+  }, [refreshSummary, userId]);
+
+  useEffect(() => {
+    refreshPreferences();
+    refreshSummary();
+
+    const handlePreferencesUpdated = () => refreshPreferences();
+    window.addEventListener("notification-preferences-updated", handlePreferencesUpdated);
+    return () => {
+      window.removeEventListener("notification-preferences-updated", handlePreferencesUpdated);
+    };
+  }, [refreshPreferences, refreshSummary]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const notificationChannel = supabase
+      .channel(`notifications_${userId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
-          table: "missions",
-          filter: `client_id=eq.${userId}`,
+          table: "notifications",
+          filter: `recipient_id=eq.${userId}`,
         },
         (payload) => {
-          if (payload.new.status === "proposed") {
-            setNotifications((prev) => ({
-              ...prev,
-              clientOffers: prev.clientOffers + 1,
-            }));
-            pushNotification("💌 New offer received!", "success");
-            broadcast("missions", "INSERT", payload);
+          refreshSummary();
+          if (toastEnabled(preferencesRef.current, payload.new.event_type)) {
+            pushNotification(payload.new.title || "New notification", "success");
           }
+          broadcast("notifications", "INSERT", payload);
         }
       )
       .on(
@@ -126,134 +205,71 @@ export function NotificationProvider({ children }) {
         {
           event: "UPDATE",
           schema: "public",
-          table: "missions",
-          filter: `client_id=eq.${userId}`,
+          table: "notifications",
+          filter: `recipient_id=eq.${userId}`,
         },
         (payload) => {
-          const status = payload.new.status;
-
-          if (status === "confirmed") {
-            pushNotification("💳 Your booking was confirmed!", "success");
-          } else if (status === "cancelled") {
-            pushNotification("❌ Your booking was cancelled.", "info");
-          }
-          // pour cancel_requested côté client, on ne spam pas, il a déjà eu un confirm modal
-
-          // 🔁 Toujours broadcast → DashboardReservations se met à jour
-          broadcast("missions", "UPDATE", payload);
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "payments",
-          filter: `client_id=eq.${userId}`,
-        },
-        (payload) => {
-          setNotifications((prev) => ({
-            ...prev,
-            payments: prev.payments + 1,
-          }));
-          pushNotification("💰 Payment received!", "success");
-          broadcast("payments", "INSERT", payload);
+          refreshSummary();
+          broadcast("notifications", "UPDATE", payload);
         }
       )
       .subscribe();
 
-    channelsRef.current.push(clientChannel);
+    const clientChannel = supabase
+      .channel(`client_domain_updates_${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "missions", filter: `client_id=eq.${userId}` },
+        (payload) => broadcast("missions", payload.eventType, payload)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments", filter: `client_id=eq.${userId}` },
+        (payload) => broadcast("payments", payload.eventType, payload)
+      )
+      .subscribe();
 
-    // -------------------------------
-    // PRO realtime
-    // -------------------------------
     const proChannel = supabase
-      .channel(`pro_realtime_${userId}`)
+      .channel(`pro_domain_updates_${userId}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "booking_notifications",
           filter: `pro_id=eq.${userId}`,
         },
-        async (payload) => {
-          const { booking_id } = payload.new;
-          const { data: b } = await supabase
-            .from("bookings")
-            .select("service")
-            .eq("id", booking_id)
-            .single();
-
-          setNotifications((prev) => ({
-            ...prev,
-            proBookings: prev.proBookings + 1,
-          }));
-
-          pushNotification(`📩 New booking request: ${b?.service || ""}`, "success");
-          broadcast("booking_notifications", "INSERT", payload);
-        }
+        (payload) => broadcast("booking_notifications", payload.eventType, payload)
       )
       .on(
         "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "missions",
-          filter: `pro_id=eq.${userId}`,
-        },
-        (payload) => {
-          const status = payload.new.status;
-
-          if (status === "confirmed") {
-            pushNotification(
-              `💰 Your offer for "${payload.new.service}" has been paid!`,
-              "success"
-            );
-          } else if (status === "cancel_requested") {
-            pushNotification(
-              `⚠️ ${payload.new.service}: the client requested a cancellation.`,
-              "info"
-            );
-          } else if (status === "cancelled") {
-            pushNotification(`❌ "${payload.new.service}" was cancelled.`, "info");
-          }
-
-          // 🔁 Toujours broadcast → ProDashboardMissions se met à jour
-          broadcast("missions", "UPDATE", payload);
-        }
+        { event: "*", schema: "public", table: "missions", filter: `pro_id=eq.${userId}` },
+        (payload) => broadcast("missions", payload.eventType, payload)
       )
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "payments",
-          filter: `pro_id=eq.${userId}`,
-        },
-        (payload) => {
-          pushNotification("💸 New payout received!", "success");
-          broadcast("payments", "INSERT", payload);
-        }
+        { event: "*", schema: "public", table: "payments", filter: `pro_id=eq.${userId}` },
+        (payload) => broadcast("payments", payload.eventType, payload)
       )
       .subscribe();
 
-    channelsRef.current.push(proChannel);
-
     return () => {
-      channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
-      channelsRef.current = [];
+      supabase.removeChannel(notificationChannel);
+      supabase.removeChannel(clientChannel);
+      supabase.removeChannel(proChannel);
     };
-  }, [user?.id, chatOpenId]);
+  }, [broadcast, pushNotification, refreshSummary, userId]);
 
   return (
     <NotificationContext.Provider
       value={{
         notifications,
         newMessages,
-        resetNotification,
         pushNotification,
-        setNewMessages,
+        refreshSummary,
+        markEventTypesRead,
+        markEntityRead,
+        markAllRead,
       }}
     >
       {children}
