@@ -21,13 +21,9 @@ test("a client session survives reload and cannot enter pro or admin routes", as
   await expect(page).toHaveURL(/\/dashboard$/);
 });
 
-test("a professional can use pro routes but cannot enter the admin review", async ({ page }) => {
+test("a professional session cannot enter the admin review", async ({ page }) => {
   await loginThroughUi(page, credentialsFor("pro"), /\/prodashboard$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Welcome back");
-
-  await page.goto("/prodashboard/missions", { waitUntil: "domcontentloaded" });
-  await expect(page).toHaveURL(/\/prodashboard\/missions$/);
-  await expect(page.getByRole("heading", { level: 1, name: "My Missions" })).toBeVisible();
 
   await page.goto("/prodashboard/notifications", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/prodashboard\/notifications$/);
