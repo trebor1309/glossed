@@ -47,3 +47,35 @@ test("an administrator can open the read-only verification queue", async ({ page
   ).toBeVisible();
   await expect(page.getByText(/No verification request is waiting|Pending/).first()).toBeVisible();
 });
+
+for (const account of [
+  { role: "client", home: /\/dashboard$/, messages: "/dashboard/messages" },
+  { role: "pro", home: /\/prodashboard$/, messages: "/prodashboard/messages" },
+]) {
+  test(`${account.role} conversations resolve profiles and fit a mobile viewport`, async ({
+    page,
+  }) => {
+    await loginThroughUi(page, credentialsFor(account.role), account.home);
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.getByRole("link", { name: "Messages", exact: true }).click();
+
+    await expect(page).toHaveURL(new RegExp(`${account.messages}$`));
+    await expect(page.getByRole("heading", { level: 1, name: "Messages" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("Unable to load conversations. Please try again.")).toHaveCount(0);
+
+    const conversationButtons = page.locator("ul > li > button");
+    if ((await conversationButtons.count()) > 0) {
+      const firstConversation = conversationButtons.first();
+      await expect(firstConversation).not.toContainText(/Unknown user|Glossed user/);
+      await expect(firstConversation.locator('img, [role="img"]').first()).toBeVisible();
+    }
+
+    const viewport = await page.evaluate(() => ({
+      width: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.width);
+  });
+}

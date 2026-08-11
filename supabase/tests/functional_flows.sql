@@ -36,6 +36,13 @@ update public.users
 set onboarding_completed = true, show_city = true, show_country = true
 where id::text like '20000000-%';
 update public.users
+set first_name = 'Functional', last_name = 'Client',
+    profile_photo = 'https://example.test/client-avatar.jpg'
+where id = '20000000-0000-0000-0000-000000000010';
+update public.users
+set profile_photo = 'https://example.test/pro-avatar.jpg'
+where id = '20000000-0000-0000-0000-000000000020';
+update public.users
 set latitude = 50.85,
     longitude = 4.35,
     radius_km = 25,
@@ -280,6 +287,78 @@ insert into public.messages (id, chat_id, sender_id, content) values (
   'Original content'
 );
 commit;
+
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000010', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+do $$
+declare
+  v_chat_id uuid := (select id from functional_chat_ids limit 1);
+begin
+  if (select count(*) from public.get_my_chat_summaries(null)) <> 1 then
+    raise exception 'Client chat summary is unavailable';
+  end if;
+  if (select partner_business_name from public.get_my_chat_summaries(v_chat_id))
+      <> 'Functional Pro' then
+    raise exception 'Client chat summary does not expose the professional display name';
+  end if;
+  if (select partner_profile_photo from public.get_my_chat_summaries(v_chat_id))
+      <> 'https://example.test/pro-avatar.jpg' then
+    raise exception 'Client chat summary does not expose the professional avatar';
+  end if;
+  if (select unread_count from public.get_my_chat_summaries(v_chat_id)) <> 1 then
+    raise exception 'Client chat unread count is incorrect';
+  end if;
+end
+$$;
+commit;
+
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000020', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+do $$
+declare
+  v_chat_id uuid := (select id from functional_chat_ids limit 1);
+begin
+  if (select partner_first_name from public.get_my_chat_summaries(v_chat_id))
+      <> 'Functional' then
+    raise exception 'Professional chat summary does not expose the client display name';
+  end if;
+  if (select partner_profile_photo from public.get_my_chat_summaries(v_chat_id))
+      <> 'https://example.test/client-avatar.jpg' then
+    raise exception 'Professional chat summary does not expose the client avatar';
+  end if;
+  if (select unread_count from public.get_my_chat_summaries(v_chat_id)) <> 0 then
+    raise exception 'Sender chat summary has an unexpected unread message';
+  end if;
+end
+$$;
+commit;
+
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000030', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+do $$
+begin
+  if (select count(*) from public.get_my_chat_summaries(null)) <> 0 then
+    raise exception 'An unrelated user obtained chat summaries';
+  end if;
+end
+$$;
+commit;
+
+do $$
+declare
+  v_chat_id uuid := (select id from functional_chat_ids limit 1);
+begin
+  if (select last_message from public.chats where id = v_chat_id) <> 'Original content' then
+    raise exception 'Message insertion did not update the chat preview';
+  end if;
+end
+$$;
 
 begin;
 set local role authenticated;

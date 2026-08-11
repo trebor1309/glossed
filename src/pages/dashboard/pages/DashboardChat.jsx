@@ -1,68 +1,46 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
-import { useUser } from "@/context/UserContext";
-
+import { useNavigate, useParams } from "react-router-dom";
 import ChatHeader from "@/components/chat/ChatHeader";
 import ChatRoom from "@/components/chat/ChatRoom";
+import { useUser } from "@/context/UserContext";
+import { getMyChat } from "@/lib/chat";
 
 export default function DashboardChat() {
-  const { chat_id } = useParams();
-  const { user } = useUser(); // ✅ on prend l'utilisateur complet
+  const { chat_id: chatId } = useParams();
+  const { user } = useUser();
   const navigate = useNavigate();
-
   const [chatInfo, setChatInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchChatInfo = useCallback(async () => {
     setLoading(true);
-
-    const { data, error } = await supabase
-      .from("chats")
-      .select(
-        `
-    id,
-    mission_id,
-    pro_id,
-    client_id,
-    missions:mission_id ( service ),
-    pro:pro_id (
-      id,
-      username,
-      first_name,
-      last_name,
-      business_name,
-      profile_photo
-    ),
-    client:client_id (
-      id,
-      username,
-      first_name,
-      last_name,
-      profile_photo
-    )
-  `
-      )
-      .eq("id", chat_id)
-      .single();
-
-    if (!error) setChatInfo(data);
-    setLoading(false);
-  }, [chat_id]);
+    try {
+      setChatInfo(await getMyChat(chatId));
+      setError(null);
+    } catch (fetchError) {
+      console.error("Unable to load chat:", fetchError);
+      setChatInfo(null);
+      setError("Unable to load this conversation. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [chatId]);
 
   useEffect(() => {
-    if (chat_id) fetchChatInfo();
-  }, [chat_id, fetchChatInfo]);
+    if (chatId) fetchChatInfo();
+  }, [chatId, fetchChatInfo]);
 
   if (loading) return <p className="p-6 text-gray-500">Loading chat...</p>;
 
-  if (!chatInfo) {
+  if (error || !chatInfo) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-gray-600">Chat not found.</p>
+      <div className="w-full min-w-0 p-6 text-center">
+        <p className="text-gray-600">{error || "Chat not found."}</p>
         <button
+          type="button"
           onClick={() => navigate(-1)}
-          className="mt-4 px-4 py-2 rounded-full bg-rose-600 text-white"
+          className="mt-4 rounded-full bg-rose-600 px-4 py-2 text-white"
         >
           Go back
         </button>
@@ -71,13 +49,13 @@ export default function DashboardChat() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto h-[calc(100vh-6rem)] flex flex-col">
+    <div className="mx-auto flex h-full w-full min-w-0 max-w-full flex-col overflow-hidden">
       <ChatHeader
         onBack={() => navigate("/dashboard/messages")}
-        partner={chatInfo.pro} // pour un client, le partenaire = le pro
+        partner={chatInfo.partner}
         service={chatInfo.missions?.service}
       />
-      <ChatRoom chatId={chat_id} user={user} /> {/* ✅ FIX */}
+      <ChatRoom chatId={chatId} user={user} />
     </div>
   );
 }

@@ -1,185 +1,39 @@
-import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
-
-import ChatList from "@/components/chat/ChatList";
 import ChatEmptyState from "@/components/chat/ChatEmptyState";
+import ChatList from "@/components/chat/ChatList";
+import { useChatList } from "@/components/chat/hooks/useChatList";
+import { useUser } from "@/context/UserContext";
 
 export default function ProDashboardMessages() {
   const { session } = useUser();
-  const proId = session?.user?.id;
+  const userId = session?.user?.id;
   const navigate = useNavigate();
-
-  const [chats, setChats] = useState([]);
-  const [unreadMap, setUnreadMap] = useState({});
-  const [loading, setLoading] = useState(true);
-
-  // -------------------------------------------------------------
-  // 🔢 Non-lus côté PRO
-  // -------------------------------------------------------------
-  const fetchUnreadMap = useCallback(
-    async (chatRows) => {
-      const ids = chatRows.map((c) => c.id);
-      if (!ids.length || !proId) return setUnreadMap({});
-
-      const { data, error } = await supabase
-        .from("messages")
-        .select("chat_id")
-        .in("chat_id", ids)
-        .neq("sender_id", proId)
-        .is("read_at", null);
-
-      if (error) {
-        console.error("Unread fetch error (pro):", error);
-        return;
-      }
-
-      const map = {};
-      for (const row of data || []) map[row.chat_id] = true;
-
-      setUnreadMap(map);
-    },
-    [proId]
-  );
-
-  // -------------------------------------------------------------
-  // 📌 Charger les chats + dernier message
-  // -------------------------------------------------------------
-  const fetchChats = useCallback(async () => {
-    if (!proId) return;
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from("chats")
-      .select(
-        `
-        id,
-        mission_id,
-        pro_id,
-        client_id,
-        updated_at,
-
-        missions:mission_id ( service ),
-
-        pro:pro_id (
-          id,
-          username,
-          first_name,
-          last_name,
-          business_name,
-          profile_photo
-        ),
-
-        client:client_id (
-          id,
-          username,
-          first_name,
-          last_name,
-          profile_photo
-        ),
-
-        messages (
-          id,
-          content,
-          attachment_url,
-          created_at,
-          read_at,
-          sender_id
-        )
-      `
-      )
-      .eq("pro_id", proId)
-      .order("updated_at", { ascending: false });
-
-    if (error) {
-      console.error("Chats fetch error (pro):", error);
-      setChats([]);
-      setUnreadMap({});
-      setLoading(false);
-      return;
-    }
-
-    // 🔥 Normaliser le dernier message
-    const normalized = (data || []).map((chat) => {
-      const sorted = [...(chat.messages || [])].sort(
-        (a, b) => new Date(b.created_at) - new Date(a.created_at)
-      );
-      return {
-        ...chat,
-        last_message_obj: sorted[0] || null,
-      };
-    });
-
-    setChats(normalized);
-    await fetchUnreadMap(normalized);
-    setLoading(false);
-  }, [fetchUnreadMap, proId]);
-
-  // -------------------------------------------------------------
-  // 📡 Realtime : INSERT + UPDATE (read_at)
-  // -------------------------------------------------------------
-  useEffect(() => {
-    if (!proId) return;
-
-    fetchChats();
-
-    const channel = supabase
-      .channel("realtime:messages_pro")
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, (payload) => {
-        const msg = payload.new;
-        const chatId = msg.chat_id;
-
-        // --- Mise à jour du dernier message dans la liste ---
-        setChats((prev) =>
-          prev.map((chat) =>
-            chat.id === chatId
-              ? {
-                  ...chat,
-                  updated_at: msg.created_at,
-                  last_message_obj: msg,
-                }
-              : chat
-          )
-        );
-
-        // --- INSERT : nouveau message ---
-        if (payload.eventType === "INSERT") {
-          if (msg.sender_id !== proId) {
-            setUnreadMap((prev) => ({ ...prev, [chatId]: true }));
-          }
-        }
-
-        // --- UPDATE : read_at vient d'être modifié ---
-        if (payload.eventType === "UPDATE") {
-          if (msg.sender_id !== proId && msg.read_at !== null) {
-            setUnreadMap((prev) => {
-              const copy = { ...prev };
-              delete copy[chatId];
-              return copy;
-            });
-          }
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchChats, proId]);
+  const { chats, unreadMap, loading, error, retry } = useChatList(userId);
 
   const openChat = (chat) => navigate(`/prodashboard/messages/${chat.id}`);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Messages</h1>
+    <div className="w-full min-w-0 max-w-full px-3 py-5 sm:px-4 sm:py-6">
+      <h1 className="mb-6 text-2xl font-bold text-gray-800">Messages</h1>
 
-      {loading && <p className="text-gray-500 text-sm">Loading conversations...</p>}
+      {loading && <p className="text-sm text-gray-500">Loading conversations...</p>}
 
-      {!loading && chats.length === 0 && <ChatEmptyState />}
+      {!loading && error && (
+        <div
+          className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700"
+          role="alert"
+        >
+          <p>{error}</p>
+          <button type="button" onClick={() => retry()} className="mt-2 font-semibold underline">
+            Try again
+          </button>
+        </div>
+      )}
 
-      {!loading && chats.length > 0 && (
-        <ChatList chats={chats} onOpenChat={openChat} userRole="pro" unreadMap={unreadMap} />
+      {!loading && !error && chats.length === 0 && <ChatEmptyState />}
+
+      {!loading && !error && chats.length > 0 && (
+        <ChatList chats={chats} onOpenChat={openChat} unreadMap={unreadMap} />
       )}
     </div>
   );

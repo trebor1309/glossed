@@ -1,153 +1,176 @@
-// 📄 src/components/chat/ChatInput.jsx
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
+import { Image as ImageIcon, Send } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import { Send, Image as ImageIcon } from "lucide-react";
 
-export default function ChatInput({ chatId, user }) {
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const lastTypingSent = useRef(0);
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 2048;
 
-  // Nom à afficher dans "is typing"
-  const typingName =
-    user?.user_metadata?.business_name ||
-    user?.user_metadata?.first_name ||
-    user?.email ||
-    "Someone";
+async function compressImage(file, quality = 0.8) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
 
-  // --- Compression image ---
-  async function compressImage(file, quality = 0.7) {
-    const bmp = await createImageBitmap(file);
-    const canvas = document.createElement("canvas");
-    canvas.width = bmp.width;
-    canvas.height = bmp.height;
-
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(bmp, 0, 0);
-
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
-    });
+  if (!context) {
+    bitmap.close();
+    throw new Error("This image cannot be processed by your browser.");
   }
 
-  // --- Upload image ---
-  const uploadImage = async (file) => {
-    const filename = `${user.id}_${Date.now()}.jpg`;
-    const path = `${chatId}/${filename}`;
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
 
-    const compressed = await compressImage(file);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("This image cannot be compressed."))),
+      "image/jpeg",
+      quality
+    );
+  });
+}
 
-    const { error: uploadError } = await supabase.storage
-      .from("chat_attachments")
-      .upload(path, compressed, {
-        contentType: "image/jpeg",
-      });
+export default function ChatInput({ chatId, user, onTyping }) {
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState(null);
+  const lastTypingSent = useRef(0);
 
-    if (uploadError) {
-      console.error("Image upload error:", uploadError);
-      return null;
-    }
-
-    return path;
-  };
-
-  // --- Envoyer message (texte / image) ---
-  const sendMessage = async (content, attachment_url = null) => {
-    const { error } = await supabase.from("messages").insert({
+  const sendMessage = async (content, attachmentUrl = null) => {
+    const { error: sendError } = await supabase.from("messages").insert({
       chat_id: chatId,
       sender_id: user.id,
       content,
-      attachment_url,
+      attachment_url: attachmentUrl,
     });
+    if (sendError) throw sendError;
+  };
 
-    if (!error) {
-      await supabase
-        .from("chats")
-        .update({
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", chatId);
+  const submitText = async () => {
+    const content = text.trim();
+    if (!content || sending || !chatId || !user?.id) return;
+
+    setSending(true);
+    setError(null);
+    try {
+      await sendMessage(content);
+      setText("");
+    } catch (sendError) {
+      console.error("Message send error:", sendError);
+      setError("Your message could not be sent. Please try again.");
+    } finally {
+      setSending(false);
     }
   };
 
-  // --- Submit texte ---
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    if (!text.trim() || sending) return;
-
-    setSending(true);
-    await sendMessage(text.trim(), null);
-    setText("");
-    setSending(false);
+  const onSubmit = async (event) => {
+    event.preventDefault();
+    await submitText();
   };
 
-  // --- Envoi image ---
-  const onImageSelect = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const onImageSelect = async (event) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file || sending || !chatId || !user?.id) return;
+
+    setError(null);
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      input.value = "";
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError("The image must be smaller than 10 MB.");
+      input.value = "";
+      return;
+    }
 
     setSending(true);
-    const url = await uploadImage(file);
-    if (url) await sendMessage(null, url);
-    setSending(false);
+    let uploadedPath = null;
+    try {
+      const compressed = await compressImage(file);
+      const filename = `${user.id}_${Date.now()}_${crypto.randomUUID()}.jpg`;
+      uploadedPath = `${chatId}/${filename}`;
+      const { error: uploadError } = await supabase.storage
+        .from("chat_attachments")
+        .upload(uploadedPath, compressed, { contentType: "image/jpeg" });
+      if (uploadError) throw uploadError;
+
+      await sendMessage(null, uploadedPath);
+    } catch (uploadError) {
+      console.error("Image message error:", uploadError);
+      if (uploadedPath) {
+        const { error: cleanupError } = await supabase.storage
+          .from("chat_attachments")
+          .remove([uploadedPath]);
+        if (cleanupError) console.error("Unable to clean up failed chat upload:", cleanupError);
+      }
+      setError("The image could not be sent. Please try again.");
+    } finally {
+      input.value = "";
+      setSending(false);
+    }
   };
 
-  // --- Typing broadcast ---
-  const sendTyping = () => {
+  const handleTyping = () => {
     const now = Date.now();
-    if (now - lastTypingSent.current < 1000) return; // throttle 1s
+    if (now - lastTypingSent.current < 1000) return;
     lastTypingSent.current = now;
-
-    supabase.channel(`typing:${chatId}`).send({
-      type: "broadcast",
-      event: "typing",
-      payload: {
-        user_id: user.id,
-        name: user.first_name || user.email,
-      },
-    });
+    onTyping?.();
   };
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="flex items-center gap-2 bg-white p-3 border-t overflow-hidden"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.3rem)" }}
-    >
-      {/* IMAGE BUTTON */}
-      <label className="p-2 cursor-pointer rounded-full hover:bg-gray-100 flex-shrink-0">
-        <ImageIcon size={22} className="text-gray-600" />
-        <input type="file" accept="image/*" className="hidden" onChange={onImageSelect} />
-      </label>
-
-      {/* TEXTAREA */}
-      <textarea
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          sendTyping();
-        }}
-        placeholder="Write a message..."
-        className="flex-1 min-w-0 border rounded-xl px-4 py-2 focus:ring-2 focus:ring-rose-400 
-                   outline-none text-gray-700 resize-none max-h-24"
-        rows={1}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            onSubmit(e);
-          }
-        }}
-      />
-
-      {/* SEND BUTTON */}
-      <button
-        type="submit"
-        disabled={sending}
-        className="flex-shrink-0 p-3 rounded-full bg-gradient-to-r from-rose-600 to-red-600 text-white 
-                   hover:scale-[1.05] transition disabled:opacity-50"
+    <div className="w-full min-w-0 shrink-0 border-t bg-white">
+      {error && (
+        <p className="px-3 pt-2 text-sm text-red-600" role="alert">
+          {error}
+        </p>
+      )}
+      <form
+        onSubmit={onSubmit}
+        className="flex w-full min-w-0 items-center gap-2 overflow-hidden p-3"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
       >
-        <Send size={18} />
-      </button>
-    </form>
+        <label className="shrink-0 cursor-pointer rounded-full p-2 hover:bg-gray-100">
+          <ImageIcon size={22} className="text-gray-600" aria-hidden="true" />
+          <span className="sr-only">Send an image</span>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={sending}
+            onChange={onImageSelect}
+          />
+        </label>
+
+        <textarea
+          value={text}
+          onChange={(event) => {
+            setText(event.target.value);
+            handleTyping();
+          }}
+          placeholder="Write a message..."
+          maxLength={5000}
+          className="min-w-0 flex-1 resize-none rounded-xl border px-3 py-2 text-gray-700 outline-none focus:ring-2 focus:ring-rose-400 sm:px-4"
+          rows={1}
+          disabled={sending}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              submitText();
+            }
+          }}
+        />
+
+        <button
+          type="submit"
+          disabled={sending || !text.trim()}
+          className="shrink-0 rounded-full bg-gradient-to-r from-rose-600 to-red-600 p-3 text-white transition hover:scale-[1.05] disabled:opacity-50"
+          aria-label="Send message"
+        >
+          <Send size={18} aria-hidden="true" />
+        </button>
+      </form>
+    </div>
   );
 }
