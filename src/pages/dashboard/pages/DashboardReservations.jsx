@@ -419,6 +419,7 @@ function ReservationSection({
                     {actions.view && (
                       <button
                         onClick={() => onView?.(b)}
+                        aria-label={`View offers for ${b.service}`}
                         className="p-2 rounded-full hover:bg-gray-100 text-rose-600"
                       >
                         <Eye size={16} />
@@ -447,6 +448,7 @@ function ReservationSection({
                     {actions.delete && (
                       <button
                         onClick={() => onDelete?.(b.id)}
+                        aria-label={`Delete ${b.service} reservation`}
                         className="p-2 rounded-full hover:bg-gray-100 text-rose-500"
                       >
                         <Trash2 size={16} />

@@ -85,8 +85,11 @@ export default function ProProposalModal({ booking, onClose, onSuccess }) {
 
         <div className="space-y-3">
           <div>
-            <label className="text-sm font-medium">Service price (€)</label>
+            <label htmlFor="proposal-service-price" className="text-sm font-medium">
+              Service price (€)
+            </label>
             <input
+              id="proposal-service-price"
               type="number"
               inputMode="decimal"
               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-rose-500"
@@ -96,8 +99,11 @@ export default function ProProposalModal({ booking, onClose, onSuccess }) {
           </div>
 
           <div>
-            <label className="text-sm font-medium">Travel fee (€)</label>
+            <label htmlFor="proposal-travel-fee" className="text-sm font-medium">
+              Travel fee (€)
+            </label>
             <input
+              id="proposal-travel-fee"
               type="number"
               inputMode="decimal"
               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-rose-500"
@@ -108,8 +114,11 @@ export default function ProProposalModal({ booking, onClose, onSuccess }) {
 
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-sm font-medium">Date</label>
+              <label htmlFor="proposal-date" className="text-sm font-medium">
+                Date
+              </label>
               <input
+                id="proposal-date"
                 type="date"
                 className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-rose-500"
                 value={form.date}
@@ -118,8 +127,11 @@ export default function ProProposalModal({ booking, onClose, onSuccess }) {
             </div>
 
             <div className="flex-1">
-              <label className="text-sm font-medium">Time</label>
+              <label htmlFor="proposal-time" className="text-sm font-medium">
+                Time
+              </label>
               <input
+                id="proposal-time"
                 type="time"
                 className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-rose-500"
                 value={form.time}
@@ -129,8 +141,11 @@ export default function ProProposalModal({ booking, onClose, onSuccess }) {
           </div>
 
           <div>
-            <label className="text-sm font-medium">Remark</label>
+            <label htmlFor="proposal-remark" className="text-sm font-medium">
+              Remark
+            </label>
             <textarea
+              id="proposal-remark"
               rows="2"
               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-rose-500"
               value={form.note}

@@ -91,9 +91,11 @@ function StepServices({ bookingData, setBookingData, onNext, targetedPro }) {
         {filteredOptions.map((opt) => {
           const selected = bookingData.services.includes(opt.id);
           return (
-            <div
+            <button
+              type="button"
               key={opt.id}
               onClick={() => toggleService(opt.id)}
+              aria-pressed={selected}
               className={`relative cursor-pointer rounded-2xl overflow-hidden border-2 group transition transform hover:scale-[1.02] ${
                 selected ? "border-rose-500 shadow-md" : "border-gray-200"
               }`}
@@ -108,7 +110,7 @@ function StepServices({ bookingData, setBookingData, onNext, targetedPro }) {
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent flex items-end justify-center pb-3 text-white font-semibold text-center text-sm sm:text-base">
                 {opt.label}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -492,6 +494,12 @@ export default function DashboardNew({ isModal = false, editBooking = null, onCl
         ]);
 
         if (error) throw error;
+
+        const { error: notificationError } = await supabase
+          .from("booking_notifications")
+          .insert({ booking_id: bookingId, pro_id: targetedPro.id });
+
+        if (notificationError) throw notificationError;
 
         setToast({
           message: `Booking sent to ${targetedPro.business_name}!`,

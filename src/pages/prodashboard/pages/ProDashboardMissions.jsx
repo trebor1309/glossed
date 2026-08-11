@@ -144,7 +144,14 @@ export default function ProDashboardMissions() {
         type: "mission",
       }));
 
-      const finalList = [...taggedDirect, ...taggedNotified, ...taggedMissions];
+      const finalList = Array.from(
+        new Map(
+          [...taggedDirect, ...taggedNotified, ...taggedMissions].map((item) => [
+            `${item.type}-${item.id}`,
+            item,
+          ])
+        ).values()
+      );
 
       setMissions(finalList);
     } catch (err) {
@@ -335,6 +342,10 @@ export default function ProDashboardMissions() {
           booking={selectedMission}
           onClose={() => setSelectedMission(null)}
           onEvaluate={(b) => setSelectedEvaluation(b)}
+          onProposalCancelled={() => {
+            setSelectedMission(null);
+            fetchMissions();
+          }}
         />
       )}
 
