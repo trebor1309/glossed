@@ -7,6 +7,7 @@ const vercelProtectionBypass = process.env.E2E_VERCEL_BYPASS_SECRET?.trim();
 const allowedSupabasePostPaths = [
   "/rest/v1/rpc/is_app_admin",
   "/rest/v1/rpc/list_pending_professional_verifications",
+  "/rest/v1/rpc/get_notification_summary",
 ];
 
 function isAllowedReadOnlySupabasePost(pathname) {

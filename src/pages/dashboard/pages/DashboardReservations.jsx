@@ -19,9 +19,17 @@ const buildDate = (item) => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
+const reservationNotificationTypes = [
+  "offer_received",
+  "mission_confirmed",
+  "cancellation_requested",
+  "mission_cancelled",
+  "mission_completed",
+];
+
 export default function DashboardReservations() {
   const { session } = useUser();
-  const { notifications } = useNotifications();
+  const { markEventTypesRead } = useNotifications();
   const clientId = session?.user?.id;
 
   const [bookings, setBookings] = useState([]);
@@ -39,6 +47,10 @@ export default function DashboardReservations() {
   const [toast, setToast] = useState(null);
 
   const [newItems, setNewItems] = useState(() => new Set());
+
+  useEffect(() => {
+    if (clientId) markEventTypesRead(reservationNotificationTypes);
+  }, [clientId, markEventTypesRead]);
 
   /* -----------------------------------------------------------
      📌 Fetch all bookings & missions (client)
@@ -108,6 +120,14 @@ export default function DashboardReservations() {
       const { table, action, payload } = event.detail || {};
 
       if (
+        table === "notifications" &&
+        action === "INSERT" &&
+        reservationNotificationTypes.includes(payload?.new?.event_type)
+      ) {
+        markEventTypesRead(reservationNotificationTypes);
+      }
+
+      if (
         table === "missions" &&
         ["INSERT", "UPDATE"].includes(action) &&
         payload?.new?.client_id === clientId &&
@@ -125,7 +145,7 @@ export default function DashboardReservations() {
 
     window.addEventListener("supabase-update", handler);
     return () => window.removeEventListener("supabase-update", handler);
-  }, [clientId, fetchBookings]);
+  }, [clientId, fetchBookings, markEventTypesRead]);
 
   /* -----------------------------------------------------------
      🗑 Delete booking

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
+import { useNotifications } from "@/context/NotificationContext";
 
 import { Download, FileText, Eye, CheckCircle, XCircle, Clock, Wallet } from "lucide-react";
 
@@ -151,6 +152,7 @@ function PaymentsList({ payments, onView, onDownloadInvoice }) {
 ------------------------------------------------------------------ */
 export default function ProDashboardPayments() {
   const { session } = useUser();
+  const { markEventTypesRead } = useNotifications();
   const proId = session?.user?.id;
 
   const [payments, setPayments] = useState([]);
@@ -161,6 +163,10 @@ export default function ProDashboardPayments() {
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [selectedMission, setSelectedMission] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
+
+  useEffect(() => {
+    if (proId) markEventTypesRead(["payment_confirmed", "refund_completed"]);
+  }, [markEventTypesRead, proId]);
 
   /* ------------------------------------------------------------------
      📡 Charger paiements

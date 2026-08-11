@@ -1,5 +1,5 @@
 // src/components/navigation/BottomNavPro.jsx
-import { Home, Calendar, DollarSign, Settings, MoreHorizontal, MessageSquare } from "lucide-react";
+import { Home, Calendar, DollarSign, MoreHorizontal, MessageSquare } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useNotifications } from "@/context/NotificationContext";
 import NotificationBadge from "@/components/navigation/NotificationBadge";
@@ -45,7 +45,10 @@ export default function ProBottomNav() {
           }`
         }
       >
-        <DollarSign size={22} />
+        <div className="relative">
+          <DollarSign size={22} />
+          {notifications.payments > 0 && <NotificationBadge count={notifications.payments} />}
+        </div>
         <span className="mt-1">Payments</span>
       </NavLink>
 
@@ -72,7 +75,12 @@ export default function ProBottomNav() {
           }`
         }
       >
-        <MoreHorizontal size={22} />
+        <div className="relative">
+          <MoreHorizontal size={22} />
+          {notifications.total > 0 && (
+            <NotificationBadge count={notifications.total} />
+          )}
+        </div>
         <span className="mt-1">More</span>
       </NavLink>
     </nav>

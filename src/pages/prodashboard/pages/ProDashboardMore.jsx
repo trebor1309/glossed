@@ -11,6 +11,7 @@ import {
   Info,
   Repeat,
   LogOut,
+  Bell,
 } from "lucide-react";
 
 export default function ProDashboardMore() {
@@ -31,6 +32,7 @@ export default function ProDashboardMore() {
       items: [
         { label: "Account", icon: User, to: "/prodashboard/account" },
         { label: "Settings", icon: Settings, to: "/prodashboard/settings" },
+        { label: "Notifications", icon: Bell, to: "/prodashboard/notifications" },
       ],
     },
     {

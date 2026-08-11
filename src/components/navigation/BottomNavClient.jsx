@@ -1,5 +1,5 @@
 // src/components/navigation/BottomNavClient.jsx
-import { Home, Calendar, User, MoreHorizontal, MessageSquare } from "lucide-react";
+import { Home, Calendar, MoreHorizontal, MessageSquare } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useNotifications } from "@/context/NotificationContext";
 import NotificationBadge from "@/components/navigation/NotificationBadge";
@@ -23,7 +23,12 @@ export default function BottomNavClient() {
       badge: newMessages, // ← NEW
     },
 
-    { to: "/dashboard/more", icon: MoreHorizontal, label: "More" },
+    {
+      to: "/dashboard/more",
+      icon: MoreHorizontal,
+      label: "More",
+      badge: notifications.total,
+    },
   ];
 
   return (
