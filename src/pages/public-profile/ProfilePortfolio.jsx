@@ -1,5 +1,3 @@
-import { Image } from "lucide-react";
-
 export default function ProfilePortfolio({ portfolio }) {
   if (!portfolio || portfolio.length === 0) {
     return <p className="text-sm text-gray-500 italic">No portfolio items uploaded yet.</p>;

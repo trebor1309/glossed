@@ -1,7 +1,6 @@
 // 📄 src/pages/dashboard/pages/DashboardHome.jsx
 import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
-import { useNotifications } from "@/context/NotificationContext";
 import { supabase } from "@/lib/supabaseClient";
 import { Calendar, Clock, CheckCircle, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -9,7 +8,6 @@ import Toast from "@/components/ui/Toast";
 
 export default function DashboardHome() {
   const { user } = useUser();
-  const { notifications } = useNotifications();
   const navigate = useNavigate();
   const clientId = user?.id;
 

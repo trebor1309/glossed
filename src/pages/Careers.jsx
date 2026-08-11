@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Briefcase, Sparkles, HeartHandshake } from "lucide-react";
+import { Briefcase, HeartHandshake } from "lucide-react";
 
 export default function Careers() {
   return (

@@ -1,21 +1,10 @@
-import { useState, useEffect } from "react";
-import { useLocation, useNavigate, Outlet } from "react-router-dom";
-import { useUser } from "../../context/UserContext";
+import { useLocation, Outlet } from "react-router-dom";
 import ProBottomNav from "../../components/navigation/BottomNavPro";
 import SidebarPro from "../../components/navigation/SidebarPro";
 
 export default function ProDashboardLayout() {
-  const { switchRole } = useUser();
-  const [active, setActive] = useState("Dashboard");
   const location = useLocation();
   const isMessagesPage = location.pathname.includes("/messages");
-
-  useEffect(() => {
-    if (location.pathname.includes("missions")) setActive("Missions");
-    else if (location.pathname.includes("payments")) setActive("Payments");
-    else if (location.pathname.includes("settings")) setActive("Settings");
-    else setActive("Dashboard");
-  }, [location.pathname]);
 
   return (
     <>

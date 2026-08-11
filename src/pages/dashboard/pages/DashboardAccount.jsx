@@ -19,7 +19,6 @@ export default function DashboardAccount() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
-  const [photoFile, setPhotoFile] = useState(null);
 
   // 🔹 Charger les infos utilisateur
   useEffect(() => {
@@ -66,7 +65,6 @@ export default function DashboardAccount() {
 
     const imageUrl = urlData.publicUrl;
     setForm((prev) => ({ ...prev, profile_photo: imageUrl }));
-    setPhotoFile(null);
 
     // Mise à jour directe dans Supabase
     await supabase.from("users").update({ profile_photo: imageUrl }).eq("id", user.id);

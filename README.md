@@ -119,5 +119,6 @@ Stripe, les flux fonctionnels principaux et la vérification des professionnels 
 
 Les tests navigateur publics et authentifiés sont automatisés. Les routes et les
 modales sont chargées à la demande, et la CI impose un budget de 500 ko au chunk
-JavaScript initial. Les prochains travaux portent sur le traitement progressif
-des avertissements du front.
+JavaScript initial. Le front passe ESLint sans avertissement ; les diagnostics
+`console.error` et `console.warn` restent explicitement autorisés. Les prochains
+travaux portent sur l'élargissement progressif des parcours fonctionnels E2E.

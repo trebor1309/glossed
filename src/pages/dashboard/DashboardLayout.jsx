@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation, useNavigate, Outlet } from "react-router-dom";
-import { useUser } from "../../context/UserContext";
+import { useLocation, Outlet } from "react-router-dom";
 import { useJsApiLoader } from "@react-google-maps/api";
 import BottomNav from "../../components/navigation/BottomNavClient";
 import Sidebar from "../../components/navigation/SidebarClient";
@@ -9,10 +8,7 @@ import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 const libraries = ["places"];
 
 export default function DashboardLayout() {
-  const { switchRole, isPro } = useUser();
-  const [active, setActive] = useState("Dashboard");
   const location = useLocation();
-  const navigate = useNavigate();
   const [toast, setToast] = useState(null);
 
   const [showNewBookingModal, setShowNewBookingModal] = useState(false);
@@ -36,23 +32,6 @@ export default function DashboardLayout() {
     window.addEventListener("open-new-booking-modal", handleOpenModal);
     return () => window.removeEventListener("open-new-booking-modal", handleOpenModal);
   }, []);
-
-  useEffect(() => {
-    if (location.pathname.includes("reservations")) setActive("My Reservations");
-    else if (location.pathname.includes("account")) setActive("My Account");
-    else if (location.pathname.includes("settings")) setActive("Settings");
-    else if (location.pathname.includes("payments")) setActive("Payments");
-    else setActive("Dashboard");
-  }, [location.pathname]);
-
-  const handleNewBookingClick = () => {
-    if (isDesktop) setShowNewBookingModal(true);
-    else navigate("/dashboard/new");
-  };
-
-  const handleBookingSuccess = () => {
-    setShowNewBookingModal(false);
-  };
 
   if (loadError)
     return (

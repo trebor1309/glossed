@@ -265,7 +265,7 @@ export default function VisualVerificationSettings() {
       if (error) throw error;
       setProfileUrl("");
       setToast({ type: "success", message: "Profile picture removed." });
-    } catch (err) {
+    } catch {
       setToast({ type: "error", message: "Error removing profile picture." });
     }
   };
@@ -343,7 +343,7 @@ export default function VisualVerificationSettings() {
 
       setPortfolio(newPortfolio);
       setToast({ type: "success", message: "Image removed from portfolio." });
-    } catch (err) {
+    } catch {
       setToast({ type: "error", message: "Error deleting portfolio image." });
     }
   };
@@ -475,7 +475,7 @@ export default function VisualVerificationSettings() {
       setVerificationRejectionReason(updatedProfile.verification_rejection_reason || null);
       await fetchUserProfile(user);
       setToast({ type: "success", message: "Document removed." });
-    } catch (err) {
+    } catch {
       setToast({ type: "error", message: "Error removing document." });
     }
   };

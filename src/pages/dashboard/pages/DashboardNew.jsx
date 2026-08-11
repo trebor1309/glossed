@@ -408,7 +408,7 @@ export default function DashboardNew({ isModal = false, editBooking = null, onCl
             } else {
               services = data.business_type.split(",").map((s) => s.trim());
             }
-          } catch (_) {
+          } catch {
             // ignore parse errors
           }
         }
