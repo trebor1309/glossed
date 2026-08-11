@@ -1,5 +1,5 @@
 // 📄 src/App.jsx
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useLocation } from "react-router-dom";
 import AppRouter from "@/router/AppRouter";
 
@@ -7,13 +7,13 @@ import ScrollToTop from "@/components/ScrollToTop";
 import Navbar from "@/components/navigation/NavbarMain";
 import Footer from "@/components/Footer";
 
-import LoginModal from "@/components/modals/LoginModal";
-import SignupModal from "@/components/modals/SignupModal";
-import ProSignupModal from "@/components/modals/ProSignupModal";
-import DownloadModal from "@/components/modals/DownloadModal";
-import UpgradeToProModal from "@/components/modals/UpgradeToProModal";
-
 import { useUser } from "@/context/UserContext";
+
+const LoginModal = lazy(() => import("@/components/modals/LoginModal"));
+const SignupModal = lazy(() => import("@/components/modals/SignupModal"));
+const ProSignupModal = lazy(() => import("@/components/modals/ProSignupModal"));
+const DownloadModal = lazy(() => import("@/components/modals/DownloadModal"));
+const UpgradeToProModal = lazy(() => import("@/components/modals/UpgradeToProModal"));
 
 function useIsMobile(breakpoint = 768) {
   return typeof window !== "undefined" && window.innerWidth < breakpoint;
@@ -61,43 +61,55 @@ export default function App() {
 
       {!isDashboardRoute && <Footer />}
 
-      {showLogin && (
-        <LoginModal
-          onClose={() => setShowLogin(false)}
-          onSignup={() => {
-            setShowLogin(false);
-            setShowSignup(true);
-          }}
-        />
-      )}
+      <Suspense
+        fallback={
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 text-sm text-gray-700"
+            role="status"
+            aria-live="polite"
+          >
+            Loading...
+          </div>
+        }
+      >
+        {showLogin && (
+          <LoginModal
+            onClose={() => setShowLogin(false)}
+            onSignup={() => {
+              setShowLogin(false);
+              setShowSignup(true);
+            }}
+          />
+        )}
 
-      {showSignup && (
-        <SignupModal
-          onClose={() => setShowSignup(false)}
-          onLogin={() => {
-            setShowSignup(false);
-            setShowLogin(true);
-          }}
-          onProSignup={() => {
-            setShowSignup(false);
-            setShowProSignup(true);
-          }}
-        />
-      )}
+        {showSignup && (
+          <SignupModal
+            onClose={() => setShowSignup(false)}
+            onLogin={() => {
+              setShowSignup(false);
+              setShowLogin(true);
+            }}
+            onProSignup={() => {
+              setShowSignup(false);
+              setShowProSignup(true);
+            }}
+          />
+        )}
 
-      {showProSignup && (
-        <ProSignupModal
-          onClose={() => setShowProSignup(false)}
-          onClientSignup={() => {
-            setShowProSignup(false);
-            setShowSignup(true);
-          }}
-        />
-      )}
+        {showProSignup && (
+          <ProSignupModal
+            onClose={() => setShowProSignup(false)}
+            onClientSignup={() => {
+              setShowProSignup(false);
+              setShowSignup(true);
+            }}
+          />
+        )}
 
-      {showDownload && <DownloadModal onClose={() => setShowDownload(false)} />}
+        {showDownload && <DownloadModal onClose={() => setShowDownload(false)} />}
 
-      {showUpgradeModal && <UpgradeToProModal onClose={() => setShowUpgradeModal(false)} />}
+        {showUpgradeModal && <UpgradeToProModal onClose={() => setShowUpgradeModal(false)} />}
+      </Suspense>
     </div>
   );
 }
