@@ -1,12 +1,13 @@
-// 📄 src/components/chat/ChatEmptyState.jsx
+import { MessageCircle } from "lucide-react";
+
 export default function ChatEmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center text-gray-500">
-      <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-        <span className="text-3xl">💬</span>
+    <div className="flex min-w-0 flex-col items-center justify-center px-4 py-20 text-center text-gray-500">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+        <MessageCircle className="h-8 w-8" aria-hidden="true" />
       </div>
       <p className="text-lg font-medium">No messages yet</p>
-      <p className="text-sm text-gray-400 max-w-xs mt-2">
+      <p className="mt-2 max-w-xs text-sm text-gray-400">
         Conversations will appear here once you confirm or accept a booking.
       </p>
     </div>

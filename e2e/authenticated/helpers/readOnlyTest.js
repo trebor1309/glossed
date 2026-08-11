@@ -8,6 +8,7 @@ const allowedSupabasePostPaths = [
   "/rest/v1/rpc/is_app_admin",
   "/rest/v1/rpc/list_pending_professional_verifications",
   "/rest/v1/rpc/get_notification_summary",
+  "/rest/v1/rpc/get_my_chat_summaries",
 ];
 
 function isAllowedReadOnlySupabasePost(pathname) {

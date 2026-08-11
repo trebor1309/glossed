@@ -1,84 +1,67 @@
-// 📄 src/components/chat/ChatList.jsx
 import { motion } from "framer-motion";
+import UserAvatar from "./UserAvatar";
 
-export default function ChatList({ chats, onOpenChat, userRole, unreadMap }) {
-  const isClient = userRole === "client";
-
+export default function ChatList({ chats, onOpenChat, unreadMap }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-      <ul className="divide-y divide-gray-100">
+    <div className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+      <ul className="min-w-0 divide-y divide-gray-100">
         {chats.map((chat) => {
-          // --- Rôle courant : le client voit le pro, le pro voit le client ---
-          const partner = isClient ? chat.pro : chat.client;
-
-          // 🧾 Nom affiché : business_name > username > first+last
+          const partner = chat.partner;
           const name =
             partner?.business_name ||
             partner?.username ||
             `${partner?.first_name || ""} ${partner?.last_name || ""}`.trim() ||
             "Glossed user";
-
-          const avatar = partner?.profile_photo || "/default-avatar.png";
-
-          // Service seulement côté client
-          const service = isClient ? chat.missions?.service : null;
-
-          // Dernier message objet
-          const last = chat.last_message_obj || null;
+          const service = chat.missions?.service;
+          const last = chat.last_message_obj;
 
           let previewText = "No messages yet";
-          if (last) {
-            if (last.attachment_url && !last.content) {
-              previewText = "📷 Photo";
-            } else if (last.content && last.content.trim().length > 0) {
-              previewText = last.content;
-            } else if (last.attachment_url) {
-              previewText = "📷 Photo";
-            }
-          }
+          if (last?.attachment_url && !last.content?.trim()) previewText = "Photo";
+          else if (last?.content?.trim()) previewText = last.content;
 
-          // Heure = celle du dernier message, fallback sur updated_at
-          let timestamp = "";
-          const tsSource = last?.created_at || chat.updated_at;
-          if (tsSource) {
-            const d = new Date(tsSource);
-            timestamp = d.toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            });
-          }
-
-          const hasUnread = !!unreadMap?.[chat.id];
+          const timestamp =
+            last?.created_at || chat.updated_at
+              ? new Date(last?.created_at || chat.updated_at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "";
+          const hasUnread = Boolean(unreadMap?.[chat.id]);
 
           return (
             <motion.li
               key={chat.id}
-              className="p-4 flex items-center gap-4 hover:bg-gray-50 cursor-pointer transition"
-              onClick={() => onOpenChat(chat)}
+              className="min-w-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <img
-                src={avatar}
-                alt={name}
-                className="w-12 h-12 rounded-full object-cover bg-gray-100 flex-shrink-0"
-              />
+              <button
+                type="button"
+                className="grid w-full min-w-0 max-w-full grid-cols-[auto,minmax(0,1fr),auto] items-center gap-3 px-3 py-4 text-left transition hover:bg-gray-50 sm:gap-4 sm:px-4"
+                onClick={() => onOpenChat(chat)}
+              >
+                <UserAvatar src={partner?.profile_photo} name={name} className="h-12 w-12" />
 
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-800 truncate">{name}</p>
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold text-gray-800">{name}</span>
+                  {service && (
+                    <span className="block truncate text-sm text-gray-500">{service}</span>
+                  )}
+                  <span className="mt-1 block truncate text-xs text-gray-400">{previewText}</span>
+                </span>
 
-                {isClient && service && <p className="text-sm text-gray-500 truncate">{service}</p>}
-
-                <p className="text-xs text-gray-400 truncate mt-1">{previewText}</p>
-              </div>
-
-              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                {timestamp && (
-                  <span className="text-xs text-gray-400 whitespace-nowrap">{timestamp}</span>
-                )}
-
-                {hasUnread && <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />}
-              </div>
+                <span className="flex shrink-0 flex-col items-end gap-1 self-stretch pt-1">
+                  {timestamp && (
+                    <span className="whitespace-nowrap text-xs text-gray-400">{timestamp}</span>
+                  )}
+                  {hasUnread && (
+                    <span
+                      className="inline-block h-2 w-2 rounded-full bg-rose-500"
+                      aria-label="Unread messages"
+                    />
+                  )}
+                </span>
+              </button>
             </motion.li>
           );
         })}

@@ -1,28 +1,34 @@
-// 📄 src/components/chat/ChatBubble.jsx
 import { useEffect, useState } from "react";
 import { createSignedStorageUrl } from "@/lib/storageUrls";
 
 export default function ChatBubble({ msg, isOwn, onImageClick }) {
-  const isImage = !!msg.attachment_url;
+  const isImage = Boolean(msg.attachment_url);
   const [attachmentUrl, setAttachmentUrl] = useState(null);
+  const [attachmentError, setAttachmentError] = useState(false);
 
   useEffect(() => {
     let active = true;
-
     if (!msg.attachment_url) {
       setAttachmentUrl(null);
+      setAttachmentError(false);
       return () => {
         active = false;
       };
     }
 
+    setAttachmentError(false);
     createSignedStorageUrl("chat_attachments", msg.attachment_url)
       .then((url) => {
-        if (active) setAttachmentUrl(url);
+        if (!active) return;
+        setAttachmentUrl(url);
+        setAttachmentError(!url);
       })
       .catch((error) => {
         console.error("Unable to sign chat attachment:", error);
-        if (active) setAttachmentUrl(null);
+        if (active) {
+          setAttachmentUrl(null);
+          setAttachmentError(true);
+        }
       });
 
     return () => {
@@ -34,18 +40,14 @@ export default function ChatBubble({ msg, isOwn, onImageClick }) {
   const timeLabel = createdAt
     ? createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
-
-  const isRead = !!msg.read_at;
-
   const rawContent = msg.content || "";
   const isSystem = rawContent.startsWith("[system]");
   const displayContent = isSystem ? rawContent.replace(/^\[system\]\s*/, "") : rawContent;
 
-  // 🎛 Rendu spécial pour messages "system"
   if (isSystem && !isImage) {
     return (
-      <div className="flex justify-center my-2 px-3">
-        <div className="px-3 py-1 rounded-full bg-gray-100 text-gray-500 text-xs text-center shadow-sm">
+      <div className="flex min-w-0 justify-center px-3 py-2">
+        <div className="max-w-full break-words rounded-full bg-gray-100 px-3 py-1 text-center text-xs text-gray-500 shadow-sm">
           {displayContent}
         </div>
       </div>
@@ -53,35 +55,41 @@ export default function ChatBubble({ msg, isOwn, onImageClick }) {
   }
 
   return (
-    <div className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
+    <div className={`flex min-w-0 ${isOwn ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[75%] rounded-2xl px-4 py-2 shadow
-        ${
+        className={`min-w-0 max-w-[85%] overflow-hidden rounded-2xl px-4 py-2 shadow sm:max-w-[75%] ${
           isOwn
-            ? "bg-gradient-to-r from-rose-500 to-red-500 text-white rounded-br-none"
-            : "bg-gray-100 text-gray-800 rounded-bl-none"
+            ? "rounded-br-none bg-gradient-to-r from-rose-500 to-red-500 text-white"
+            : "rounded-bl-none bg-gray-100 text-gray-800"
         }`}
       >
-        {/* IMAGE */}
         {isImage && attachmentUrl && (
-          <img
-            src={attachmentUrl}
-            alt="Attachment"
+          <button
+            type="button"
+            className="mb-2 block max-w-full cursor-zoom-in overflow-hidden rounded-xl"
             onClick={() => onImageClick?.(attachmentUrl)}
-            className="rounded-xl shadow-md max-h-64 mb-2 object-cover cursor-pointer hover:opacity-90 transition"
-          />
+            aria-label="Open image attachment"
+          >
+            <img
+              src={attachmentUrl}
+              alt="Attachment"
+              className="max-h-64 max-w-full object-contain transition hover:opacity-90"
+            />
+          </button>
         )}
 
-        {/* TEXTE */}
-        {displayContent && <p className="whitespace-pre-line">{displayContent}</p>}
+        {isImage && !attachmentUrl && (
+          <p className="text-sm opacity-80">
+            {attachmentError ? "Image unavailable" : "Loading image..."}
+          </p>
+        )}
+        {displayContent && <p className="whitespace-pre-wrap break-words">{displayContent}</p>}
 
-        {/* HEURE + STATUT */}
-        <p className="text-[10px] mt-1 opacity-80 flex items-center justify-end gap-1">
+        <p className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-80">
           {timeLabel && <span>{timeLabel}</span>}
-
           {isOwn && (
-            <span className={isRead ? "text-rose-200" : "text-gray-300"}>
-              {isRead ? "✓✓" : "✓"}
+            <span className={msg.read_at ? "text-rose-200" : "text-gray-300"}>
+              {msg.read_at ? "✓✓" : "✓"}
             </span>
           )}
         </p>
