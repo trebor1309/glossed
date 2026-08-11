@@ -177,7 +177,7 @@ test("client booking becomes a professional proposal and a payable client offer"
     const proPending = proPage.getByRole("listitem").filter({ hasText: address });
     await expect(proPending).toHaveCount(1, { timeout: 20_000 });
     await proPending.getByRole("button", { name: "View" }).click();
-    await expect(proPage.getByText(marker, { exact: false })).toBeVisible();
+    await expect(proPage.getByText(address, { exact: true })).toBeVisible();
     await proPage.getByRole("button", { name: "Make proposal" }).click();
 
     await proPage.getByLabel("Service price (€)").fill("42.31");
