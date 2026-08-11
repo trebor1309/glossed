@@ -11,15 +11,11 @@ import { UserProvider } from "./context/UserContext.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx"; // ← NEW
 
 function Root() {
-  const [showUpgradeModal, setShowUpgradeModal] = React.useState(false);
-  const openUpgradeModal = () => setShowUpgradeModal(true);
-  const closeUpgradeModal = () => setShowUpgradeModal(false);
-
   return (
-    <UserProvider openUpgradeModal={openUpgradeModal}>
+    <UserProvider>
       {/* 🔔 Notifications globales accessibles partout (landing + dashboards) */}
       <NotificationProvider>
-        <App showUpgradeModal={showUpgradeModal} closeUpgradeModal={closeUpgradeModal} />
+        <App />
       </NotificationProvider>
     </UserProvider>
   );

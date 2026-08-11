@@ -31,7 +31,8 @@ npm run lint       # contrôle sans modifier les fichiers
 npm run lint:e2e   # contrôle des tests et lanceurs Playwright
 npm run lint:fix   # applique les corrections ESLint disponibles
 npm run build      # build de production dans dist/
-npm run check      # lint puis build
+npm run check:bundle # vérifie le budget du chunk JavaScript initial
+npm run check      # lint, build et budget du bundle
 npm run test:e2e   # tests navigateur Playwright sans données distantes
 npm run test:e2e:auth # tests authentifiés distants en lecture seule
 ```
@@ -116,6 +117,7 @@ et les fonctions Stripe sécurisées sont versionnés dans `supabase/`. Les parc
 Stripe, les flux fonctionnels principaux et la vérification des professionnels ont
 été validés en environnement de test.
 
-Les prochains travaux portent sur l'automatisation des tests navigateur, le
-traitement progressif des avertissements du front et le découpage du bundle de
-production.
+Les tests navigateur publics et authentifiés sont automatisés. Les routes et les
+modales sont chargées à la demande, et la CI impose un budget de 500 ko au chunk
+JavaScript initial. Les prochains travaux portent sur le traitement progressif
+des avertissements du front.

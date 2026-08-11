@@ -1,7 +1,6 @@
 // src/context/UserContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import UpgradeToProModal from "@/components/modals/UpgradeToProModal";
 
 const UserContext = createContext();
 export const useUser = () => useContext(UserContext);
@@ -295,10 +294,5 @@ export function UserProvider({ children }) {
     setShowUpgradeModal,
   };
 
-  return (
-    <UserContext.Provider value={value}>
-      {children}
-      {user && showUpgradeModal && <UpgradeToProModal onClose={() => setShowUpgradeModal(false)} />}
-    </UserContext.Provider>
-  );
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
