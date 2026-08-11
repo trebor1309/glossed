@@ -180,6 +180,7 @@ test("client booking becomes a professional proposal and a payable client offer"
     await expect(proPage.getByText(address, { exact: true })).toBeVisible();
     await proPage.getByRole("button", { name: "Make proposal" }).click();
 
+    await expect(proPage.getByLabel("Time")).toHaveValue("08:00");
     await proPage.getByLabel("Service price (€)").fill("42.31");
     await proPage.getByLabel("Travel fee (€)").fill("3.21");
     await proPage.getByLabel("Remark").fill(`${marker} professional proposal`);

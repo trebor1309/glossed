@@ -6,11 +6,13 @@ import { supabase } from "@/lib/supabaseClient";
 import Toast from "@/components/ui/Toast";
 
 export default function ProProposalModal({ booking, onClose, onSuccess }) {
-  // 🧠 Extract "HH:mm" from a slot like "Afternoon (13–18)" → "13:00"
+  // Extract the starting time without depending on the separator used in the slot label.
   const extractTimeFromSlot = (slot) => {
     if (!slot) return "";
-    const match = slot.match(/\((\d{2})[–-](\d{2})\)/);
-    return match ? `${match[1]}:00` : "";
+    const match = String(slot).match(/\((\d{1,2})(?::(\d{2}))?/);
+    if (!match) return "";
+
+    return `${match[1].padStart(2, "0")}:${match[2] || "00"}`;
   };
 
   const [form, setForm] = useState({
