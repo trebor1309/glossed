@@ -1,6 +1,5 @@
 // src/components/navigation/NavbarMain.jsx
 import { useState } from "react";
-import { Facebook, Instagram } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useNotifications } from "@/context/NotificationContext"; // ← NEW
 

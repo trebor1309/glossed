@@ -87,8 +87,7 @@ export default function DashboardOffers() {
           table: "missions",
           filter: `client_id=eq.${session.user.id}`,
         },
-        (payload) => {
-          console.log("🔁 Missions changed:", payload);
+        () => {
           fetchOffers();
         }
       )
@@ -185,26 +184,7 @@ export default function DashboardOffers() {
       )}
 
       {selectedBooking && (
-        <ClientOffersModal
-          booking={selectedBooking}
-          onClose={() => setSelectedBooking(null)}
-          onAccepted={() => {
-            // ✅ Masquer le modal & recharger
-            setSelectedBooking(null);
-            setToast({
-              type: "success",
-              message: "Offer accepted! Proceed to payment.",
-            });
-          }}
-          onPay={() => {
-            // ✅ Après paiement Stripe : recharger
-            setSelectedBooking(null);
-            setToast({
-              type: "success",
-              message: "Payment confirmed successfully!",
-            });
-          }}
-        />
+        <ClientOffersModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
       )}
 
       {toast && <Toast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}

@@ -323,18 +323,7 @@ export default function DashboardReservations() {
 
       <AnimatePresence>
         {showOffersModal && selectedBooking && (
-          <ClientOffersModal
-            booking={selectedBooking}
-            onClose={() => setShowOffersModal(false)}
-            onPay={() => {
-              setShowOffersModal(false);
-              fetchBookings();
-              setToast({
-                message: "Payment confirmed!",
-                type: "success",
-              });
-            }}
-          />
+          <ClientOffersModal booking={selectedBooking} onClose={() => setShowOffersModal(false)} />
         )}
       </AnimatePresence>
 

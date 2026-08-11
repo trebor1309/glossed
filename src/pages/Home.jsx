@@ -2,8 +2,8 @@ import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { useUser } from "../context/UserContext";
 
-export default function Home({ onOpenLogin, onOpenSignup, onOpenProSignup, onOpenDownload }) {
-  const { isAuthenticated, isClient, isPro, switchRole } = useUser();
+export default function Home({ onOpenLogin, onOpenSignup, onOpenDownload }) {
+  const { isAuthenticated } = useUser();
   const navigate = useNavigate();
 
   const handleBookNow = () => {

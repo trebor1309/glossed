@@ -134,8 +134,6 @@ export function UserProvider({ children }) {
       AUTH LISTENER
     ----------------------------------------------------------- */
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("🔄 Auth change:", event);
-
       if (event === "TOKEN_REFRESHED" && session) {
         setSession(session);
         return;

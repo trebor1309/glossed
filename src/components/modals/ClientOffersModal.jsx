@@ -4,7 +4,7 @@ import Toast from "@/components/ui/Toast";
 import { motion } from "framer-motion";
 import { X, CreditCard, User } from "lucide-react";
 
-export default function ClientOffersModal({ booking, onClose, onPay }) {
+export default function ClientOffersModal({ booking, onClose }) {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
@@ -18,7 +18,6 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
     const fetchOffers = async () => {
       try {
         setLoading(true);
-        console.log("🎯 Fetching offers for:", booking.id, "client:", booking.client_id);
 
         const { data: missionRows, error } = await supabase
           .from("missions")
@@ -60,11 +59,9 @@ export default function ClientOffersModal({ booking, onClose, onPay }) {
   // ------------------------------------------------------------
   const handlePayAndConfirm = async (offer) => {
     try {
-      console.log("💳 Creating payment session for mission:", offer.id);
       const { data: result, error } = await supabase.functions.invoke("create-checkout-session", {
         body: { mission_id: offer.id },
       });
-      console.log("📦 Payment intent response:", result);
 
       if (error || !result?.url) {
         alert(

@@ -200,7 +200,6 @@ export default function DashboardPayments() {
           filter: `client_id=eq.${clientId}`,
         },
         () => {
-          console.log("💸 New client payment, refreshing list…");
           fetchPayments();
         }
       )

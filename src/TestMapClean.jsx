@@ -6,8 +6,6 @@ export default function TestMapClean() {
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
   });
 
-  console.log("Google Maps status:", { isLoaded, loadError });
-
   if (loadError)
     return (
       <div style={{ color: "red", padding: "20px" }}>❌ Google Maps error: {loadError.message}</div>

@@ -32,7 +32,7 @@ export default defineConfig([
       ...pluginReact.configs.recommended.rules,
       ...pluginReactHooks.configs.recommended.rules,
       "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-      "no-console": "warn",
+      "no-console": ["warn", { allow: ["warn", "error"] }],
       "react/prop-types": "off",
       "react/react-in-jsx-scope": "off",
       "react-hooks/exhaustive-deps": "warn",

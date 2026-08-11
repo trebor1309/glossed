@@ -1,13 +1,5 @@
 import { motion } from "framer-motion";
-import {
-  LifeBuoy,
-  Search,
-  Users,
-  HeartHandshake,
-  CreditCard,
-  ShieldCheck,
-  Mail,
-} from "lucide-react";
+import { LifeBuoy, Search, Users, HeartHandshake, CreditCard, Mail } from "lucide-react";
 
 export default function HelpCenter() {
   return (
