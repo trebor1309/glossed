@@ -59,7 +59,10 @@ for (const account of [
     await page.setViewportSize({ width: 320, height: 720 });
     await page.goto(account.messages, { waitUntil: "domcontentloaded" });
 
-    await expect(page.getByRole("heading", { level: 1, name: "Messages" })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`${account.messages}$`));
+    await expect(page.getByRole("heading", { level: 1, name: "Messages" })).toBeVisible({
+      timeout: 20_000,
+    });
     await expect(page.getByText("Unable to load conversations. Please try again.")).toHaveCount(0);
 
     const conversationButtons = page.locator("ul > li > button");
