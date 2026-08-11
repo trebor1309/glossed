@@ -183,10 +183,17 @@ test("client booking becomes a professional proposal and a payable client offer"
     await proPage.getByLabel("Service price (€)").fill("42.31");
     await proPage.getByLabel("Travel fee (€)").fill("3.21");
     await proPage.getByLabel("Remark").fill(`${marker} professional proposal`);
+    const proposalResponsePromise = proPage.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === "/rest/v1/rpc/create_mission_proposal"
+    );
     await proPage.getByRole("button", { name: "Send proposal" }).click();
-    await expect(proPage.getByText("Proposal sent!", { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
+    const proposalResponse = await proposalResponsePromise;
+    expect(proposalResponse.ok()).toBe(true);
+    const proposalPayload = await proposalResponse.json();
+    const createdProposal = Array.isArray(proposalPayload) ? proposalPayload[0] : proposalPayload;
+    expect(createdProposal?.booking_id).toBe(bookingId);
 
     await clientPage.goto("/dashboard/reservations", { waitUntil: "domcontentloaded" });
     const clientOffer = clientPage.getByRole("listitem").filter({ hasText: address });
