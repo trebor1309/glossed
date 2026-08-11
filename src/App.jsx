@@ -56,7 +56,11 @@ export default function App() {
       <ScrollToTop />
 
       <main className="flex-grow">
-        <AppRouter />
+        <AppRouter
+          onOpenLogin={() => setShowLogin(true)}
+          onOpenSignup={() => setShowSignup(true)}
+          onOpenDownload={() => setShowDownload(true)}
+        />
       </main>
 
       {!isDashboardRoute && <Footer />}

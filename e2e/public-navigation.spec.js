@@ -53,6 +53,32 @@ test("opens the sign-in dialog without submitting credentials", async ({ page })
   await expect(page.locator('input[type="password"]')).toBeVisible();
 });
 
+test("opens the sign-in dialog from the primary booking CTA", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  await page.getByRole("button", { name: "Book Now" }).click();
+
+  await expect(page.getByRole("heading", { level: 2, name: "Sign in" })).toBeVisible();
+});
+
+test("opens the sign-up dialog from the account CTA", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  await page.getByRole("button", { name: "Create your account" }).click();
+
+  await expect(page.getByRole("heading", { level: 2, name: "Create your account" })).toBeVisible();
+});
+
+test("opens the download dialog from the app CTA", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  await page.getByRole("button", { name: /Download app/ }).click();
+
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Download the Glossed App" })
+  ).toBeVisible();
+});
+
 test("redirects an unknown route to the home page", async ({ page }) => {
   await page.goto("/route-that-does-not-exist", { waitUntil: "domcontentloaded" });
 

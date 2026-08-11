@@ -79,12 +79,21 @@ function RouteFallback() {
   );
 }
 
-export default function AppRouter() {
+export default function AppRouter({ onOpenLogin, onOpenSignup, onOpenDownload }) {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         {/* 🌍 Public */}
-        <Route path="/" element={<Home />} />
+        <Route
+          path="/"
+          element={
+            <Home
+              onOpenLogin={onOpenLogin}
+              onOpenSignup={onOpenSignup}
+              onOpenDownload={onOpenDownload}
+            />
+          }
+        />
         <Route path="/about" element={<About />} />
         <Route path="/services" element={<Services />} />
         <Route path="/legal" element={<Legal />} />

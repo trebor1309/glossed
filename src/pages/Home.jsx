@@ -7,17 +7,9 @@ export default function Home({ onOpenLogin, onOpenSignup, onOpenDownload }) {
   const navigate = useNavigate();
 
   const handleBookNow = () => {
-    const isDesktop = window.innerWidth >= 768;
-
     if (!isAuthenticated) {
-      // ouvre le modal de login
       onOpenLogin?.();
-    } else if (isDesktop) {
-      // envoie un signal global que le DashboardLayout écoutera
-      const event = new CustomEvent("open-new-booking-modal");
-      window.dispatchEvent(event);
     } else {
-      // mobile : redirige vers la page complète
       navigate("/dashboard/new");
     }
   };
@@ -227,20 +219,20 @@ export default function Home({ onOpenLogin, onOpenSignup, onOpenDownload }) {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
-            <a
-              role="button"
+            <button
+              type="button"
               onClick={onOpenSignup}
               className="bg-white text-rose-600 px-8 py-4 rounded-full font-bold hover:shadow-xl hover:scale-105 transition-all duration-300 text-lg"
             >
               Create your account
-            </a>
-            <a
-              role="button"
+            </button>
+            <button
+              type="button"
               onClick={onOpenDownload}
               className="bg-gradient-to-r from-rose-600 to-red-600 text-white font-semibold hover:opacity-90 hover:shadow-lg hover:scale-105 transition-all duration-300 flex items-center gap-2 px-8 py-4 rounded-full"
             >
               Download app →
-            </a>
+            </button>
           </div>
         </div>
       </section>
