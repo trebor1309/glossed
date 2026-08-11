@@ -21,6 +21,18 @@ test("a client session survives reload and cannot enter pro or admin routes", as
   await expect(page).toHaveURL(/\/dashboard$/);
 });
 
+test("an authenticated client can start a booking from the home CTA", async ({ page }) => {
+  await loginThroughUi(page, credentialsFor("client"), /\/dashboard$/);
+
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Book Now" }).click();
+
+  await expect(page).toHaveURL(/\/dashboard\/new$/);
+  await expect(
+    page.getByRole("heading", { level: 2, name: /Which service\(s\) would you like to book/ })
+  ).toBeVisible();
+});
+
 test("a professional session cannot enter the admin review", async ({ page }) => {
   await loginThroughUi(page, credentialsFor("pro"), /\/prodashboard$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Welcome back");
