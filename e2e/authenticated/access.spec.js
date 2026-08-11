@@ -57,7 +57,7 @@ for (const account of [
   }) => {
     await loginThroughUi(page, credentialsFor(account.role), account.home);
     await page.setViewportSize({ width: 320, height: 720 });
-    await page.goto(account.messages, { waitUntil: "domcontentloaded" });
+    await page.getByRole("link", { name: "Messages", exact: true }).click();
 
     await expect(page).toHaveURL(new RegExp(`${account.messages}$`));
     await expect(page.getByRole("heading", { level: 1, name: "Messages" })).toBeVisible({
