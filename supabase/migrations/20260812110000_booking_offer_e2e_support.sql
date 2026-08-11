@@ -91,6 +91,7 @@ begin
     return false;
   end if;
   if coalesce(v_booking.notes, '') not like '[E2E:%'
+     or v_booking.created_at is null
      or v_booking.created_at < now() - interval '7 days' then
     raise exception 'Only recent E2E bookings may be cleaned up' using errcode = '42501';
   end if;
