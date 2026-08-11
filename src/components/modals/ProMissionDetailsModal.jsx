@@ -1,16 +1,6 @@
 // src/components/modals/ProMissionDetailsModal.jsx
 import { motion } from "framer-motion";
-import {
-  X,
-  Calendar,
-  Clock,
-  MapPin,
-  FileText,
-  MessageSquare,
-  Star,
-  Pencil,
-  Trash2,
-} from "lucide-react";
+import { X, Calendar, Clock, MapPin, FileText, MessageSquare, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -29,7 +19,12 @@ const fmtDate = (d) => {
   }
 };
 
-export default function ProMissionDetailsModal({ booking, onClose, onEvaluate }) {
+export default function ProMissionDetailsModal({
+  booking,
+  onClose,
+  onEvaluate,
+  onProposalCancelled,
+}) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user, isPro } = useUser();
@@ -82,6 +77,40 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
       }
     } catch (err) {
       console.error("Unexpected error while opening chat:", err);
+    }
+  };
+
+  const handleCancelProposal = async () => {
+    if (!booking?.id) return;
+
+    const confirmed = await openConfirmModal(
+      "Cancel this proposal?",
+      "The client request will become available again. This action is unavailable once Checkout has started.",
+      {
+        confirmLabel: "Cancel proposal",
+        cancelLabel: "Keep proposal",
+        type: "delete",
+      }
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      const { error } = await supabase.rpc("cancel_mission_proposal", {
+        p_mission_id: booking.id,
+      });
+
+      if (error) throw error;
+
+      pushNotification("Proposal cancelled.", "success");
+      onProposalCancelled?.(booking);
+      onClose?.();
+    } catch (err) {
+      console.error("Error cancelling proposal:", err);
+      pushNotification(err.message || "Unable to cancel proposal.", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -308,17 +337,14 @@ export default function ProMissionDetailsModal({ booking, onClose, onEvaluate })
 
         {/* ACTIONS */}
         <div className="mt-8 flex flex-wrap justify-end gap-3">
-          {/* Proposed: edit/cancel — à implémenter plus tard si besoin */}
           {status === "proposed" && (
-            <>
-              <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-full font-medium hover:bg-gray-100 transition flex items-center gap-2">
-                <Pencil size={16} /> Edit proposal
-              </button>
-
-              <button className="px-4 py-2 border border-red-200 text-red-600 rounded-full font-medium hover:bg-red-50 transition flex items-center gap-2">
-                <Trash2 size={16} /> Cancel proposal
-              </button>
-            </>
+            <button
+              onClick={handleCancelProposal}
+              disabled={loading}
+              className="px-4 py-2 border border-red-200 text-red-600 rounded-full font-medium hover:bg-red-50 transition flex items-center gap-2 disabled:opacity-60"
+            >
+              <Trash2 size={16} /> Cancel proposal
+            </button>
           )}
 
           {/* Cancellation requested: approve / keep */}

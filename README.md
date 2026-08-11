@@ -35,6 +35,7 @@ npm run check:bundle # vérifie le budget du chunk JavaScript initial
 npm run check      # lint, build et budget du bundle
 npm run test:e2e   # tests navigateur Playwright sans données distantes
 npm run test:e2e:auth # tests authentifiés distants en lecture seule
+npm run test:e2e:functional # parcours métier avec données E2E jetables
 ```
 
 npm est l'unique gestionnaire de paquets du projet. `package-lock.json` doit être
@@ -85,6 +86,23 @@ Le workflow manuel `Authenticated E2E` lit la même configuration depuis les var
 `E2E_BASE_URL` et `E2E_SUPABASE_URL` de l’environnement GitHub `e2e`, ainsi que les
 six secrets `E2E_*_EMAIL` et `E2E_*_PASSWORD`. Il ne doit être activé qu’avec des
 comptes dédiés au projet de test.
+
+### Parcours fonctionnel avec écritures
+
+Le parcours mission/offre utilise les trois mêmes comptes de test et crée une réservation
+marquée `[E2E:...]`. Il vérifie sa visibilité côté prestataire, la proposition, l’offre
+payable côté client et l’annulation de la proposition. Un RPC réservé aux administrateurs
+supprime ensuite la réservation, ses missions et ses notifications. Il refuse toute donnée
+non marquée E2E, âgée de plus de sept jours ou liée à une tentative financière.
+
+Ce parcours n’est jamais lancé par le workflow quotidien en lecture seule. Pour l’exécuter
+manuellement sur l’environnement de test :
+
+```powershell
+$env:E2E_ENABLE_WRITES='true'
+$env:E2E_FUNCTIONAL_CONFIRMATION='disposable-test-data'
+npm run test:e2e:functional
+```
 
 ## Organisation
 

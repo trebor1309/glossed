@@ -130,7 +130,10 @@ export default function ClientOffersModal({ booking, onClose }) {
             {offers.map((o, i) => {
               const totalPrice = (Number(o.price) * 1.1).toFixed(2);
               const proName =
-                [o.pro?.first_name, o.pro?.last_name].filter(Boolean).join(" ") || "Professional";
+                [o.pro?.first_name, o.pro?.last_name].filter(Boolean).join(" ") ||
+                o.pro?.business_name ||
+                o.pro?.username ||
+                "Professional";
 
               return (
                 <motion.div
