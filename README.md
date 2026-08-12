@@ -32,10 +32,24 @@ npm run lint:e2e   # contrôle des tests et lanceurs Playwright
 npm run lint:fix   # applique les corrections ESLint disponibles
 npm run build      # build de production dans dist/
 npm run check:bundle # vérifie le budget du chunk JavaScript initial
+npm run check:functions # type-check des Edge Functions Supabase avec Deno
+npm run check:sql  # lint du schéma Supabase local démarré
+npm run test:sql  # tests SQL sur la base Supabase locale démarrée
 npm run check      # lint, build et budget du bundle
 npm run test:e2e   # tests navigateur Playwright sans données distantes
 npm run test:e2e:auth # tests authentifiés distants en lecture seule
 npm run test:e2e:functional # parcours métier avec données E2E jetables
+```
+
+Les contrôles SQL exigent Docker et une pile Supabase locale. La CI reconstruit
+la base depuis toutes les migrations avant de lancer le lint et les tests :
+
+```powershell
+npx supabase start
+npx supabase db reset --local
+npm run check:sql
+npm run test:sql
+npx supabase stop --no-backup
 ```
 
 npm est l'unique gestionnaire de paquets du projet. `package-lock.json` doit être
