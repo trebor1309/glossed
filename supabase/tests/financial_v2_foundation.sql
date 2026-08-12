@@ -24,6 +24,27 @@ begin
   ) then
     raise exception 'Authenticated browser sessions can post ledger batches';
   end if;
+
+  if has_sequence_privilege(
+       'authenticated', 'public.financial_audit_log_id_seq', 'usage'
+     )
+     or has_sequence_privilege(
+       'authenticated', 'public.financial_ledger_entries_id_seq', 'usage'
+     )
+     or has_sequence_privilege(
+       'authenticated', 'public.financial_runtime_control_events_id_seq', 'usage'
+     )
+     or has_sequence_privilege(
+       'anon', 'public.financial_audit_log_id_seq', 'usage'
+     )
+     or has_sequence_privilege(
+       'anon', 'public.financial_ledger_entries_id_seq', 'usage'
+     )
+     or has_sequence_privilege(
+       'anon', 'public.financial_runtime_control_events_id_seq', 'usage'
+     ) then
+    raise exception 'Browser roles can consume server-only financial sequences';
+  end if;
 end
 $$;
 
