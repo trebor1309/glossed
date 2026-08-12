@@ -2,9 +2,18 @@
 
 begin;
 
-insert into public.users (
-  id, username, first_name, last_name, business_name, profile_photo
-) values
+insert into auth.users (id, email) values
+  ('50000000-0000-0000-0000-000000000010', 'chat-client@example.test'),
+  ('50000000-0000-0000-0000-000000000020', 'chat-pro@example.test'),
+  ('50000000-0000-0000-0000-000000000030', 'chat-outsider@example.test');
+
+update public.users as user_profile
+set username = test_user.username,
+    first_name = test_user.first_name,
+    last_name = test_user.last_name,
+    business_name = test_user.business_name,
+    profile_photo = test_user.profile_photo
+from (values
   (
     '50000000-0000-0000-0000-000000000010',
     'chat-client', 'Chat', 'Client', null,
@@ -18,10 +27,12 @@ insert into public.users (
   (
     '50000000-0000-0000-0000-000000000030',
     'chat-outsider', 'Chat', 'Outsider', null, null
-  );
+  )
+) as test_user(id, username, first_name, last_name, business_name, profile_photo)
+where user_profile.id = test_user.id::uuid;
 
-insert into public.missions (id, service) values (
-  '50000000-0000-0000-0000-000000000100', 'Chat test service'
+insert into public.missions (id, service, date) values (
+  '50000000-0000-0000-0000-000000000100', 'Chat test service', current_date
 );
 
 insert into public.chats (
