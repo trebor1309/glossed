@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 
-create schema if not exists extensions;
-create extension if not exists dblink with schema extensions;
+-- dblink is prepared by scripts/run-supabase-sql-tests.mjs. Keeping that
+-- local-only setup outside this test prevents accidental ACL changes remotely.
 select set_config('app.test_database_url', :'TEST_DATABASE_URL', false);
 
 delete from public.stripe_webhook_events where event_id like 'evt_concurrency_test_%';
@@ -97,8 +97,8 @@ end
 $$;
 rollback;
 
-select extensions.dblink_connect('checkout_1', current_setting('app.test_database_url'));
-select extensions.dblink_connect('checkout_2', current_setting('app.test_database_url'));
+select extensions.dblink_connect_u('checkout_1', current_setting('app.test_database_url'));
+select extensions.dblink_connect_u('checkout_2', current_setting('app.test_database_url'));
 select extensions.dblink_send_query('checkout_1', $$
   select attempt_id, idempotency_key, attempt_status, stripe_session_id,
          stripe_session_url, expires_at
@@ -158,8 +158,8 @@ begin
 end
 $$;
 
-select extensions.dblink_connect('webhook_1', current_setting('app.test_database_url'));
-select extensions.dblink_connect('webhook_2', current_setting('app.test_database_url'));
+select extensions.dblink_connect_u('webhook_1', current_setting('app.test_database_url'));
+select extensions.dblink_connect_u('webhook_2', current_setting('app.test_database_url'));
 select extensions.dblink_send_query('webhook_1', $$
   select * from public.process_stripe_checkout_completed(
     'evt_concurrency_test_1', 'checkout.session.completed', now(), false,
@@ -227,8 +227,8 @@ begin
 end
 $$;
 
-select extensions.dblink_connect('refund_1', current_setting('app.test_database_url'));
-select extensions.dblink_connect('refund_2', current_setting('app.test_database_url'));
+select extensions.dblink_connect_u('refund_1', current_setting('app.test_database_url'));
+select extensions.dblink_connect_u('refund_2', current_setting('app.test_database_url'));
 select extensions.dblink_send_query('refund_1', $$
   select * from public.reserve_mission_refund(
     '10000000-0000-0000-0000-000000000003',

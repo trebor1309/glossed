@@ -46,4 +46,4 @@ build/
 # (Facultatif) ignorer les logs Supabase locaux
 .supabase/
 supabase/.temp/
-
+supabase/.branches/

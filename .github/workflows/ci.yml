@@ -26,6 +26,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type-check Supabase Edge Functions
+        run: npm run check:functions
+
       - name: Lint and build
         run: npm run check
 
@@ -43,3 +51,36 @@ jobs:
           path: playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start local Supabase
+        run: npx supabase start
+
+      - name: Rebuild database from migrations
+        run: npx supabase db reset --local
+
+      - name: Lint database
+        run: npm run check:sql
+
+      - name: Run SQL tests
+        run: npm run test:sql
+
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop --no-backup
