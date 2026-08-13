@@ -48,9 +48,10 @@ begin
 
   if exists (
     select 1 from public.financial_flow_versions
-    where version <> 'legacy_v1'
-  ) then
-    raise exception 'The state-model migration unexpectedly activated another financial flow';
+    where version not in ('legacy_v1', 'marketplace_v2')
+  ) or coalesce((select enabled from public.financial_feature_flags
+                 where flag_code = 'checkout_v2'), false) then
+    raise exception 'An unexpected financial flow is defined or Checkout v2 was activated';
   end if;
 
   if has_table_privilege('authenticated', 'public.workflow_instances', 'select')

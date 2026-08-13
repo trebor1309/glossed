@@ -7,8 +7,11 @@ begin
   if exists (select 1 from public.provider_eligibility_policy_versions) then
     raise exception 'The migration must not invent or activate jurisdiction rules';
   end if;
-  if exists (select 1 from public.financial_flow_versions where version <> 'legacy_v1') then
-    raise exception 'Provider eligibility foundation activated a non-legacy financial engine';
+  if exists (select 1 from public.financial_flow_versions
+             where version not in ('legacy_v1', 'marketplace_v2'))
+     or coalesce((select enabled from public.financial_feature_flags
+                  where flag_code = 'checkout_v2'), false) then
+    raise exception 'Provider eligibility tests found an active or unexpected financial engine';
   end if;
   if has_table_privilege('authenticated', 'public.provider_connect_accounts', 'insert')
      or has_table_privilege('authenticated', 'public.provider_connect_accounts', 'update')
@@ -449,8 +452,9 @@ begin
     raise exception 'Connect event journal was mutable';
   exception when sqlstate '55000' then null;
   end;
-  if exists (select 1 from public.financial_flow_versions where version <> 'legacy_v1') then
-    raise exception 'Tests found an unexpectedly active financial v2 engine';
+  if coalesce((select enabled from public.financial_feature_flags
+               where flag_code = 'checkout_v2'), false) then
+    raise exception 'Tests found Checkout v2 unexpectedly active';
   end if;
 end
 $$;
