@@ -140,7 +140,7 @@ supabase secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... STRIPE_CONN
 
 Les fonctions appelées par un utilisateur conservent la vérification JWT Supabase par défaut. Seules `stripe-payment-webhook` et `stripe-connect-webhook` utilisent `verify_jwt = false` : chacune vérifie la signature du corps brut avec son secret webhook Stripe dédié.
 
-Le proxy Vercel `/api/stripe-webhook` nécessite `SUPABASE_STRIPE_WEBHOOK_URL`. Dans Stripe, l'endpoint à déclarer est l'URL publique de ce proxy et l'événement requis est `checkout.session.completed`.
+Le proxy Vercel `/api/stripe-webhook` nécessite `SUPABASE_STRIPE_WEBHOOK_URL`. Dans Stripe, l'endpoint à déclarer est l'URL publique de ce proxy. Le flux historique requiert `checkout.session.completed`; le futur Checkout v2 requiert aussi `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` et `checkout.session.expired`. Le moteur v2 reste désactivé tant que son flag et une politique validée ne sont pas explicitement configurés.
 
 ## État de la reprise
 

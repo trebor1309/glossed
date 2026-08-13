@@ -33,12 +33,58 @@ Deno.serve(async (req) => {
     return response({ error: "Invalid signature" }, 400);
   }
 
-  if (event.type !== "checkout.session.completed") {
+  if (!["checkout.session.completed", "checkout.session.async_payment_succeeded",
+        "checkout.session.async_payment_failed", "checkout.session.expired"].includes(event.type)) {
     return response({ skipped: true });
   }
 
   try {
     const session = event.data.object as Stripe.Checkout.Session;
+    if (session.metadata?.financial_flow_version === "marketplace_v2") {
+      const authoritative = await stripe.checkout.sessions.retrieve(session.id, {
+        expand: ["payment_intent.latest_charge"],
+      });
+      const paymentIntent =
+        typeof authoritative.payment_intent === "string"
+          ? null
+          : authoritative.payment_intent;
+      const paymentIntentId =
+        typeof authoritative.payment_intent === "string"
+          ? authoritative.payment_intent
+          : authoritative.payment_intent?.id ?? null;
+      const latestCharge = paymentIntent?.latest_charge;
+      const chargeId = typeof latestCharge === "string" ? latestCharge : latestCharge?.id ?? null;
+      const amountTotal = authoritative.amount_total;
+      const currency = authoritative.currency;
+      if (!Number.isSafeInteger(amountTotal) || !currency) {
+        return response({ error: "Invalid Checkout v2 amount" }, 422);
+      }
+      const { data, error } = await admin.rpc("process_checkout_v2_event", {
+        p_event_id: event.id,
+        p_event_type: event.type,
+        p_stripe_created_at: new Date(event.created * 1000).toISOString(),
+        p_livemode: event.livemode,
+        p_stripe_session_id: authoritative.id,
+        p_payment_status: authoritative.payment_status,
+        p_stripe_payment_intent_id: paymentIntentId,
+        p_stripe_charge_id: chargeId,
+        p_amount_total_cents: amountTotal,
+        p_currency: currency,
+        p_payload_summary: {
+          checkout_status: authoritative.status,
+          payment_status: authoritative.payment_status,
+          payment_method_types: authoritative.payment_method_types,
+        },
+      });
+      if (error) throw error;
+      return response({
+        ok: true,
+        duplicate: data?.[0]?.duplicate ?? false,
+        outcome: data?.[0]?.outcome,
+      });
+    }
+
+    if (event.type !== "checkout.session.completed") return response({ skipped: true });
     if (session.payment_status !== "paid") return response({ skipped: true });
 
     const missionId = session.metadata?.mission_id;

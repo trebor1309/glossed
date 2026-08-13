@@ -12,6 +12,7 @@ const localTests = [
   "financial_v2_foundation.sql",
   "financial_state_models_v1.sql",
   "provider_eligibility_connect_v2.sql",
+  "checkout_v2_payment_accounting.sql",
 ];
 
 function run(command, args, options = {}) {
