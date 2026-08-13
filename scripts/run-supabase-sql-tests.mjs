@@ -10,6 +10,7 @@ const localTests = [
   "chat_reliability.sql",
   "booking_offer_e2e_support.sql",
   "financial_v2_foundation.sql",
+  "financial_state_models_v1.sql",
 ];
 
 function run(command, args, options = {}) {
