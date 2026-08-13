@@ -56,6 +56,7 @@ export async function syncConnectAccount(
     createdAt: Date;
     livemode?: boolean;
     source: "webhook" | "account_creation" | "account_check";
+    expectedRevision?: number;
   }
 ) {
   const account = asConnectAccount(accountValue);
@@ -81,6 +82,7 @@ export async function syncConnectAccount(
       source: event.source,
       object: account.object ?? "v2.core.account",
     },
+    p_expected_revision: event.expectedRevision ?? null,
   });
   if (error) throw error;
   return Boolean(data);

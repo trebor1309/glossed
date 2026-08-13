@@ -885,7 +885,8 @@ create or replace function public.sync_provider_connect_account(
   p_future_requirements jsonb,
   p_applied_configurations text[],
   p_closed boolean,
-  p_payload_summary jsonb
+  p_payload_summary jsonb,
+  p_expected_revision bigint default null
 )
 returns boolean
 language plpgsql
@@ -910,14 +911,15 @@ begin
       using errcode = 'P0002';
   end if;
 
-  select stripe_account_id = p_stripe_account_id and (
-           last_stripe_event_created_at is null
-           or p_stripe_created_at > last_stripe_event_created_at
-           or (
-             p_stripe_created_at = last_stripe_event_created_at
-             and p_event_id > coalesce(last_stripe_event_id, '')
-           )
-         )
+  select stripe_account_id = p_stripe_account_id and case
+           when p_expected_revision is not null then revision = p_expected_revision
+           else last_stripe_event_created_at is null
+             or p_stripe_created_at > last_stripe_event_created_at
+             or (
+               p_stripe_created_at = last_stripe_event_created_at
+               and p_event_id > coalesce(last_stripe_event_id, '')
+             )
+         end
   into v_apply
   from public.provider_connect_accounts
   where provider_id = v_provider_id
@@ -949,8 +951,10 @@ begin
         applied_configurations = coalesce(p_applied_configurations, '{}'::text[]),
         livemode = p_livemode,
         closed = p_closed,
-        last_stripe_event_id = p_event_id,
-        last_stripe_event_created_at = p_stripe_created_at,
+        last_stripe_event_id = case when p_expected_revision is null
+          then p_event_id else last_stripe_event_id end,
+        last_stripe_event_created_at = case when p_expected_revision is null
+          then p_stripe_created_at else last_stripe_event_created_at end,
         last_synced_at = clock_timestamp(),
         revision = revision + 1,
         updated_at = clock_timestamp()
@@ -1103,7 +1107,15 @@ begin
   from public.paid_proposal_drafts d
   join public.paid_proposal_draft_events e on e.draft_id = d.id
   where e.deduplication_key = p_deduplication_key;
-  if found then return v_draft; end if;
+  if found then
+    if v_draft.provider_id <> v_provider_id
+       or v_draft.booking_id <> p_booking_id
+       or (p_draft_id is not null and v_draft.id <> p_draft_id) then
+      raise exception 'Deduplication key belongs to another paid proposal draft'
+        using errcode = '23505';
+    end if;
+    return v_draft;
+  end if;
 
   if p_draft_id is null then
     insert into public.paid_proposal_drafts (
@@ -1300,11 +1312,11 @@ to service_role;
 
 revoke all on function public.sync_provider_connect_account(
   text, text, text, timestamptz, boolean, text, text, text, jsonb, jsonb,
-  jsonb, jsonb, text[], boolean, jsonb
+  jsonb, jsonb, text[], boolean, jsonb, bigint
 ) from public, anon, authenticated;
 grant execute on function public.sync_provider_connect_account(
   text, text, text, timestamptz, boolean, text, text, text, jsonb, jsonb,
-  jsonb, jsonb, text[], boolean, jsonb
+  jsonb, jsonb, text[], boolean, jsonb, bigint
 ) to service_role;
 
 revoke all on function public.get_provider_paid_proposal_readiness(uuid, text, text, text)

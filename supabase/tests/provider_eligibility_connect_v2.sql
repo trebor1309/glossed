@@ -32,12 +32,20 @@ insert into auth.users (id, email, raw_user_meta_data) values
     '72000000-0000-0000-0000-000000000020',
     'eligibility-provider@example.test',
     '{"requested_role":"pro"}'::jsonb
+  ),
+  (
+    '72000000-0000-0000-0000-000000000030',
+    'eligibility-other-provider@example.test',
+    '{"requested_role":"pro"}'::jsonb
   )
 on conflict (id) do nothing;
 
 update public.users
 set role = 'pro', active_role = 'pro', verification_status = 'rejected'
-where id = '72000000-0000-0000-0000-000000000020';
+where id in (
+  '72000000-0000-0000-0000-000000000020',
+  '72000000-0000-0000-0000-000000000030'
+);
 
 insert into public.bookings (
   id, client_id, pro_id, service, date, time_slot, address, notes, status
@@ -48,6 +56,11 @@ insert into public.bookings (
   'Eligibility foundation test', current_date + 7, '10:00',
   'Test address', 'The full proposal must survive missing prerequisites.', 'pending'
 ) on conflict (id) do nothing;
+
+insert into public.booking_notifications (booking_id, pro_id) values (
+  '72000000-0000-0000-0000-000000000100',
+  '72000000-0000-0000-0000-000000000030'
+);
 
 insert into public.provider_eligibility_policy_versions (
   version, jurisdiction_code, residence_country_code, service_country_code,
@@ -210,6 +223,39 @@ select public.save_paid_proposal_draft(
   'eligibility-test:draft:create:1'
 );
 
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"72000000-0000-0000-0000-000000000030","role":"authenticated"}',
+  false
+);
+select set_config(
+  'request.jwt.claim.sub', '72000000-0000-0000-0000-000000000030', false
+);
+do $$
+begin
+  begin
+    perform public.save_paid_proposal_draft(
+      null,
+      '72000000-0000-0000-0000-000000000100',
+      'test.eu.launch.v1', 'hair.custom', 'BE', 12000, 0,
+      now() + interval '7 days', null,
+      'A foreign provider must never recover the original draft.',
+      'eligibility-test:draft:create:1'
+    );
+    raise exception 'A foreign deduplication key exposed another provider draft';
+  exception when unique_violation then null;
+  end;
+end
+$$;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"72000000-0000-0000-0000-000000000020","role":"authenticated"}',
+  false
+);
+select set_config(
+  'request.jwt.claim.sub', '72000000-0000-0000-0000-000000000020', false
+);
+
 select public.refresh_paid_proposal_draft_readiness(
   (select id from public.paid_proposal_drafts
    where provider_id = '72000000-0000-0000-0000-000000000020'),
@@ -285,6 +331,41 @@ begin
   end if;
 end
 $$;
+
+select set_config('request.jwt.claim.role', 'service_role', false);
+select public.sync_provider_connect_account(
+  'evt_connect_changed_during_poll_1', 'v2.core.account.updated',
+  'acct_EligibilityTestV2', now() + interval '2 seconds', false, 'express',
+  'restricted', 'restricted', '[]'::jsonb, '[]'::jsonb,
+  '{}'::jsonb, '{}'::jsonb, array['recipient'], false,
+  '{"source":"webhook_during_poll"}'::jsonb
+);
+select public.sync_provider_connect_account(
+  'account-check:stale-after-webhook', 'v2.core.account.polled',
+  'acct_EligibilityTestV2', now() + interval '1 day', false, 'express',
+  'active', 'active', '[]'::jsonb, '[]'::jsonb,
+  '{}'::jsonb, '{}'::jsonb, array['recipient'], false,
+  '{"source":"stale_poll"}'::jsonb,
+  (select revision from connect_revision_after_active)
+);
+do $$
+begin
+  if (select stripe_transfers_status from public.provider_connect_accounts
+      where provider_id = '72000000-0000-0000-0000-000000000020') <> 'restricted'
+     or (select applied from public.stripe_connect_webhook_events
+         where event_id = 'account-check:stale-after-webhook') then
+    raise exception 'A stale account poll superseded an intervening Stripe webhook';
+  end if;
+end
+$$;
+select public.sync_provider_connect_account(
+  'evt_connect_active_after_poll_1',
+  'v2.core.account[configuration.recipient].capability_status_updated',
+  'acct_EligibilityTestV2', now() + interval '3 seconds', false, 'express',
+  'active', 'active', '[]'::jsonb, '[]'::jsonb,
+  '{}'::jsonb, '{}'::jsonb, array['recipient'], false,
+  '{"source":"webhook_after_stale_poll"}'::jsonb
+);
 
 select set_config(
   'request.jwt.claims',
@@ -409,7 +490,7 @@ $$;
 
 select public.sync_provider_connect_account(
   'evt_connect_closed_1', 'v2.core.account.closed', 'acct_EligibilityTestV2',
-  now() + interval '2 seconds', false, 'express', 'restricted', 'restricted',
+  now() + interval '4 seconds', false, 'express', 'restricted', 'restricted',
   '[]'::jsonb, '[]'::jsonb, '{}'::jsonb, '{}'::jsonb,
   array['recipient'], true, '{"source":"closed_account"}'::jsonb
 );
@@ -445,7 +526,7 @@ select public.complete_provider_connect_account_creation(
 select public.sync_provider_connect_account(
   'evt_connect_replacement_active_1',
   'v2.core.account[configuration.recipient].capability_status_updated',
-  'acct_EligibilityTestV2Replacement', now() + interval '3 seconds', false,
+  'acct_EligibilityTestV2Replacement', now() + interval '5 seconds', false,
   'express', 'active', 'unknown', '[]'::jsonb, '[]'::jsonb,
   '{}'::jsonb, '{}'::jsonb, array['recipient'], false,
   '{"source":"replacement_account"}'::jsonb
@@ -453,7 +534,7 @@ select public.sync_provider_connect_account(
 -- A late event for the retired identity is journaled but cannot overwrite the replacement.
 select public.sync_provider_connect_account(
   'evt_connect_old_identity_late_1', 'v2.core.account.updated',
-  'acct_EligibilityTestV2', now() + interval '4 seconds', false,
+  'acct_EligibilityTestV2', now() + interval '6 seconds', false,
   'express', 'active', 'active', '[]'::jsonb, '[]'::jsonb,
   '{}'::jsonb, '{}'::jsonb, array['recipient'], false,
   '{"source":"late_old_identity"}'::jsonb

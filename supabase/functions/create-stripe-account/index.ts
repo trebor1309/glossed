@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
         { idempotencyKey: reservation.idempotency_key }
       );
       accountId = account.id;
-      const { error: completionError } = await admin.rpc(
+      const { data: completedAccount, error: completionError } = await admin.rpc(
         "complete_provider_connect_account_creation",
         {
           p_provider_id: authUser.id,
@@ -72,14 +72,25 @@ Deno.serve(async (req) => {
         }
       );
       if (completionError) throw completionError;
+      if (!completedAccount) throw new Error("Connect account completion failed");
       await syncConnectAccount(account, {
         id: `account-create:${account.id}`,
         type: "v2.core.account.created",
         createdAt: new Date(),
         livemode: Boolean(account.livemode),
         source: "account_creation",
+        expectedRevision: completedAccount.revision,
       });
     } else if (accountId) {
+      const { data: accountState, error: accountStateError } = await admin
+        .from("provider_connect_accounts")
+        .select("stripe_account_id, revision")
+        .eq("provider_id", authUser.id)
+        .single();
+      if (accountStateError) throw accountStateError;
+      if (accountState.stripe_account_id !== accountId) {
+        throw new Error("Connect account changed while preparing the account check");
+      }
       const account = await retrieveConnectAccount(accountId);
       await syncConnectAccount(account, {
         id: `account-check:${account.id}:${crypto.randomUUID()}`,
@@ -87,6 +98,7 @@ Deno.serve(async (req) => {
         createdAt: new Date(),
         livemode: Boolean(account.livemode),
         source: "account_check",
+        expectedRevision: accountState.revision,
       });
     }
 

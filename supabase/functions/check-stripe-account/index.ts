@@ -2,7 +2,7 @@ import {
   retrieveConnectAccount,
   syncConnectAccount,
 } from "../_shared/connect-v2.ts";
-import { errorResponse, handleOptions, HttpError, json } from "../_shared/http.ts";
+import { errorResponse, handleOptions, json } from "../_shared/http.ts";
 import { admin, requireUser } from "../_shared/supabase.ts";
 
 Deno.serve(async (req) => {
@@ -11,23 +11,25 @@ Deno.serve(async (req) => {
 
   try {
     const authUser = await requireUser(req);
-    const { data: profile, error } = await admin
-      .from("users")
-      .select("stripe_account_id")
-      .eq("id", authUser.id)
+    const { data: accountState, error } = await admin
+      .from("provider_connect_accounts")
+      .select("stripe_account_id, revision")
+      .eq("provider_id", authUser.id)
       .maybeSingle();
 
     if (error) throw error;
-    if (!profile) throw new HttpError(404, "Profile not found");
-    if (!profile.stripe_account_id) return json(req, { connected: false, reason: "no_account_id" });
+    if (!accountState?.stripe_account_id) {
+      return json(req, { connected: false, reason: "no_account_id" });
+    }
 
-    const account = await retrieveConnectAccount(profile.stripe_account_id);
+    const account = await retrieveConnectAccount(accountState.stripe_account_id);
     await syncConnectAccount(account, {
       id: `account-check:${account.id}:${crypto.randomUUID()}`,
       type: "v2.core.account.polled",
       createdAt: new Date(),
       livemode: Boolean(account.livemode),
       source: "account_check",
+      expectedRevision: accountState.revision,
     });
 
     const { data: connect, error: connectError } = await admin
