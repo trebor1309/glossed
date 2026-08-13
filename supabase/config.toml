@@ -2,3 +2,9 @@
 # Stripe does not send a Supabase JWT. The handler verifies the raw-body
 # signature with STRIPE_WEBHOOK_SECRET before processing an event.
 verify_jwt = false
+
+[functions.stripe-connect-webhook]
+# Accounts v2 thin events do not carry a Supabase JWT. This dedicated endpoint
+# verifies Stripe-Signature against STRIPE_CONNECT_WEBHOOK_SECRET and retrieves
+# the current related account from Stripe before applying the event.
+verify_jwt = false

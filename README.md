@@ -135,10 +135,10 @@ Copier `.env.example` vers `.env.local`. Les variables préfixées par `VITE_` s
 Les secrets des Edge Functions doivent être configurés côté Supabase, par exemple :
 
 ```powershell
-supabase secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... APP_URL=... ALLOWED_ORIGINS=...
+supabase secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... STRIPE_CONNECT_WEBHOOK_SECRET=... APP_URL=... ALLOWED_ORIGINS=...
 ```
 
-Les fonctions appelées par un utilisateur conservent la vérification JWT Supabase par défaut. Seule `stripe-payment-webhook` utilise `verify_jwt = false`, car elle authentifie Stripe avec la signature du corps brut et `STRIPE_WEBHOOK_SECRET`.
+Les fonctions appelées par un utilisateur conservent la vérification JWT Supabase par défaut. Seules `stripe-payment-webhook` et `stripe-connect-webhook` utilisent `verify_jwt = false` : chacune vérifie la signature du corps brut avec son secret webhook Stripe dédié.
 
 Le proxy Vercel `/api/stripe-webhook` nécessite `SUPABASE_STRIPE_WEBHOOK_URL`. Dans Stripe, l'endpoint à déclarer est l'URL publique de ce proxy et l'événement requis est `checkout.session.completed`.
 

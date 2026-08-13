@@ -1,8 +1,9 @@
-import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
+import {
+  retrieveConnectAccount,
+  syncConnectAccount,
+} from "../_shared/connect-v2.ts";
 import { errorResponse, handleOptions, HttpError, json } from "../_shared/http.ts";
 import { admin, requireUser } from "../_shared/supabase.ts";
-
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2023-10-16" });
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return handleOptions(req);
@@ -20,21 +21,31 @@ Deno.serve(async (req) => {
     if (!profile) throw new HttpError(404, "Profile not found");
     if (!profile.stripe_account_id) return json(req, { connected: false, reason: "no_account_id" });
 
-    const account = await stripe.accounts.retrieve(profile.stripe_account_id);
-    const connected = !account.deleted;
-    const payoutsEnabled = connected && account.payouts_enabled;
-    const detailsSubmitted = connected && account.details_submitted;
+    const account = await retrieveConnectAccount(profile.stripe_account_id);
+    await syncConnectAccount(account, {
+      id: `account-check:${account.id}:${crypto.randomUUID()}`,
+      type: "v2.core.account.polled",
+      createdAt: new Date(),
+      livemode: Boolean(account.livemode),
+      source: "account_check",
+    });
 
-    const { error: updateError } = await admin
-      .from("users")
-      .update({ stripe_account_ready: detailsSubmitted, payouts_enabled: payoutsEnabled })
-      .eq("id", authUser.id);
-    if (updateError) throw updateError;
+    const { data: connect, error: connectError } = await admin
+      .from("provider_connect_accounts")
+      .select("closed, stripe_transfers_status, payouts_status, requirements, future_requirements")
+      .eq("provider_id", authUser.id)
+      .single();
+    if (connectError) throw connectError;
+
+    const connected = !connect.closed;
 
     return json(req, {
       connected,
-      payouts_enabled: payoutsEnabled,
-      details_submitted: detailsSubmitted,
+      transfers_status: connect.stripe_transfers_status,
+      payouts_status: connect.payouts_status,
+      ready: connected && connect.stripe_transfers_status === "active",
+      requirements: connect.requirements,
+      future_requirements: connect.future_requirements,
     });
   } catch (error) {
     return errorResponse(req, error);
