@@ -181,9 +181,30 @@ create trigger provider_eligibility_assessments_immutable
 before update or delete on public.provider_eligibility_assessments
 for each row execute function public.reject_financial_definition_mutation();
 
+create table public.provider_connect_account_identities (
+  stripe_account_id text primary key,
+  provider_id uuid not null references public.users(id) on delete restrict,
+  creation_generation integer not null check (creation_generation > 0),
+  account_api_version text not null
+    check (account_api_version in ('accounts_v1_legacy', 'accounts_v2')),
+  created_at timestamptz not null default now(),
+  unique (provider_id, creation_generation),
+  constraint provider_connect_identity_id_format check (
+    stripe_account_id ~ '^acct_[A-Za-z0-9]+$'
+  )
+);
+
+comment on table public.provider_connect_account_identities is
+  'Immutable Stripe account generations. Closed identities remain addressable for late webhook reconciliation.';
+
+create trigger provider_connect_account_identities_immutable
+before update or delete on public.provider_connect_account_identities
+for each row execute function public.reject_financial_definition_mutation();
+
 create table public.provider_connect_accounts (
   provider_id uuid primary key references public.users(id) on delete restrict,
-  stripe_account_id text unique,
+  stripe_account_id text unique
+    references public.provider_connect_account_identities(stripe_account_id) on delete restrict,
   account_api_version text not null default 'accounts_v2'
     check (account_api_version in ('accounts_v1_legacy', 'accounts_v2')),
   dashboard text not null default 'express' check (dashboard = 'express'),
@@ -247,7 +268,7 @@ create table public.stripe_connect_webhook_events (
   event_id text primary key,
   event_type text not null,
   stripe_account_id text not null
-    references public.provider_connect_accounts(stripe_account_id) on delete restrict,
+    references public.provider_connect_account_identities(stripe_account_id) on delete restrict,
   stripe_created_at timestamptz not null,
   livemode boolean not null,
   applied boolean not null,
@@ -366,10 +387,22 @@ begin
     raise exception 'Provider Connect account state is server-managed'
       using errcode = '42501';
   end if;
+  if (new.creation_generation is distinct from old.creation_generation
+      or new.creation_idempotency_key is distinct from old.creation_idempotency_key)
+     and not (
+       old.closed
+       and new.creation_state = 'creating'
+       and new.stripe_account_id is null
+       and new.creation_generation = old.creation_generation + 1
+       and new.creation_idempotency_key =
+         'connect-account-v2:' || old.provider_id::text || ':'
+           || new.creation_generation::text
+     ) then
+    raise exception 'Invalid Provider Connect account generation change'
+      using errcode = '55000';
+  end if;
   if new.provider_id is distinct from old.provider_id
      or new.created_at is distinct from old.created_at
-     or new.creation_generation is distinct from old.creation_generation
-     or new.creation_idempotency_key is distinct from old.creation_idempotency_key
      or new.revision <> old.revision + 1
      or new.updated_at <= old.updated_at then
     raise exception 'Invalid Provider Connect account update'
@@ -414,6 +447,14 @@ before update or delete on public.paid_proposal_drafts
 for each row execute function public.protect_paid_proposal_draft();
 
 -- Existing accounts are recorded without trusting deprecated readiness flags.
+insert into public.provider_connect_account_identities (
+  stripe_account_id, provider_id, creation_generation, account_api_version
+)
+select u.stripe_account_id, u.id, 1, 'accounts_v1_legacy'
+from public.users u
+where u.role = 'pro' and u.stripe_account_id is not null
+on conflict (stripe_account_id) do nothing;
+
 insert into public.provider_connect_accounts (
   provider_id,
   stripe_account_id,
@@ -647,6 +688,43 @@ begin
       'connect-account-v2:' || p_provider_id::text || ':1'
     ) returning * into v_account;
   else
+    if v_account.closed then
+      perform set_config('app.trusted_connect_sync', 'on', true);
+      update public.provider_connect_accounts as connect_account
+      set stripe_account_id = null,
+          account_api_version = 'accounts_v2',
+          creation_state = 'creating',
+          creation_generation = connect_account.creation_generation + 1,
+          creation_idempotency_key =
+            'connect-account-v2:' || p_provider_id::text || ':'
+              || (connect_account.creation_generation + 1)::text,
+          stripe_transfers_status = 'unknown',
+          payouts_status = 'unknown',
+          stripe_transfers_status_details = '[]'::jsonb,
+          payouts_status_details = '[]'::jsonb,
+          requirements = '{}'::jsonb,
+          future_requirements = '{}'::jsonb,
+          applied_configurations = '{}'::text[],
+          livemode = null,
+          closed = false,
+          connection_enabled = true,
+          last_stripe_event_id = null,
+          last_stripe_event_created_at = null,
+          last_synced_at = null,
+          revision = connect_account.revision + 1,
+          updated_at = clock_timestamp()
+      where provider_id = p_provider_id
+      returning * into v_account;
+      perform set_config('app.trusted_connect_sync', 'off', true);
+
+      update public.users
+      set stripe_account_id = null,
+          stripe_account_ready = false,
+          payouts_enabled = false,
+          updated_at = now()
+      where id = p_provider_id;
+    end if;
+
     if not v_account.connection_enabled then
       perform set_config('app.trusted_connect_sync', 'on', true);
       update public.provider_connect_accounts
@@ -694,6 +772,37 @@ begin
   if auth.role() <> 'service_role' then
     raise exception 'Service role required' using errcode = '42501';
   end if;
+  select * into v_account
+  from public.provider_connect_accounts
+  where provider_id = p_provider_id
+  for update;
+  if found and v_account.creation_state = 'created'
+     and v_account.stripe_account_id = p_stripe_account_id then
+    return v_account;
+  end if;
+  if not found or v_account.creation_state <> 'creating'
+     or v_account.stripe_account_id is not null then
+    raise exception 'Connect account creation is not reserved'
+      using errcode = '55000';
+  end if;
+
+  insert into public.provider_connect_account_identities (
+    stripe_account_id, provider_id, creation_generation, account_api_version
+  ) values (
+    p_stripe_account_id, p_provider_id, v_account.creation_generation, 'accounts_v2'
+  )
+  on conflict (stripe_account_id) do nothing;
+
+  if not exists (
+    select 1 from public.provider_connect_account_identities
+    where stripe_account_id = p_stripe_account_id
+      and provider_id = p_provider_id
+      and creation_generation = v_account.creation_generation
+  ) then
+    raise exception 'Stripe account identity belongs to another reservation'
+      using errcode = '23505';
+  end if;
+
   perform set_config('app.trusted_connect_sync', 'on', true);
   update public.provider_connect_accounts
   set stripe_account_id = p_stripe_account_id,
@@ -793,23 +902,26 @@ begin
   end if;
 
   select provider_id into v_provider_id
-  from public.provider_connect_accounts
+  from public.provider_connect_account_identities
   where stripe_account_id = p_stripe_account_id
-  for update;
-  if not found then
+  ;
+  if v_provider_id is null then
     raise exception 'Stripe account is not linked to a provider'
       using errcode = 'P0002';
   end if;
 
-  select last_stripe_event_created_at is null
-      or p_stripe_created_at > last_stripe_event_created_at
-      or (
-        p_stripe_created_at = last_stripe_event_created_at
-        and p_event_id > coalesce(last_stripe_event_id, '')
-      )
+  select stripe_account_id = p_stripe_account_id and (
+           last_stripe_event_created_at is null
+           or p_stripe_created_at > last_stripe_event_created_at
+           or (
+             p_stripe_created_at = last_stripe_event_created_at
+             and p_event_id > coalesce(last_stripe_event_id, '')
+           )
+         )
   into v_apply
   from public.provider_connect_accounts
-  where provider_id = v_provider_id;
+  where provider_id = v_provider_id
+  for update;
 
   insert into public.stripe_connect_webhook_events (
     event_id, event_type, stripe_account_id, stripe_created_at,
@@ -1110,6 +1222,7 @@ $$;
 alter table public.provider_eligibility_policy_versions enable row level security;
 alter table public.provider_eligibility_declarations enable row level security;
 alter table public.provider_eligibility_assessments enable row level security;
+alter table public.provider_connect_account_identities enable row level security;
 alter table public.provider_connect_accounts enable row level security;
 alter table public.stripe_connect_webhook_events enable row level security;
 alter table public.paid_proposal_drafts enable row level security;
@@ -1118,6 +1231,7 @@ alter table public.paid_proposal_draft_events enable row level security;
 revoke all on public.provider_eligibility_policy_versions from public, anon, authenticated;
 revoke all on public.provider_eligibility_declarations from public, anon, authenticated;
 revoke all on public.provider_eligibility_assessments from public, anon, authenticated;
+revoke all on public.provider_connect_account_identities from public, anon, authenticated;
 revoke all on public.provider_connect_accounts from public, anon, authenticated;
 revoke all on public.stripe_connect_webhook_events from public, anon, authenticated;
 revoke all on public.paid_proposal_drafts from public, anon, authenticated;
@@ -1126,6 +1240,7 @@ revoke all on public.paid_proposal_draft_events from public, anon, authenticated
 grant all on public.provider_eligibility_policy_versions to service_role;
 grant all on public.provider_eligibility_declarations to service_role;
 grant all on public.provider_eligibility_assessments to service_role;
+grant all on public.provider_connect_account_identities to service_role;
 grant all on public.provider_connect_accounts to service_role;
 grant all on public.stripe_connect_webhook_events to service_role;
 grant all on public.paid_proposal_drafts to service_role;

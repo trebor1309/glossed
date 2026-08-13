@@ -407,4 +407,72 @@ begin
 end
 $$;
 
+select public.sync_provider_connect_account(
+  'evt_connect_closed_1', 'v2.core.account.closed', 'acct_EligibilityTestV2',
+  now() + interval '2 seconds', false, 'express', 'restricted', 'restricted',
+  '[]'::jsonb, '[]'::jsonb, '{}'::jsonb, '{}'::jsonb,
+  array['recipient'], true, '{"source":"closed_account"}'::jsonb
+);
+
+create temporary table replacement_reservation as
+select * from public.reserve_provider_connect_account_creation(
+  '72000000-0000-0000-0000-000000000020'
+);
+
+do $$
+begin
+  if not (select should_create from replacement_reservation)
+     or (select stripe_account_id from replacement_reservation) is not null
+     or (select creation_generation from replacement_reservation) <> 2
+     or (select creation_idempotency_key from replacement_reservation)
+        <> 'connect-account-v2:72000000-0000-0000-0000-000000000020:2' then
+    raise exception 'Closed Connect account did not reserve a replacement generation';
+  end if;
+  if (select count(*) from public.provider_connect_account_identities
+      where provider_id = '72000000-0000-0000-0000-000000000020') <> 1 then
+    raise exception 'Closed Connect account identity was not retained for reconciliation';
+  end if;
+end
+$$;
+
+select public.complete_provider_connect_account_creation(
+  '72000000-0000-0000-0000-000000000020', 'acct_EligibilityTestV2Replacement', false
+);
+-- Completion itself is retry-safe after a network interruption.
+select public.complete_provider_connect_account_creation(
+  '72000000-0000-0000-0000-000000000020', 'acct_EligibilityTestV2Replacement', false
+);
+select public.sync_provider_connect_account(
+  'evt_connect_replacement_active_1',
+  'v2.core.account[configuration.recipient].capability_status_updated',
+  'acct_EligibilityTestV2Replacement', now() + interval '3 seconds', false,
+  'express', 'active', 'unknown', '[]'::jsonb, '[]'::jsonb,
+  '{}'::jsonb, '{}'::jsonb, array['recipient'], false,
+  '{"source":"replacement_account"}'::jsonb
+);
+-- A late event for the retired identity is journaled but cannot overwrite the replacement.
+select public.sync_provider_connect_account(
+  'evt_connect_old_identity_late_1', 'v2.core.account.updated',
+  'acct_EligibilityTestV2', now() + interval '4 seconds', false,
+  'express', 'active', 'active', '[]'::jsonb, '[]'::jsonb,
+  '{}'::jsonb, '{}'::jsonb, array['recipient'], false,
+  '{"source":"late_old_identity"}'::jsonb
+);
+
+do $$
+begin
+  if (select stripe_account_id from public.provider_connect_accounts
+      where provider_id = '72000000-0000-0000-0000-000000000020')
+       <> 'acct_EligibilityTestV2Replacement'
+     or (select creation_generation from public.provider_connect_accounts
+         where provider_id = '72000000-0000-0000-0000-000000000020') <> 2
+     or (select count(*) from public.provider_connect_account_identities
+         where provider_id = '72000000-0000-0000-0000-000000000020') <> 2
+     or (select applied from public.stripe_connect_webhook_events
+         where event_id = 'evt_connect_old_identity_late_1') then
+    raise exception 'Connect replacement generation or late-event isolation failed';
+  end if;
+end
+$$;
+
 select set_config('request.jwt.claim.role', '', false);
