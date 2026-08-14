@@ -18,6 +18,7 @@ const localTests = [
   "provider_balances_payouts_v2.sql",
   "admin_backoffice_foundation.sql",
   "admin_operations_read_models.sql",
+  "admin_disputes_cancellations.sql",
 ];
 
 function run(command, args, options = {}) {

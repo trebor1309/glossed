@@ -9,6 +9,8 @@ import AdminUsersPage from "./AdminUsersPage";
 import AdminUserDetailPage from "./AdminUserDetailPage";
 import AdminMissionsPage from "./AdminMissionsPage";
 import AdminMissionDetailPage from "./AdminMissionDetailPage";
+import AdminDisputesPage from "./AdminDisputesPage";
+import AdminDisputeDetailPage from "./AdminDisputeDetailPage";
 
 const allowedHosts = new Set([
   "admin.glossed.app",
@@ -36,7 +38,8 @@ function AdminWorkspace() {
         <Route path="utilisateurs/:userId" element={<PermissionRoute permission="users.read"><AdminUserDetailPage /></PermissionRoute>} />
         <Route path="missions" element={<PermissionRoute permission="missions.read"><AdminMissionsPage /></PermissionRoute>} />
         <Route path="missions/:missionId" element={<PermissionRoute permission="missions.read"><AdminMissionDetailPage /></PermissionRoute>} />
-        <Route path="litiges" element={<PermissionRoute permission="disputes.read"><AdminPlaceholderPage title="Litiges" description="Instruction des litiges de prestation Glossed." /></PermissionRoute>} />
+        <Route path="litiges" element={<PermissionRoute permission="disputes.read"><AdminDisputesPage /></PermissionRoute>} />
+        <Route path="litiges/:caseType/:caseId" element={<PermissionRoute permission="disputes.read"><AdminDisputeDetailPage /></PermissionRoute>} />
         <Route path="finance" element={<PermissionRoute permission="finance.read"><AdminPlaceholderPage title="Finance" description="Rapprochement et opérations financières contrôlées." /></PermissionRoute>} />
         <Route path="risque" element={<PermissionRoute permission="risk.read"><AdminPlaceholderPage title="Chargebacks / risque" description="Contestation bancaire Stripe, Radar et suivi du risque." /></PermissionRoute>} />
         <Route path="incidents" element={<PermissionRoute permission="incidents.read"><AdminPlaceholderPage title="Incidents" description="Suivi des incidents opérationnels et techniques." /></PermissionRoute>} />
