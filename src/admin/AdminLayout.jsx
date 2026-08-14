@@ -30,7 +30,7 @@ const navigation = [
   { to: "/risque", label: "Chargebacks / risque", icon: ShieldAlert, permission: "risk.read" },
   { to: "/incidents", label: "Incidents", icon: AlertTriangle, permission: "incidents.read" },
   { to: "/audit", label: "Audit", icon: BookOpenCheck, permission: "audit.read" },
-  { to: "/configuration", label: "Configuration / conformité", icon: Settings2, permission: "configuration.manage" },
+  { to: "/configuration", label: "Configuration / conformité", icon: Settings2, permission: "configuration.read" },
 ];
 
 export default function AdminLayout() {

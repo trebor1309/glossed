@@ -45,6 +45,51 @@ export async function executeAdminFinancialOperation(previewId, reason, operatio
   return data;
 }
 
+export const listAdminFinancialIncidents = (queue = "open", limit = 50, offset = 0) =>
+  rpc("admin_list_financial_incidents", { p_queue: queue, p_limit: limit, p_offset: offset });
+export const getAdminFinancialIncident = (incidentKey) =>
+  rpc("admin_get_financial_incident_detail", { p_incident_key: incidentKey });
+export const reconcileAdminFinancialIncident = (incidentKey) =>
+  rpc("admin_reconcile_financial_incident_v2", {
+    p_incident_key: incidentKey,
+    p_deduplication_key: `admin-incident-reconciliation:${crypto.randomUUID()}`,
+  });
+export const previewAdminControlReactivation = (controlId, reconciliationId) =>
+  rpc("admin_preview_financial_control_reactivation_v2", {
+    p_control_id: controlId,
+    p_reconciliation_id: reconciliationId,
+  });
+
+export async function executeAdminControlReactivation(previewId, reason, operationId) {
+  const { data, error } = await adminSupabase.functions.invoke("financial-remediation-v2", {
+    body: {
+      action: "admin_reactivate_financial_control",
+      preview_id: previewId,
+      reason,
+      confirmed: true,
+      operation_id: operationId,
+    },
+  });
+  if (error) throw error;
+  return data;
+}
+
+export const searchAdminAudit = (query = "", source = "all", limit = 50, offset = 0) =>
+  rpc("admin_search_audit", {
+    p_query: query.trim() || null,
+    p_source: source,
+    p_limit: limit,
+    p_offset: offset,
+  });
+export const getAdminConfiguration = () => rpc("admin_get_configuration_catalog");
+export const createAdminConfigurationVersion = (configurationType, version, payload, reason) =>
+  rpc("admin_create_configuration_version", {
+    p_configuration_type: configurationType,
+    p_version: version,
+    p_payload: payload,
+    p_reason: reason,
+  });
+
 export const listAdminDisputeCases = (queue = "disputes", limit = 50, offset = 0) =>
   rpc("admin_list_dispute_cases", { p_queue: queue, p_limit: limit, p_offset: offset });
 export const getAdminDisputeCase = (disputeId) =>

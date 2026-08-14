@@ -3,7 +3,6 @@ import { AdminAuthProvider, useAdminAuth } from "./AdminAuthContext";
 import AdminLayout from "./AdminLayout";
 import AdminLogin from "./AdminLogin";
 import AdminOverview from "./AdminOverview";
-import AdminPlaceholderPage from "./AdminPlaceholderPage";
 import VerificationReviewPage from "./VerificationReviewPage";
 import AdminUsersPage from "./AdminUsersPage";
 import AdminUserDetailPage from "./AdminUserDetailPage";
@@ -15,6 +14,10 @@ import AdminFinancePage from "./AdminFinancePage";
 import AdminFinancialPaymentDetailPage from "./AdminFinancialPaymentDetailPage";
 import AdminPaymentDisputesPage from "./AdminPaymentDisputesPage";
 import AdminPaymentDisputeDetailPage from "./AdminPaymentDisputeDetailPage";
+import AdminIncidentsPage from "./AdminIncidentsPage";
+import AdminIncidentDetailPage from "./AdminIncidentDetailPage";
+import AdminAuditPage from "./AdminAuditPage";
+import AdminConfigurationPage from "./AdminConfigurationPage";
 
 const allowedHosts = new Set([
   "admin.glossed.app",
@@ -48,9 +51,10 @@ function AdminWorkspace() {
         <Route path="finance/paiements/:paymentId" element={<PermissionRoute permission="finance.read"><AdminFinancialPaymentDetailPage /></PermissionRoute>} />
         <Route path="risque" element={<PermissionRoute permission="risk.read"><AdminPaymentDisputesPage /></PermissionRoute>} />
         <Route path="risque/:disputeId" element={<PermissionRoute permission="risk.read"><AdminPaymentDisputeDetailPage /></PermissionRoute>} />
-        <Route path="incidents" element={<PermissionRoute permission="incidents.read"><AdminPlaceholderPage title="Incidents" description="Suivi des incidents opérationnels et techniques." /></PermissionRoute>} />
-        <Route path="audit" element={<PermissionRoute permission="audit.read"><AdminPlaceholderPage title="Audit" description="Consultation du journal immuable des actions administratives." /></PermissionRoute>} />
-        <Route path="configuration" element={<PermissionRoute permission="configuration.manage"><AdminPlaceholderPage title="Configuration / conformité" description="Politiques versionnées et règles de conformité par juridiction." /></PermissionRoute>} />
+        <Route path="incidents" element={<PermissionRoute permission="incidents.read"><AdminIncidentsPage /></PermissionRoute>} />
+        <Route path="incidents/:incidentKey" element={<PermissionRoute permission="incidents.read"><AdminIncidentDetailPage /></PermissionRoute>} />
+        <Route path="audit" element={<PermissionRoute permission="audit.read"><AdminAuditPage /></PermissionRoute>} />
+        <Route path="configuration" element={<PermissionRoute permission="configuration.read"><AdminConfigurationPage /></PermissionRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
