@@ -1,7 +1,11 @@
-import Stripe from "https://esm.sh/stripe@16.5.0?target=deno";
+import Stripe from "npm:stripe@22.5.0";
+import {
+  dispatchProviderRetransferV2,
+  dispatchTransferReversalV2,
+} from "../_shared/financial-remediation-v2.ts";
 import { admin } from "../_shared/supabase.ts";
 
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2023-10-16" });
+const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { maxNetworkRetries: 2 });
 const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET")!;
 const cryptoProvider = Stripe.createSubtleCryptoProvider();
 
@@ -33,12 +37,103 @@ Deno.serve(async (req) => {
     return response({ error: "Invalid signature" }, 400);
   }
 
-  if (!["checkout.session.completed", "checkout.session.async_payment_succeeded",
-        "checkout.session.async_payment_failed", "checkout.session.expired"].includes(event.type)) {
+  const supported = [
+    "checkout.session.completed",
+    "checkout.session.async_payment_succeeded",
+    "checkout.session.async_payment_failed",
+    "checkout.session.expired",
+    "charge.dispute.created",
+    "charge.dispute.updated",
+    "charge.dispute.closed",
+    "refund.created",
+    "refund.updated",
+    "refund.failed",
+  ];
+  if (!supported.includes(event.type)) {
     return response({ skipped: true });
   }
 
   try {
+    if (event.type.startsWith("charge.dispute.")) {
+      const incoming = event.data.object as Stripe.Dispute;
+      const dispute = await stripe.disputes.retrieve(incoming.id, {
+        expand: ["balance_transactions"],
+      });
+      const chargeId = typeof dispute.charge === "string" ? dispute.charge : dispute.charge.id;
+      const balanceTransactions = dispute.balance_transactions ?? [];
+      const disputeFee = balanceTransactions.reduce((total, value) => {
+        const transaction = typeof value === "string" ? null : value;
+        return total + Math.max(0, transaction?.fee ?? 0);
+      }, 0);
+      const { data, error } = await admin.rpc("process_payment_dispute_v2_event", {
+        p_event_id: event.id,
+        p_event_type: event.type,
+        p_stripe_created_at: new Date(event.created * 1000).toISOString(),
+        p_stripe_dispute_id: dispute.id,
+        p_stripe_charge_id: chargeId,
+        p_stripe_status: dispute.status,
+        p_reason_code: dispute.reason,
+        p_amount_debited_cents: dispute.amount,
+        p_stripe_dispute_fee_amount_cents: disputeFee,
+        p_currency: dispute.currency,
+        p_risk_details: {
+          evidence_details: dispute.evidence_details,
+          payment_method_details: dispute.payment_method_details,
+        },
+        p_payload_summary: {
+          status: dispute.status,
+          reason: dispute.reason,
+          is_charge_refundable: dispute.is_charge_refundable,
+        },
+      });
+      if (error) throw error;
+      const result = data?.[0];
+      if (result?.reversal_id && result.outcome === "opened") {
+        await dispatchTransferReversalV2(result.reversal_id);
+      }
+      if (result?.retransfer_reversal_id && result?.payment_dispute_id) {
+        const { data: localDispute, error: disputeError } = await admin
+          .from("payment_disputes_v2")
+          .select("payment_id")
+          .eq("id", result.payment_dispute_id)
+          .single();
+        if (disputeError) throw disputeError;
+        await dispatchProviderRetransferV2(
+          localDispute.payment_id,
+          result.retransfer_reversal_id
+        );
+      }
+      return response({ ok: true, duplicate: result?.duplicate ?? false, outcome: result?.outcome });
+    }
+
+    if (event.type.startsWith("refund.")) {
+      const refund = event.data.object as Stripe.Refund;
+      const localRefundId = refund.metadata?.refund_v2_id ?? null;
+      const { data, error } = await admin.rpc("process_refund_v2_event", {
+        p_event_id: event.id,
+        p_event_type: event.type,
+        p_stripe_created_at: new Date(event.created * 1000).toISOString(),
+        p_local_refund_id: localRefundId,
+        p_stripe_refund_id: refund.id,
+        p_refund_status: refund.status ?? "pending",
+        p_amount_cents: refund.amount,
+        p_failure_reason: refund.failure_reason,
+        p_payload_summary: {
+          status: refund.status,
+          reason: refund.reason,
+          payment_intent: typeof refund.payment_intent === "string"
+            ? refund.payment_intent
+            : refund.payment_intent?.id,
+        },
+      });
+      if (error) throw error;
+      return response({
+        ok: true,
+        duplicate: data?.[0]?.duplicate ?? false,
+        outcome: data?.[0]?.outcome,
+      });
+    }
+
     const session = event.data.object as Stripe.Checkout.Session;
     if (session.metadata?.financial_flow_version === "marketplace_v2") {
       const authoritative = await stripe.checkout.sessions.retrieve(session.id, {
