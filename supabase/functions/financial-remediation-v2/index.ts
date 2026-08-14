@@ -1,4 +1,5 @@
 import {
+  dispatchProviderRetransferV2,
   dispatchRefundV2,
   dispatchTransferReversalV2,
 } from "../_shared/financial-remediation-v2.ts";
@@ -315,6 +316,69 @@ Deno.serve(async (req) => {
       });
       if (auditError) throw auditError;
       return json(req, { decision: result, operations, execution_status: outcome }, 202);
+    }
+    if (action === "admin_execute_financial_operation") {
+      if (body.confirmed !== true) throw new HttpError(400, "Explicit confirmation required");
+      if (typeof body.reason !== "string" || body.reason.trim().length < 10) {
+        throw new HttpError(400, "A detailed justification is required");
+      }
+      await requireAdminPermissions(user.id, ["finance.execute"]);
+      const mfaAt = mfaAuthenticatedAt(req);
+      const { data: preview, error: previewError } = await admin
+        .from("admin_financial_operation_previews_v2")
+        .select("operation_type, operation_id, payment_id, payment_dispute_id")
+        .eq("id", body.preview_id)
+        .single();
+      if (previewError) throw previewError;
+      if (preview.payment_dispute_id) {
+        await requireAdminPermissions(user.id, ["risk.manage"]);
+      }
+      const { data, error } = await admin.rpc("consume_admin_financial_operation_preview_v2", {
+        p_preview_id: body.preview_id,
+        p_admin_id: user.id,
+        p_reason: body.reason.trim(),
+        p_mfa_authenticated_at: mfaAt,
+        p_execution_operation_id: operationId,
+      });
+      if (error) throw error;
+      const operation = data?.[0] ?? preview;
+      let result: Record<string, unknown>;
+      let outcome = "success";
+      try {
+        if (operation.operation_type === "refund") {
+          result = await dispatchRefundV2(operation.operation_id);
+          outcome = result.status === "pending" ? "pending" : "success";
+        } else if (operation.operation_type === "transfer_reversal") {
+          result = await dispatchTransferReversalV2(operation.operation_id);
+        } else if (operation.operation_type === "provider_retransfer") {
+          result = await dispatchProviderRetransferV2(
+            operation.payment_id,
+            operation.operation_id
+          );
+        } else {
+          throw new HttpError(400, "Unsupported financial operation type");
+        }
+      } catch (operationError) {
+        outcome = "failed";
+        result = {
+          status: "failed",
+          message: operationError instanceof Error ? operationError.message : "Execution failed",
+        };
+      }
+      const { error: auditError } = await admin.rpc(
+        "record_admin_financial_execution_audit_v2",
+        {
+          p_admin_id: user.id,
+          p_operation_type: operation.operation_type,
+          p_operation_id: operation.operation_id,
+          p_execution_operation_id: operationId,
+          p_outcome: outcome,
+          p_result: result,
+          p_mfa_authenticated_at: mfaAt,
+        }
+      );
+      if (auditError) throw auditError;
+      return json(req, { operation, result, execution_status: outcome }, 202);
     }
     if (action === "finalize_resolution") {
       const context = await resolutionExecutionContext(body.resolution_id);
