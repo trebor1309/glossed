@@ -11,6 +11,10 @@ import AdminMissionsPage from "./AdminMissionsPage";
 import AdminMissionDetailPage from "./AdminMissionDetailPage";
 import AdminDisputesPage from "./AdminDisputesPage";
 import AdminDisputeDetailPage from "./AdminDisputeDetailPage";
+import AdminFinancePage from "./AdminFinancePage";
+import AdminFinancialPaymentDetailPage from "./AdminFinancialPaymentDetailPage";
+import AdminPaymentDisputesPage from "./AdminPaymentDisputesPage";
+import AdminPaymentDisputeDetailPage from "./AdminPaymentDisputeDetailPage";
 
 const allowedHosts = new Set([
   "admin.glossed.app",
@@ -40,8 +44,10 @@ function AdminWorkspace() {
         <Route path="missions/:missionId" element={<PermissionRoute permission="missions.read"><AdminMissionDetailPage /></PermissionRoute>} />
         <Route path="litiges" element={<PermissionRoute permission="disputes.read"><AdminDisputesPage /></PermissionRoute>} />
         <Route path="litiges/:caseType/:caseId" element={<PermissionRoute permission="disputes.read"><AdminDisputeDetailPage /></PermissionRoute>} />
-        <Route path="finance" element={<PermissionRoute permission="finance.read"><AdminPlaceholderPage title="Finance" description="Rapprochement et opérations financières contrôlées." /></PermissionRoute>} />
-        <Route path="risque" element={<PermissionRoute permission="risk.read"><AdminPlaceholderPage title="Chargebacks / risque" description="Contestation bancaire Stripe, Radar et suivi du risque." /></PermissionRoute>} />
+        <Route path="finance" element={<PermissionRoute permission="finance.read"><AdminFinancePage /></PermissionRoute>} />
+        <Route path="finance/paiements/:paymentId" element={<PermissionRoute permission="finance.read"><AdminFinancialPaymentDetailPage /></PermissionRoute>} />
+        <Route path="risque" element={<PermissionRoute permission="risk.read"><AdminPaymentDisputesPage /></PermissionRoute>} />
+        <Route path="risque/:disputeId" element={<PermissionRoute permission="risk.read"><AdminPaymentDisputeDetailPage /></PermissionRoute>} />
         <Route path="incidents" element={<PermissionRoute permission="incidents.read"><AdminPlaceholderPage title="Incidents" description="Suivi des incidents opérationnels et techniques." /></PermissionRoute>} />
         <Route path="audit" element={<PermissionRoute permission="audit.read"><AdminPlaceholderPage title="Audit" description="Consultation du journal immuable des actions administratives." /></PermissionRoute>} />
         <Route path="configuration" element={<PermissionRoute permission="configuration.manage"><AdminPlaceholderPage title="Configuration / conformité" description="Politiques versionnées et règles de conformité par juridiction." /></PermissionRoute>} />

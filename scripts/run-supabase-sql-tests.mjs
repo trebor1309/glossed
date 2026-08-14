@@ -19,6 +19,7 @@ const localTests = [
   "admin_backoffice_foundation.sql",
   "admin_operations_read_models.sql",
   "admin_disputes_cancellations.sql",
+  "admin_finance_payment_disputes.sql",
 ];
 
 function run(command, args, options = {}) {

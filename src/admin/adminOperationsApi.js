@@ -17,6 +17,34 @@ export const listAdminMissions = (query = "", limit = 50, offset = 0) =>
 export const getAdminMission = (missionId) =>
   rpc("admin_get_mission_detail", { p_mission_id: missionId });
 
+export const searchAdminFinance = (query, limit = 50) =>
+  rpc("admin_financial_search", { p_query: query, p_limit: limit });
+export const getAdminFinancialPayment = (paymentId) =>
+  rpc("admin_get_financial_payment_detail", { p_payment_id: paymentId });
+export const listAdminPaymentDisputes = (queue = "open", limit = 50, offset = 0) =>
+  rpc("admin_list_payment_disputes", { p_queue: queue, p_limit: limit, p_offset: offset });
+export const getAdminPaymentDispute = (disputeId) =>
+  rpc("admin_get_payment_dispute_detail", { p_dispute_id: disputeId });
+export const previewAdminFinancialOperation = (operationType, operationId) =>
+  rpc("admin_preview_financial_operation_v2", {
+    p_operation_type: operationType,
+    p_operation_id: operationId,
+  });
+
+export async function executeAdminFinancialOperation(previewId, reason, operationId) {
+  const { data, error } = await adminSupabase.functions.invoke("financial-remediation-v2", {
+    body: {
+      action: "admin_execute_financial_operation",
+      preview_id: previewId,
+      reason,
+      confirmed: true,
+      operation_id: operationId,
+    },
+  });
+  if (error) throw error;
+  return data;
+}
+
 export const listAdminDisputeCases = (queue = "disputes", limit = 50, offset = 0) =>
   rpc("admin_list_dispute_cases", { p_queue: queue, p_limit: limit, p_offset: offset });
 export const getAdminDisputeCase = (disputeId) =>
