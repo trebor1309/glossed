@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useAdminAuth } from "./AdminAuthContext";
+import AdminGlobalSearch from "./AdminGlobalSearch";
 
 const navigation = [
   { to: "/", label: "Vue d’ensemble", icon: LayoutDashboard, permission: "admin.access", end: true },
@@ -77,7 +78,10 @@ export default function AdminLayout() {
       </aside>
 
       <main className="min-w-0 p-4 sm:p-6 lg:ml-72 lg:p-8">
-        <div className="mx-auto max-w-7xl"><Outlet /></div>
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-6"><AdminGlobalSearch /></div>
+          <Outlet />
+        </div>
       </main>
     </div>
   );
