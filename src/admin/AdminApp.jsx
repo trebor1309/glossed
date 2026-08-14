@@ -5,6 +5,10 @@ import AdminLogin from "./AdminLogin";
 import AdminOverview from "./AdminOverview";
 import AdminPlaceholderPage from "./AdminPlaceholderPage";
 import VerificationReviewPage from "./VerificationReviewPage";
+import AdminUsersPage from "./AdminUsersPage";
+import AdminUserDetailPage from "./AdminUserDetailPage";
+import AdminMissionsPage from "./AdminMissionsPage";
+import AdminMissionDetailPage from "./AdminMissionDetailPage";
 
 const allowedHosts = new Set([
   "admin.glossed.app",
@@ -28,8 +32,10 @@ function AdminWorkspace() {
       <Route element={<AdminLayout />}>
         <Route index element={<AdminOverview />} />
         <Route path="verifications" element={<PermissionRoute permission="verification.read"><VerificationReviewPage /></PermissionRoute>} />
-        <Route path="utilisateurs" element={<PermissionRoute permission="users.read"><AdminPlaceholderPage title="Utilisateurs" description="Recherche, support et vue des comptes Glossed." /></PermissionRoute>} />
-        <Route path="missions" element={<PermissionRoute permission="missions.read"><AdminPlaceholderPage title="Missions" description="Supervision opérationnelle des missions." /></PermissionRoute>} />
+        <Route path="utilisateurs" element={<PermissionRoute permission="users.read"><AdminUsersPage /></PermissionRoute>} />
+        <Route path="utilisateurs/:userId" element={<PermissionRoute permission="users.read"><AdminUserDetailPage /></PermissionRoute>} />
+        <Route path="missions" element={<PermissionRoute permission="missions.read"><AdminMissionsPage /></PermissionRoute>} />
+        <Route path="missions/:missionId" element={<PermissionRoute permission="missions.read"><AdminMissionDetailPage /></PermissionRoute>} />
         <Route path="litiges" element={<PermissionRoute permission="disputes.read"><AdminPlaceholderPage title="Litiges" description="Instruction des litiges de prestation Glossed." /></PermissionRoute>} />
         <Route path="finance" element={<PermissionRoute permission="finance.read"><AdminPlaceholderPage title="Finance" description="Rapprochement et opérations financières contrôlées." /></PermissionRoute>} />
         <Route path="risque" element={<PermissionRoute permission="risk.read"><AdminPlaceholderPage title="Chargebacks / risque" description="Contestation bancaire Stripe, Radar et suivi du risque." /></PermissionRoute>} />
