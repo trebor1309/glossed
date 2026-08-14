@@ -16,7 +16,10 @@ function tokenClaims(req: Request) {
   try {
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-    return JSON.parse(atob(padded)) as { aal?: string; iat?: number };
+    return JSON.parse(atob(padded)) as {
+      aal?: string;
+      amr?: Array<{ method?: string; timestamp?: number }>;
+    };
   } catch {
     throw new HttpError(401, "Invalid session claims");
   }
@@ -24,10 +27,26 @@ function tokenClaims(req: Request) {
 
 function mfaAuthenticatedAt(req: Request) {
   const claims = tokenClaims(req);
-  if (claims.aal !== "aal2" || !Number.isSafeInteger(claims.iat)) {
+  const timestamps = (claims.amr ?? [])
+    .filter((entry) => ["totp", "webauthn", "phone"].includes(entry.method ?? ""))
+    .map((entry) => entry.timestamp)
+    .filter((value): value is number => Number.isSafeInteger(value));
+  const latest = timestamps.length > 0 ? Math.max(...timestamps) : null;
+  if (claims.aal !== "aal2" || latest === null) {
     throw new HttpError(403, "Recent MFA authentication required");
   }
-  return new Date(Number(claims.iat) * 1000).toISOString();
+  return new Date(latest * 1000).toISOString();
+}
+
+async function requireAdminPermissions(userId: string, permissions: string[]) {
+  for (const permission of permissions) {
+    const { data, error } = await admin.rpc("admin_account_has_permission", {
+      p_user_id: userId,
+      p_permission_code: permission,
+    });
+    if (error) throw error;
+    if (data !== true) throw new HttpError(403, `Missing administrator permission: ${permission}`);
+  }
 }
 
 async function connectRevision(paymentId: string, required: boolean) {
@@ -178,6 +197,15 @@ Deno.serve(async (req) => {
     }
     if (action === "execute_cancellation") {
       const context = await cancellationExecutionContext(body.cancellation_id);
+      const { data: payment, error: paymentError } = await admin
+        .from("checkout_v2_payments")
+        .select("client_id, provider_id")
+        .eq("id", context.paymentId)
+        .single();
+      if (paymentError) throw paymentError;
+      if (![payment.client_id, payment.provider_id].includes(user.id)) {
+        throw new HttpError(403, "Cancellation participant required");
+      }
       const expectedRevision = await connectRevision(context.paymentId, context.requiresConnect);
       const { data, error } = await admin.rpc("execute_agreed_cancellation_v2", {
         p_cancellation_id: body.cancellation_id,
@@ -218,35 +246,75 @@ Deno.serve(async (req) => {
       if (error) throw error;
       return json(req, { evidence: data });
     }
+    if (action === "admin_add_service_dispute_evidence") {
+      await requireAdminPermissions(user.id, ["disputes.decide"]);
+      const { data, error } = await admin.rpc("add_service_dispute_evidence_v2", {
+        p_dispute_id: body.dispute_id,
+        p_actor_type: "admin",
+        p_actor_user_id: user.id,
+        p_statement: body.statement,
+        p_attachments: body.attachments ?? [],
+        p_deduplication_key: `admin-dispute-evidence:${operationId}`,
+      });
+      if (error) throw error;
+      return json(req, { evidence: data });
+    }
     if (action === "decide_service_dispute") {
+      throw new HttpError(
+        410,
+        "Direct dispute allocations are disabled; create and explicitly confirm a server preview"
+      );
+    }
+    if (action === "admin_decide_service_dispute") {
+      if (body.confirmed !== true) throw new HttpError(400, "Explicit confirmation required");
+      if (typeof body.reason !== "string" || body.reason.trim().length < 10) {
+        throw new HttpError(400, "A detailed justification is required");
+      }
+      await requireAdminPermissions(user.id, ["disputes.allocate", "finance.execute"]);
       const mfaAt = mfaAuthenticatedAt(req);
-      const { data: disputeContext, error: disputeContextError } = await admin
-        .from("service_disputes_v2")
-        .select("payment_id")
-        .eq("id", body.dispute_id)
+      const { data: preview, error: previewError } = await admin
+        .from("admin_dispute_allocation_previews_v2")
+        .select("dispute_id, provider_transfer_amount_cents, service_disputes_v2(payment_id)")
+        .eq("id", body.preview_id)
         .single();
-      if (disputeContextError) throw disputeContextError;
+      if (previewError) throw previewError;
+      const disputeContext = preview.service_disputes_v2 as unknown as { payment_id: string };
       const expectedRevision = await connectRevision(
         disputeContext.payment_id,
-        Number(body.provider_awarded_gross_amount_cents ?? 0) > 0
+        Number(preview.provider_transfer_amount_cents) > 0
       );
-      const { data, error } = await admin.rpc("decide_service_dispute_v2", {
-        p_dispute_id: body.dispute_id,
+      const { data, error } = await admin.rpc("execute_admin_service_dispute_decision_v2", {
+        p_preview_id: body.preview_id,
         p_admin_id: user.id,
-        p_provider_awarded_gross_amount_cents: body.provider_awarded_gross_amount_cents,
-        p_provider_statutory_withholding_amount_cents:
-          body.provider_statutory_withholding_amount_cents ?? 0,
-        p_client_tax_allocated_amount_cents: body.client_tax_allocated_amount_cents ?? 0,
-        p_reason: body.reason,
+        p_reason: body.reason.trim(),
         p_evidence_manifest: body.evidence_manifest ?? {},
         p_mfa_authenticated_at: mfaAt,
-        p_security_policy_version: "financial_admin_mfa_v1",
         p_expected_connect_revision: expectedRevision,
-        p_deduplication_key: `remediation-v2:service-decision:${operationId}`,
+        p_operation_id: operationId,
       });
       if (error) throw error;
       const result = data?.[0] ?? {};
-      return json(req, { decision: result, operations: await executeOperations(result) }, 202);
+      let operations: Record<string, unknown> = {};
+      let outcome = "success";
+      try {
+        operations = await executeOperations(result);
+      } catch (operationError) {
+        outcome = "failed";
+        operations = {
+          status: "failed",
+          message: operationError instanceof Error ? operationError.message : "Execution failed",
+        };
+      }
+      const { error: auditError } = await admin.rpc("record_admin_dispute_execution_audit_v2", {
+        p_admin_id: user.id,
+        p_dispute_id: preview.dispute_id,
+        p_operation_id: operationId,
+        p_outcome: outcome,
+        p_operations: operations,
+        p_mfa_authenticated_at: mfaAt,
+      });
+      if (auditError) throw auditError;
+      return json(req, { decision: result, operations, execution_status: outcome }, 202);
     }
     if (action === "finalize_resolution") {
       const context = await resolutionExecutionContext(body.resolution_id);
