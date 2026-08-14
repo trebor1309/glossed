@@ -15,6 +15,7 @@ const localTests = [
   "checkout_v2_payment_accounting.sql",
   "completion_release_deferred_transfer.sql",
   "financial_remediation_v2.sql",
+  "provider_balances_payouts_v2.sql",
 ];
 
 function run(command, args, options = {}) {

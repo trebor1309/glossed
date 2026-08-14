@@ -22,7 +22,20 @@ Deno.serve(async (req) => {
       account: account.stripe_account_id,
       components: {
         account_onboarding: { enabled: true },
-        account_management: { enabled: true },
+        account_management: {
+          enabled: true,
+          features: { external_account_collection: true },
+        },
+        balances: {
+          enabled: true,
+          features: {
+            instant_payouts: false,
+            standard_payouts: false,
+            edit_payout_schedule: false,
+            external_account_collection: false,
+          },
+        },
+        payouts_list: { enabled: true },
         notification_banner: { enabled: true },
       },
     });
