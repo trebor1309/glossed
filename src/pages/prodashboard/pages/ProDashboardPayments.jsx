@@ -1,5 +1,5 @@
 // 📄 src/pages/prodashboard/pages/ProDashboardPayments.jsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -11,6 +11,8 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import PaymentDetailsModal from "@/components/modals/PaymentDetailsModal";
+
+const ProviderGainsV2 = lazy(() => import("../components/ProviderGainsV2"));
 
 /* ------------------------------------------------------------------
    🧮 Helpers
@@ -504,11 +506,16 @@ export default function ProDashboardPayments() {
 
       {/* ---------------------------- PAYOUTS VIEW ---------------------------- */}
       {view === "payouts" && (
-        <div className="bg-white p-6 rounded-xl shadow border space-y-3 text-center">
-          <Wallet size={42} className="mx-auto text-rose-600" />
-          <h2 className="text-xl font-bold text-gray-800">Stripe Payouts</h2>
-          <p className="text-gray-500">Your payouts are handled automatically by Stripe Express.</p>
-        </div>
+        <Suspense
+          fallback={
+            <div className="bg-white p-6 rounded-xl shadow border space-y-3 text-center">
+              <Wallet size={42} className="mx-auto text-rose-600" />
+              <p className="text-gray-500">Chargement des gains…</p>
+            </div>
+          }
+        >
+          <ProviderGainsV2 />
+        </Suspense>
       )}
 
       {/* ---------------------------- MODAL ---------------------------- */}

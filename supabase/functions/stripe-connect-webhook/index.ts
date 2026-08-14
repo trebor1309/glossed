@@ -1,4 +1,5 @@
 import { stripe, syncConnectAccount } from "../_shared/connect-v2.ts";
+import { admin } from "../_shared/supabase.ts";
 
 const webhookSecret = Deno.env.get("STRIPE_CONNECT_WEBHOOK_SECRET") ?? "";
 const handledTypes = new Set([
@@ -10,6 +11,7 @@ const handledTypes = new Set([
   "v2.core.account[requirements].updated",
   "v2.core.account[future_requirements].updated",
 ]);
+const payoutTypes = new Set(["payout.created", "payout.updated", "payout.paid", "payout.failed"]);
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -35,6 +37,81 @@ Deno.serve(async (req) => {
   }
 
   const rawBody = await req.text();
+  let declaredType = "";
+  try {
+    const parsed = JSON.parse(rawBody);
+    declaredType = typeof parsed?.type === "string" ? parsed.type : "";
+  } catch {
+    return response({ error: "Invalid JSON payload" }, 400);
+  }
+
+  if (payoutTypes.has(declaredType)) {
+    try {
+      const event = await stripe.webhooks.constructEventAsync(rawBody, signature, webhookSecret);
+      const payout = event.data.object;
+      if (payout.object !== "payout") return response({ error: "Expected a Stripe payout" }, 400);
+      const stripeAccountId = typeof event.account === "string" ? event.account : "";
+      if (!stripeAccountId) return response({ error: "Connected account is missing" }, 400);
+
+      const applicationFeeId =
+        typeof payout.application_fee === "string"
+          ? payout.application_fee
+          : payout.application_fee?.id ?? null;
+      const balanceTransactionId =
+        typeof payout.balance_transaction === "string"
+          ? payout.balance_transaction
+          : payout.balance_transaction?.id ?? null;
+      let applicationFeeAmount: number | null = null;
+      let balanceTransactionFee: number | null = null;
+      if (applicationFeeId) {
+        const fee = await stripe.applicationFees.retrieve(applicationFeeId);
+        applicationFeeAmount = fee.amount;
+      }
+      if (balanceTransactionId) {
+        const transaction = await stripe.balanceTransactions.retrieve(
+          balanceTransactionId,
+          {},
+          { stripeAccount: stripeAccountId }
+        );
+        balanceTransactionFee = transaction.fee;
+      }
+      const localPayoutId = payout.metadata?.provider_payout_v2_id ?? null;
+      const { data, error } = await admin.rpc("process_provider_payout_v2_event", {
+        p_event_id: event.id,
+        p_event_type: event.type,
+        p_stripe_account_id: stripeAccountId,
+        p_stripe_created_at: eventDate(event.created).toISOString(),
+        p_livemode: event.livemode,
+        p_stripe_payout_id: payout.id,
+        p_local_payout_id: localPayoutId,
+        p_amount_cents: payout.amount,
+        p_currency: payout.currency,
+        p_method: payout.method,
+        p_status: payout.status,
+        p_arrival_date: payout.arrival_date
+          ? new Date(payout.arrival_date * 1000).toISOString().slice(0, 10)
+          : null,
+        p_failure_code: payout.failure_code ?? null,
+        p_failure_message: payout.failure_message ?? null,
+        p_stripe_application_fee_id: applicationFeeId,
+        p_application_fee_amount_cents: applicationFeeAmount,
+        p_stripe_balance_transaction_id: balanceTransactionId,
+        p_balance_transaction_fee_cents: balanceTransactionFee,
+        p_payload_summary: {
+          status: payout.status,
+          method: payout.method,
+          amount: payout.amount,
+          currency: payout.currency,
+        },
+      });
+      if (error) throw error;
+      return response({ ok: true, result: data?.[0] ?? null });
+    } catch (error) {
+      console.error("Stripe payout webhook processing failed", error);
+      return response({ error: "Invalid or failed payout event" }, 400);
+    }
+  }
+
   let notification;
   try {
     notification = await stripe.parseEventNotificationAsync(
