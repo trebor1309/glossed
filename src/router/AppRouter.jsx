@@ -17,7 +17,6 @@ import ProtectedRoute from "./ProtectedRoute";
 import ProRoute from "./ProRoute";
 import PublicOnlyRoute from "./PublicOnlyRoute";
 import OnboardingGuard from "./OnboardingGuard";
-import AdminRoute from "./AdminRoute";
 
 const Home = lazy(() => import("@/pages/Home"));
 const About = lazy(() => import("@/pages/About"));
@@ -38,7 +37,6 @@ const UserPublicProfile = lazy(() => import("@/pages/public-profile/UserPublicPr
 const CheckEmail = lazy(() => import("@/pages/auth/CheckEmail"));
 const EmailVerified = lazy(() => import("@/pages/auth/EmailVerified"));
 const OnboardingPage = lazy(() => import("@/pages/auth/OnboardingPage"));
-const VerificationReviewPage = lazy(() => import("@/pages/admin/VerificationReviewPage"));
 
 const DashboardLayout = lazy(() => import("@/pages/dashboard/DashboardLayout"));
 const DashboardHome = lazy(() => import("@/pages/dashboard/pages/DashboardHome"));
@@ -162,17 +160,6 @@ export default function AppRouter({ onOpenLogin, onOpenSignup, onOpenDownload })
         </Route>
 
         <Route path="/payment/success" element={<PaymentSuccess />} />
-
-        <Route
-          path="/admin/verifications"
-          element={
-            <ProtectedRoute>
-              <AdminRoute>
-                <VerificationReviewPage />
-              </AdminRoute>
-            </ProtectedRoute>
-          }
-        />
 
         {/* 💼 Dashboard Pro */}
         <Route
