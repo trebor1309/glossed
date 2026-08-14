@@ -2,10 +2,18 @@
 
 select set_config('storage.allow_delete_query', 'true', false);
 
+alter table public.admin_audit_log disable trigger admin_audit_log_immutable;
+delete from public.admin_audit_log where admin_account_id::text like '40000000-%';
+alter table public.admin_audit_log enable trigger admin_audit_log_immutable;
+alter table public.admin_auth_events disable trigger admin_auth_events_immutable;
+delete from public.admin_auth_events where user_id::text like '40000000-%';
+alter table public.admin_auth_events enable trigger admin_auth_events_immutable;
 delete from public.professional_verification_reviews
 where professional_id::text like '40000000-%' or reviewer_id::text like '40000000-%';
-delete from public.app_admins where user_id::text like '40000000-%';
 delete from storage.objects where owner_id like '40000000-%';
+delete from public.app_admins where user_id::text like '40000000-%';
+delete from public.admin_account_roles where user_id::text like '40000000-%';
+delete from public.admin_accounts where user_id::text like '40000000-%';
 delete from public.users where id::text like '40000000-%';
 delete from auth.users where id::text like '40000000-%';
 
@@ -103,6 +111,12 @@ begin;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '40000000-0000-0000-0000-000000000010', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claims', jsonb_build_object(
+  'sub', '40000000-0000-0000-0000-000000000010', 'role', 'authenticated',
+  'aal', 'aal2', 'session_id', 'verification-admin-session-1',
+  'amr', jsonb_build_array(jsonb_build_object('method', 'totp',
+    'timestamp', extract(epoch from clock_timestamp())::bigint))
+)::text, true);
 
 do $$
 begin
@@ -215,6 +229,12 @@ begin;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '40000000-0000-0000-0000-000000000010', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claims', jsonb_build_object(
+  'sub', '40000000-0000-0000-0000-000000000010', 'role', 'authenticated',
+  'aal', 'aal2', 'session_id', 'verification-admin-session-2',
+  'amr', jsonb_build_array(jsonb_build_object('method', 'totp',
+    'timestamp', extract(epoch from clock_timestamp())::bigint))
+)::text, true);
 select * from public.review_professional_verification(
   '40000000-0000-0000-0000-000000000020',
   'rejected',
@@ -248,6 +268,12 @@ begin;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '40000000-0000-0000-0000-000000000040', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claims', jsonb_build_object(
+  'sub', '40000000-0000-0000-0000-000000000040', 'role', 'authenticated',
+  'aal', 'aal2', 'session_id', 'verification-self-admin-session',
+  'amr', jsonb_build_array(jsonb_build_object('method', 'totp',
+    'timestamp', extract(epoch from clock_timestamp())::bigint))
+)::text, true);
 
 insert into storage.objects (bucket_id, name, owner_id) values (
   'verification-documents',
@@ -273,8 +299,16 @@ commit;
 
 delete from public.professional_verification_reviews
 where professional_id::text like '40000000-%' or reviewer_id::text like '40000000-%';
-delete from public.app_admins where user_id::text like '40000000-%';
 delete from storage.objects where owner_id like '40000000-%';
+alter table public.admin_audit_log disable trigger admin_audit_log_immutable;
+delete from public.admin_audit_log where admin_account_id::text like '40000000-%';
+alter table public.admin_audit_log enable trigger admin_audit_log_immutable;
+alter table public.admin_auth_events disable trigger admin_auth_events_immutable;
+delete from public.admin_auth_events where user_id::text like '40000000-%';
+alter table public.admin_auth_events enable trigger admin_auth_events_immutable;
+delete from public.app_admins where user_id::text like '40000000-%';
+delete from public.admin_account_roles where user_id::text like '40000000-%';
+delete from public.admin_accounts where user_id::text like '40000000-%';
 delete from public.users where id::text like '40000000-%';
 delete from auth.users where id::text like '40000000-%';
 

@@ -7,6 +7,8 @@ delete from public.booking_notifications where booking_id::text like '60000000-%
 delete from public.missions where booking_id::text like '60000000-%';
 delete from public.bookings where id::text like '60000000-%';
 delete from public.app_admins where user_id::text like '60000000-%';
+delete from public.admin_account_roles where user_id::text like '60000000-%';
+delete from public.admin_accounts where user_id::text like '60000000-%';
 delete from public.users where id::text like '60000000-%';
 delete from auth.users where id::text like '60000000-%';
 
@@ -169,6 +171,12 @@ begin;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '60000000-0000-0000-0000-000000000030', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claims', jsonb_build_object(
+  'sub', '60000000-0000-0000-0000-000000000030', 'role', 'authenticated',
+  'aal', 'aal2', 'session_id', 'e2e-support-admin-guard',
+  'amr', jsonb_build_array(jsonb_build_object('method', 'totp',
+    'timestamp', extract(epoch from clock_timestamp())::bigint))
+)::text, true);
 do $$
 begin
   begin
@@ -187,6 +195,12 @@ begin;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '60000000-0000-0000-0000-000000000030', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claims', jsonb_build_object(
+  'sub', '60000000-0000-0000-0000-000000000030', 'role', 'authenticated',
+  'aal', 'aal2', 'session_id', 'e2e-support-admin-cleanup',
+  'amr', jsonb_build_array(jsonb_build_object('method', 'totp',
+    'timestamp', extract(epoch from clock_timestamp())::bigint))
+)::text, true);
 select public.cleanup_e2e_booking('60000000-0000-0000-0000-000000000100');
 commit;
 
@@ -201,6 +215,8 @@ end
 $$;
 
 delete from public.app_admins where user_id::text like '60000000-%';
+delete from public.admin_account_roles where user_id::text like '60000000-%';
+delete from public.admin_accounts where user_id::text like '60000000-%';
 delete from public.users where id::text like '60000000-%';
 delete from auth.users where id::text like '60000000-%';
 

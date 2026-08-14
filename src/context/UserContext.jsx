@@ -66,8 +66,6 @@ export function UserProvider({ children }) {
         throw new Error("Your account profile is unavailable. Please retry or sign out.");
       }
 
-      const { data: adminFlag, error: adminError } = await supabase.rpc("is_app_admin");
-
       const fullUser = {
         id: profile.id,
         email: profile.email,
@@ -91,7 +89,6 @@ export function UserProvider({ children }) {
         verification_submitted_at: profile.verification_submitted_at || null,
         verification_rejection_reason: profile.verification_rejection_reason || null,
         verified_at: profile.verified_at || null,
-        is_admin: !adminError && adminFlag === true,
         role: profile.role || "client",
         activeRole: profile.active_role || profile.role || "client",
         theme: profile.theme || "light",
@@ -287,7 +284,6 @@ export function UserProvider({ children }) {
     isAuthenticated: !!user,
     isPro: user?.activeRole === "pro",
     isClient: user?.activeRole === "client",
-    isAdmin: user?.is_admin === true,
     showUpgradeModal,
     setShowUpgradeModal,
   };

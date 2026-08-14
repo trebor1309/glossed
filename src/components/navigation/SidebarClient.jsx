@@ -9,7 +9,6 @@ import {
   Plus,
   MessageSquare,
   CreditCard,
-  ShieldCheck,
   Bell,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -19,7 +18,7 @@ import NotificationBadge from "@/components/navigation/NotificationBadge";
 
 export default function SidebarClient() {
   const navigate = useNavigate();
-  const { logout, switchRole, isPro, isAdmin } = useUser();
+  const { logout, switchRole, isPro } = useUser();
   const { notifications, newMessages } = useNotifications();
 
   const links = [
@@ -64,9 +63,6 @@ export default function SidebarClient() {
       hasBadge: notifications.payments > 0,
       badgeCount: notifications.payments,
     },
-    ...(isAdmin
-      ? [{ to: "/admin/verifications", label: "Verifications", icon: ShieldCheck }]
-      : []),
   ];
 
   return (
