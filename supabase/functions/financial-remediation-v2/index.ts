@@ -380,6 +380,26 @@ Deno.serve(async (req) => {
       if (auditError) throw auditError;
       return json(req, { operation, result, execution_status: outcome }, 202);
     }
+    if (action === "admin_reactivate_financial_control") {
+      if (body.confirmed !== true) throw new HttpError(400, "Explicit confirmation required");
+      if (typeof body.reason !== "string" || body.reason.trim().length < 10) {
+        throw new HttpError(400, "A detailed justification is required");
+      }
+      await requireAdminPermissions(user.id, ["finance.execute", "incidents.reactivate"]);
+      const mfaAt = mfaAuthenticatedAt(req);
+      const { data, error } = await admin.rpc(
+        "consume_admin_financial_control_reactivation_v2",
+        {
+          p_preview_id: body.preview_id,
+          p_admin_id: user.id,
+          p_reason: body.reason.trim(),
+          p_mfa_authenticated_at: mfaAt,
+          p_execution_operation_id: operationId,
+        }
+      );
+      if (error) throw error;
+      return json(req, { control: data, execution_status: "success" });
+    }
     if (action === "finalize_resolution") {
       const context = await resolutionExecutionContext(body.resolution_id);
       const expectedRevision = await connectRevision(context.paymentId, context.requiresConnect);
