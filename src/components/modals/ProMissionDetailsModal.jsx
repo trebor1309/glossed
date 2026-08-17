@@ -8,6 +8,7 @@ import { useNotifications } from "@/context/NotificationContext";
 import { supabase } from "@/lib/supabaseClient";
 import { getOrCreateChat } from "@/lib/chat";
 import { openConfirmModal } from "@/components/ui/openConfirmModal";
+import MissionLifecycleV2Panel from "@/components/mission-lifecycle/MissionLifecycleV2Panel";
 
 const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
 
@@ -24,6 +25,8 @@ export default function ProMissionDetailsModal({
   onClose,
   onEvaluate,
   onProposalCancelled,
+  lifecycle,
+  onLifecycleChanged,
 }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -35,6 +38,7 @@ export default function ProMissionDetailsModal({
   const isMission = typeof booking.price !== "undefined" || typeof booking.time !== "undefined";
   const status = booking.status;
   const showChat =
+    Boolean(lifecycle) ||
     status === "confirmed" ||
     status === "cancel_requested" ||
     status === "cancelled" ||
@@ -253,7 +257,7 @@ export default function ProMissionDetailsModal({
       exit={{ opacity: 0 }}
     >
       <motion.div
-        className="bg-white rounded-2xl shadow-xl w-11/12 max-w-lg p-6 relative"
+        className="relative max-h-[calc(100dvh-2rem)] w-11/12 max-w-lg overflow-y-auto overflow-x-hidden rounded-2xl bg-white p-4 shadow-xl sm:p-6"
         onClick={(e) => e.stopPropagation()}
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -304,27 +308,29 @@ export default function ProMissionDetailsModal({
 
           {booking.notes && <p className="italic text-sm text-gray-500">“{booking.notes}”</p>}
 
-          <div className="mt-4">
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${
-                status === "pending"
-                  ? "bg-amber-100 text-amber-700"
-                  : status === "proposed"
-                    ? "bg-blue-100 text-blue-700"
-                    : status === "confirmed"
-                      ? "bg-green-100 text-green-700"
-                      : status === "cancel_requested"
-                        ? "bg-orange-100 text-orange-700"
-                        : status === "completed"
-                          ? "bg-rose-100 text-rose-700"
-                          : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {status}
-            </span>
-          </div>
+          {!lifecycle && (
+            <div className="mt-4">
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${
+                  status === "pending"
+                    ? "bg-amber-100 text-amber-700"
+                    : status === "proposed"
+                      ? "bg-blue-100 text-blue-700"
+                      : status === "confirmed"
+                        ? "bg-green-100 text-green-700"
+                        : status === "cancel_requested"
+                          ? "bg-orange-100 text-orange-700"
+                          : status === "completed"
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {status}
+              </span>
+            </div>
+          )}
 
-          {status === "cancel_requested" && (
+          {!lifecycle && status === "cancel_requested" && (
             <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-start gap-2">
               <span className="mt-0.5">⚠️</span>
               <span>
@@ -333,11 +339,17 @@ export default function ProMissionDetailsModal({
               </span>
             </p>
           )}
+
+          <MissionLifecycleV2Panel
+            lifecycle={lifecycle}
+            onChanged={onLifecycleChanged}
+            onEvaluate={() => onEvaluate?.(booking)}
+          />
         </div>
 
         {/* ACTIONS */}
         <div className="mt-8 flex flex-wrap justify-end gap-3">
-          {status === "proposed" && (
+          {!lifecycle && status === "proposed" && (
             <button
               onClick={handleCancelProposal}
               disabled={loading}
@@ -348,7 +360,7 @@ export default function ProMissionDetailsModal({
           )}
 
           {/* Cancellation requested: approve / keep */}
-          {status === "cancel_requested" && (
+          {!lifecycle && status === "cancel_requested" && (
             <>
               <button
                 onClick={handleApproveCancellation}
@@ -369,7 +381,7 @@ export default function ProMissionDetailsModal({
           )}
 
           {/* Pro cancel direct (booking confirmé) */}
-          {status === "confirmed" && (
+          {!lifecycle && status === "confirmed" && (
             <button
               onClick={handleProCancel}
               disabled={loading}
@@ -390,7 +402,7 @@ export default function ProMissionDetailsModal({
           )}
 
           {/* Evaluate */}
-          {status === "completed" && (
+          {!lifecycle && status === "completed" && (
             <button
               onClick={() => {
                 setLoading(true);

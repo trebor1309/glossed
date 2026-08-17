@@ -14,6 +14,7 @@ const localTests = [
   "provider_eligibility_connect_v2.sql",
   "checkout_v2_payment_accounting.sql",
   "completion_release_deferred_transfer.sql",
+  "mission_lifecycle_ux_v2.sql",
   "financial_remediation_v2.sql",
   "provider_balances_payouts_v2.sql",
   "admin_backoffice_foundation.sql",
@@ -40,13 +41,7 @@ function run(command, args, options = {}) {
   return result.stdout ?? "";
 }
 
-const containers = run("docker", [
-  "ps",
-  "--filter",
-  "name=supabase_db_",
-  "--format",
-  "{{.Names}}",
-])
+const containers = run("docker", ["ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"])
   .split(/\r?\n/)
   .map((name) => name.trim())
   .filter(Boolean);

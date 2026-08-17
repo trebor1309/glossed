@@ -35,6 +35,12 @@ Deno.serve(async (req) => {
     const results: unknown[] = [];
     const dispatched = new Set<string>();
 
+    const { data: remindersQueued, error: reminderError } = await admin.rpc(
+      "enqueue_due_service_release_reminders_v2",
+      { p_limit: limit }
+    );
+    if (reminderError) throw reminderError;
+
     const { data: due, error: dueError } = await admin.rpc("list_due_fund_releases_v2", {
       p_limit: limit,
     });
@@ -87,7 +93,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json(req, { processed: results.length, results });
+    return json(req, {
+      reminders_queued: remindersQueued ?? 0,
+      processed: results.length,
+      results,
+    });
   } catch (error) {
     return errorResponse(req, error);
   }
