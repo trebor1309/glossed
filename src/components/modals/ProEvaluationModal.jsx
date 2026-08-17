@@ -16,6 +16,10 @@ export default function ProEvaluationModal({ booking, onClose, onSuccess }) {
 
   if (!booking) return null;
 
+  const reviewerIsClient = user?.id === booking.client_id;
+  const targetId = reviewerIsClient ? booking.pro_id : booking.client_id;
+  const targetLabel = reviewerIsClient ? "provider" : "client";
+
   const handleSubmit = async () => {
     if (submitting) return;
     setSubmitting(true);
@@ -26,7 +30,7 @@ export default function ProEvaluationModal({ booking, onClose, onSuccess }) {
         {
           mission_id: booking.id,
           reviewer_id: user.id,
-          target_id: booking.client_id,
+          target_id: targetId,
           rating,
           comment,
         },
@@ -68,10 +72,12 @@ export default function ProEvaluationModal({ booking, onClose, onSuccess }) {
         </button>
 
         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <Star size={20} className="text-amber-500" /> Rate your client
+          <Star size={20} className="text-amber-500" /> Rate your {targetLabel}
         </h2>
 
-        <p className="text-gray-600 text-sm mb-4">How was your experience with this client?</p>
+        <p className="text-gray-600 text-sm mb-4">
+          How was your experience with this {targetLabel}?
+        </p>
 
         {/* ⭐ Notation */}
         <div className="flex justify-center gap-2 mb-6">

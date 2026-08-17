@@ -8,6 +8,7 @@ import { useNotifications } from "@/context/NotificationContext";
 import { supabase } from "@/lib/supabaseClient";
 import { getOrCreateChat } from "@/lib/chat";
 import { openConfirmModal } from "@/components/ui/openConfirmModal";
+import MissionLifecycleV2Panel from "@/components/mission-lifecycle/MissionLifecycleV2Panel";
 
 const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
 
@@ -19,7 +20,14 @@ const fmtDate = (d) => {
   }
 };
 
-export default function ClientReservationDetailsModal({ booking, onClose, onCancel, onEvaluate }) {
+export default function ClientReservationDetailsModal({
+  booking,
+  onClose,
+  onCancel,
+  onEvaluate,
+  lifecycle,
+  onLifecycleChanged,
+}) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useUser();
@@ -30,6 +38,7 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
   const isMission = typeof booking.price !== "undefined" || typeof booking.time !== "undefined";
   const status = booking.status;
   const showChat =
+    Boolean(lifecycle) ||
     status === "confirmed" ||
     status === "cancel_requested" ||
     status === "cancelled" ||
@@ -120,7 +129,7 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
       exit={{ opacity: 0 }}
     >
       <motion.div
-        className="bg-white rounded-2xl shadow-xl w-11/12 max-w-lg p-6 relative"
+        className="relative max-h-[calc(100dvh-2rem)] w-11/12 max-w-lg overflow-y-auto overflow-x-hidden rounded-2xl bg-white p-4 shadow-xl sm:p-6"
         onClick={(e) => e.stopPropagation()}
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -171,28 +180,30 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
 
           {booking.notes && <p className="italic text-sm text-gray-500">“{booking.notes}”</p>}
 
-          <div className="mt-4">
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${
-                status === "pending"
-                  ? "bg-amber-100 text-amber-700"
-                  : status === "proposed"
-                    ? "bg-blue-100 text-blue-700"
-                    : status === "confirmed"
-                      ? "bg-green-100 text-green-700"
-                      : status === "cancel_requested"
-                        ? "bg-orange-100 text-orange-700"
-                        : status === "completed"
-                          ? "bg-rose-100 text-rose-700"
-                          : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {status}
-            </span>
-          </div>
+          {!lifecycle && (
+            <div className="mt-4">
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${
+                  status === "pending"
+                    ? "bg-amber-100 text-amber-700"
+                    : status === "proposed"
+                      ? "bg-blue-100 text-blue-700"
+                      : status === "confirmed"
+                        ? "bg-green-100 text-green-700"
+                        : status === "cancel_requested"
+                          ? "bg-orange-100 text-orange-700"
+                          : status === "completed"
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {status}
+              </span>
+            </div>
+          )}
 
           {/* Discret: demander une annulation (réservation confirmée) */}
-          {status === "confirmed" && (
+          {!lifecycle && status === "confirmed" && (
             <button
               type="button"
               onClick={handleRequestCancellation}
@@ -202,12 +213,18 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
               Request cancellation
             </button>
           )}
+
+          <MissionLifecycleV2Panel
+            lifecycle={lifecycle}
+            onChanged={onLifecycleChanged}
+            onEvaluate={() => onEvaluate?.(booking)}
+          />
         </div>
 
         {/* ACTION BUTTONS */}
         <div className="mt-8 flex flex-wrap justify-end gap-3">
           {/* Cancel booking (pendant pending / proposed) */}
-          {(status === "pending" || status === "proposed") && (
+          {!lifecycle && (status === "pending" || status === "proposed") && (
             <button
               onClick={() => onCancel?.(booking)}
               className="px-4 py-2 border border-red-200 text-red-600 rounded-full font-medium hover:bg-red-50 transition flex items-center gap-2"
@@ -227,7 +244,7 @@ export default function ClientReservationDetailsModal({ booking, onClose, onCanc
           )}
 
           {/* Evaluate at end */}
-          {status === "completed" && (
+          {!lifecycle && status === "completed" && (
             <button
               onClick={() => onEvaluate?.(booking)}
               disabled={loading}

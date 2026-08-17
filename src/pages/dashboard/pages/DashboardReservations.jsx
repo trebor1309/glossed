@@ -7,6 +7,13 @@ import { Clock, Bell, CheckCircle, Star, XCircle, Trash2, Edit3, Eye } from "luc
 
 import ClientOffersModal from "@/components/modals/ClientOffersModal";
 import ClientReservationDetailsModal from "@/components/modals/ClientReservationDetailsModal";
+import ProEvaluationModal from "@/components/modals/ProEvaluationModal";
+import {
+  fetchMyMissionLifecyclesV2,
+  formatMissionLifecycleState,
+  indexMissionLifecycles,
+  missionLifecycleNotificationTypes,
+} from "@/lib/missionLifecycleV2";
 
 import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
 import CalendarView from "@/components/CalendarView";
@@ -25,6 +32,7 @@ const reservationNotificationTypes = [
   "cancellation_requested",
   "mission_cancelled",
   "mission_completed",
+  ...missionLifecycleNotificationTypes,
 ];
 
 export default function DashboardReservations() {
@@ -33,6 +41,7 @@ export default function DashboardReservations() {
   const clientId = session?.user?.id;
 
   const [bookings, setBookings] = useState([]);
+  const [lifecyclesByMission, setLifecyclesByMission] = useState(() => new Map());
   const [loading, setLoading] = useState(true);
 
   const [selectedDayBookings, setSelectedDayBookings] = useState(null);
@@ -40,6 +49,7 @@ export default function DashboardReservations() {
 
   const [selectedBooking, setSelectedBooking] = useState(null); // for Offers
   const [selectedConfirmedBooking, setSelectedConfirmedBooking] = useState(null);
+  const [selectedEvaluation, setSelectedEvaluation] = useState(null);
 
   const [showOffersModal, setShowOffersModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -47,6 +57,17 @@ export default function DashboardReservations() {
   const [toast, setToast] = useState(null);
 
   const [newItems, setNewItems] = useState(() => new Set());
+
+  const refreshLifecycles = useCallback(async () => {
+    const rows = await fetchMyMissionLifecyclesV2();
+    const next = indexMissionLifecycles(rows);
+    setLifecyclesByMission(next);
+    setBookings((current) =>
+      current.map((item) =>
+        item.type === "mission" ? { ...item, lifecycle_v2: next.get(item.id) || null } : item
+      )
+    );
+  }, []);
 
   useEffect(() => {
     if (clientId) markEventTypesRead(reservationNotificationTypes);
@@ -81,8 +102,15 @@ export default function DashboardReservations() {
         ])
         .order("date", { ascending: true });
 
+      const lifecycleRows = await fetchMyMissionLifecyclesV2();
+      const lifecycleIndex = indexMissionLifecycles(lifecycleRows);
+      setLifecyclesByMission(lifecycleIndex);
+
       const confirmedBookingIds = (missionsData || [])
-        .filter((m) => m.status === "confirmed" || m.status === "cancel_requested")
+        .filter(
+          (m) =>
+            lifecycleIndex.has(m.id) || m.status === "confirmed" || m.status === "cancel_requested"
+        )
         .map((m) => m.booking_id);
 
       const cleanedBookings = (bookingsData || []).filter(
@@ -98,8 +126,9 @@ export default function DashboardReservations() {
         .map((m) => ({
           ...m,
           type: "mission",
+          lifecycle_v2: lifecycleIndex.get(m.id) || null,
         }))
-        .filter((m) => m.status !== "proposed" || !m.booking_id);
+        .filter((m) => m.status !== "proposed" || !m.booking_id || m.lifecycle_v2);
 
       setBookings([...bookingsTagged, ...missionsTagged]);
     } catch (err) {
@@ -191,11 +220,23 @@ export default function DashboardReservations() {
 
   const grouped = {
     pending: sortList(display.filter((b) => b.status === "pending")),
-    offers: sortList(display.filter((b) => ["proposed", "offers"].includes(b.status))),
-    confirmed: sortList(
-      display.filter((b) => b.status === "confirmed" || b.status === "cancel_requested")
+    offers: sortList(
+      display.filter((b) => ["proposed", "offers"].includes(b.status) && !b.lifecycle_v2)
     ),
-    completed: sortList(display.filter((b) => b.status === "completed")),
+    confirmed: sortList(
+      display.filter(
+        (b) =>
+          (b.lifecycle_v2 && b.lifecycle_v2.execution_state !== "concluded") ||
+          (!b.lifecycle_v2 && (b.status === "confirmed" || b.status === "cancel_requested"))
+      )
+    ),
+    completed: sortList(
+      display.filter(
+        (b) =>
+          b.lifecycle_v2?.execution_state === "concluded" ||
+          (!b.lifecycle_v2 && b.status === "completed")
+      )
+    ),
     cancelled: sortList(display.filter((b) => b.status === "cancelled")),
   };
 
@@ -218,7 +259,7 @@ export default function DashboardReservations() {
      🎨 RENDER
   ----------------------------------------------------------- */
   return (
-    <section className="mt-10 max-w-4xl mx_auto p-4 space-y-6">
+    <section className="mx-auto mt-10 max-w-4xl space-y-6 overflow-x-hidden p-4">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800 text-center sm:text-left">
           My Reservations
@@ -309,6 +350,7 @@ export default function DashboardReservations() {
         color="text-green-600"
         data={grouped.completed}
         empty="No completed services."
+        onViewConfirmed={(b) => setSelectedConfirmedBooking(b)}
       />
 
       <ReservationSection
@@ -344,6 +386,25 @@ export default function DashboardReservations() {
         <ClientReservationDetailsModal
           booking={selectedConfirmedBooking}
           onClose={() => setSelectedConfirmedBooking(null)}
+          onEvaluate={(booking) => setSelectedEvaluation(booking)}
+          lifecycle={
+            lifecyclesByMission.get(selectedConfirmedBooking.id) ||
+            selectedConfirmedBooking.lifecycle_v2 ||
+            null
+          }
+          onLifecycleChanged={refreshLifecycles}
+        />
+      )}
+
+      {selectedEvaluation && (
+        <ProEvaluationModal
+          booking={selectedEvaluation}
+          onClose={() => setSelectedEvaluation(null)}
+          onSuccess={async () => {
+            setSelectedEvaluation(null);
+            await refreshLifecycles();
+            setToast({ message: "Review submitted!", type: "success" });
+          }}
         />
       )}
 
@@ -384,7 +445,7 @@ function ReservationSection({
             return (
               <li
                 key={`${b.type}-${b.id}`}
-                className="py-3 flex justify-between items-start hover:bg-gray-50 px-2 rounded-lg transition relative"
+                className="relative flex min-w-0 flex-col gap-3 rounded-lg px-2 py-3 transition hover:bg-gray-50 sm:flex-row sm:items-start sm:justify-between"
               >
                 {/* NEW badge */}
                 {isNew && (
@@ -393,7 +454,7 @@ function ReservationSection({
                   </span>
                 )}
 
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <p className="font-medium text-gray-800">{b.service}</p>
                   <p className="text-sm text-gray-500">
                     {b.date} — {b.time_slot || b.time || ""}
@@ -402,10 +463,12 @@ function ReservationSection({
                   {b.notes && <p className="text-xs text-gray-400 italic mt-1">“{b.notes}”</p>}
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                   <div className="flex flex-col items-end gap-1">
                     <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>
-                      {b.status}
+                      {b.lifecycle_v2
+                        ? formatMissionLifecycleState(b.lifecycle_v2.execution_state)
+                        : b.status}
                     </span>
 
                     {isCancelRequested && (
@@ -426,7 +489,7 @@ function ReservationSection({
                       </button>
                     )}
 
-                    {title === "Confirmed Appointments" && (
+                    {onViewConfirmed && (
                       <button
                         onClick={() => onViewConfirmed?.(b)}
                         className="p-2 rounded-full hover:bg-gray-100 text-rose-600"

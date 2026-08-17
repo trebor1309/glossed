@@ -11,6 +11,12 @@ import ProProposalModal from "@/components/modals/ProProposalModal";
 import ProMissionDetailsModal from "@/components/modals/ProMissionDetailsModal";
 import ProEvaluationModal from "@/components/modals/ProEvaluationModal";
 import ProBookingDetailsModal from "@/components/modals/ProBookingDetailsModal";
+import {
+  fetchMyMissionLifecyclesV2,
+  formatMissionLifecycleState,
+  indexMissionLifecycles,
+  missionLifecycleNotificationTypes,
+} from "@/lib/missionLifecycleV2";
 
 const formatTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : "");
 
@@ -28,6 +34,7 @@ const missionNotificationTypes = [
   "cancellation_requested",
   "mission_cancelled",
   "mission_completed",
+  ...missionLifecycleNotificationTypes,
 ];
 
 export default function ProDashboardMissions() {
@@ -36,6 +43,7 @@ export default function ProDashboardMissions() {
   const proId = session?.user?.id;
 
   const [missions, setMissions] = useState([]);
+  const [lifecyclesByMission, setLifecyclesByMission] = useState(() => new Map());
   const [loading, setLoading] = useState(true);
 
   const [selectedDayMissions, setSelectedDayMissions] = useState(null);
@@ -50,6 +58,17 @@ export default function ProDashboardMissions() {
 
   // NEW badges pour nouvelles demandes (booking_notifications)
   const [newItems, setNewItems] = useState(() => new Set());
+
+  const refreshLifecycles = useCallback(async () => {
+    const rows = await fetchMyMissionLifecyclesV2();
+    const next = indexMissionLifecycles(rows);
+    setLifecyclesByMission(next);
+    setMissions((current) =>
+      current.map((item) =>
+        item.type === "mission" ? { ...item, lifecycle_v2: next.get(item.id) || null } : item
+      )
+    );
+  }, []);
 
   useEffect(() => {
     if (proId) markEventTypesRead(missionNotificationTypes);
@@ -111,14 +130,21 @@ export default function ProDashboardMissions() {
 
       if (missionsErr) throw missionsErr;
 
+      const lifecycleRows = await fetchMyMissionLifecyclesV2();
+      const lifecycleIndex = indexMissionLifecycles(lifecycleRows);
+      setLifecyclesByMission(lifecycleIndex);
+
       const missionsWithNet = (proMissions || []).map((m) => ({
         ...m,
         net_amount: Number(m.price), // Glossed's fee is added to the client's total.
+        lifecycle_v2: lifecycleIndex.get(m.id) || null,
       }));
 
       // 4️⃣ Ne pas montrer de bookings déjà confirmés ou cancel_requested
       const confirmedBookingIds = missionsWithNet
-        .filter((m) => m.status === "confirmed" || m.status === "cancel_requested")
+        .filter(
+          (m) => m.lifecycle_v2 || m.status === "confirmed" || m.status === "cancel_requested"
+        )
         .map((m) => m.booking_id);
       const proposedBookingIds = missionsWithNet
         .filter((m) => m.status === "proposed")
@@ -253,11 +279,21 @@ export default function ProDashboardMissions() {
         (m) => m.type === "booking" && (m.status === "pending" || m.status === "offers")
       )
     ),
-    proposed: sortMissions(sourceList.filter((m) => m.status === "proposed")),
+    proposed: sortMissions(sourceList.filter((m) => m.status === "proposed" && !m.lifecycle_v2)),
     confirmed: sortMissions(
-      sourceList.filter((m) => m.status === "confirmed" || m.status === "cancel_requested")
+      sourceList.filter(
+        (m) =>
+          (m.lifecycle_v2 && m.lifecycle_v2.execution_state !== "concluded") ||
+          (!m.lifecycle_v2 && (m.status === "confirmed" || m.status === "cancel_requested"))
+      )
     ),
-    completed: sortMissions(sourceList.filter((m) => m.status === "completed")),
+    completed: sortMissions(
+      sourceList.filter(
+        (m) =>
+          m.lifecycle_v2?.execution_state === "concluded" ||
+          (!m.lifecycle_v2 && m.status === "completed")
+      )
+    ),
     cancelled: sortMissions(sourceList.filter((m) => m.status === "cancelled")),
   };
 
@@ -342,6 +378,10 @@ export default function ProDashboardMissions() {
           booking={selectedMission}
           onClose={() => setSelectedMission(null)}
           onEvaluate={(b) => setSelectedEvaluation(b)}
+          lifecycle={
+            lifecyclesByMission.get(selectedMission.id) || selectedMission.lifecycle_v2 || null
+          }
+          onLifecycleChanged={refreshLifecycles}
           onProposalCancelled={() => {
             setSelectedMission(null);
             fetchMissions();
@@ -354,8 +394,9 @@ export default function ProDashboardMissions() {
         <ProEvaluationModal
           booking={selectedEvaluation}
           onClose={() => setSelectedEvaluation(null)}
-          onSuccess={() => {
+          onSuccess={async () => {
             setSelectedEvaluation(null);
+            await refreshLifecycles();
             setToast({ message: "⭐ Review submitted!", type: "success" });
           }}
         />
@@ -439,7 +480,7 @@ function MissionSection({ title, icon, data, color, empty, onView, setSelectedMi
             return (
               <li
                 key={`${m.type || "item"}-${m.id}`}
-                className="py-3 flex justify-between items-start hover:bg-gray-50 px-2 rounded-lg transition relative"
+                className="relative flex min-w-0 flex-col gap-3 rounded-lg px-2 py-3 transition hover:bg-gray-50 sm:flex-row sm:items-start sm:justify-between"
               >
                 {/* Badge NEW */}
                 {isNew && (
@@ -448,7 +489,7 @@ function MissionSection({ title, icon, data, color, empty, onView, setSelectedMi
                   </span>
                 )}
 
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <p className="font-medium text-gray-800">{m.service}</p>
                   <p className="text-sm text-gray-500">
                     {m.date} — {m.time_slot || formatTime(m.time) || ""}
@@ -460,10 +501,12 @@ function MissionSection({ title, icon, data, color, empty, onView, setSelectedMi
                   )}
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                   <div className="flex flex-col items-end gap-1">
                     <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>
-                      {m.status}
+                      {m.lifecycle_v2
+                        ? formatMissionLifecycleState(m.lifecycle_v2.execution_state)
+                        : m.status}
                     </span>
 
                     {isCancelRequested && (
