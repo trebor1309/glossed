@@ -9,7 +9,6 @@ const protectedRoutes = [
   "/prodashboard",
   "/prodashboard/payments",
   "/prodashboard/messages",
-  "/admin/verifications",
 ];
 
 test.beforeEach(async ({ page }) => {
@@ -28,3 +27,10 @@ for (const path of protectedRoutes) {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Beauty");
   });
 }
+
+test("does not expose the former admin route from the consumer application", async ({ page }) => {
+  await page.goto("/admin/verifications", { waitUntil: "domcontentloaded" });
+
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Beauty");
+});

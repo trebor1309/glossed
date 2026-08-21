@@ -10,6 +10,7 @@ const credentialsByRole = {
   admin: {
     email: process.env.E2E_ADMIN_EMAIL,
     password: process.env.E2E_ADMIN_PASSWORD,
+    totpSecret: process.env.E2E_ADMIN_TOTP_SECRET?.trim() || null,
   },
 };
 

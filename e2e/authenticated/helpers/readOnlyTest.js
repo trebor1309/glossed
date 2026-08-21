@@ -3,9 +3,11 @@ import { expect, test as base } from "@playwright/test";
 const stripeHost = /(^|\.)stripe\.com$/;
 const configuredSupabaseHost = new URL(process.env.E2E_SUPABASE_URL).hostname;
 const configuredTargetOrigin = new URL(process.env.PLAYWRIGHT_BASE_URL).origin;
+const configuredAdminOrigin = new URL(process.env.PLAYWRIGHT_ADMIN_BASE_URL).origin;
 const vercelProtectionBypass = process.env.E2E_VERCEL_BYPASS_SECRET?.trim();
 const allowedSupabasePostPaths = [
   "/rest/v1/rpc/is_app_admin",
+  "/rest/v1/rpc/get_my_admin_access",
   "/rest/v1/rpc/list_pending_professional_verifications",
   "/rest/v1/rpc/get_notification_summary",
   "/rest/v1/rpc/get_my_chat_summaries",
@@ -14,6 +16,8 @@ const allowedSupabasePostPaths = [
 function isAllowedReadOnlySupabasePost(pathname) {
   return (
     pathname === "/auth/v1/token" ||
+    pathname === "/auth/v1/logout" ||
+    pathname.startsWith("/auth/v1/factors/") ||
     allowedSupabasePostPaths.includes(pathname) ||
     pathname.startsWith("/storage/v1/object/sign/")
   );
@@ -49,7 +53,10 @@ export const test = base.extend({
           return;
         }
 
-        if (vercelProtectionBypass && url.origin === configuredTargetOrigin) {
+        if (
+          vercelProtectionBypass &&
+          [configuredTargetOrigin, configuredAdminOrigin].includes(url.origin)
+        ) {
           await route.continue({
             headers: {
               ...request.headers(),
