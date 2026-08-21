@@ -45,8 +45,12 @@ if (missingVariables.length > 0) {
   process.exitCode = 1;
 } else {
   const targetUrl = new URL(process.env.E2E_BASE_URL);
+  const adminTargetUrl = new URL(
+    process.env.E2E_ADMIN_BASE_URL?.trim() || "https://admin.glossed.app"
+  );
   const supabaseUrl = new URL(process.env.E2E_SUPABASE_URL);
   const isLocalTarget = ["127.0.0.1", "localhost"].includes(targetUrl.hostname);
+  const isLocalAdminTarget = ["127.0.0.1", "localhost"].includes(adminTargetUrl.hostname);
   const isLocalSupabase = ["127.0.0.1", "localhost"].includes(supabaseUrl.hostname);
 
   if (targetUrl.protocol !== "https:" && !isLocalTarget) {
@@ -55,6 +59,14 @@ if (missingVariables.length > 0) {
 
   if (supabaseUrl.protocol !== "https:" && !isLocalSupabase) {
     throw new Error("E2E_SUPABASE_URL must use HTTPS unless it targets localhost.");
+  }
+
+  if (adminTargetUrl.protocol !== "https:" && !isLocalAdminTarget) {
+    throw new Error("E2E_ADMIN_BASE_URL must use HTTPS unless it targets localhost.");
+  }
+
+  if (!isLocalTarget && targetUrl.origin === adminTargetUrl.origin) {
+    throw new Error("Public and administrator E2E targets must use distinct origins.");
   }
 
   const accountEmails = [
@@ -68,6 +80,7 @@ if (missingVariables.length > 0) {
   }
 
   process.env.PLAYWRIGHT_BASE_URL = targetUrl.origin;
+  process.env.PLAYWRIGHT_ADMIN_BASE_URL = adminTargetUrl.origin;
 
   const child = spawn(
     process.execPath,

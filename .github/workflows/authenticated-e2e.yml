@@ -19,6 +19,7 @@ jobs:
     environment: e2e
     env:
       E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+      E2E_ADMIN_BASE_URL: ${{ vars.E2E_ADMIN_BASE_URL || 'https://admin.glossed.app' }}
       E2E_SUPABASE_URL: ${{ vars.E2E_SUPABASE_URL }}
       E2E_VERCEL_BYPASS_SECRET: ${{ secrets.E2E_VERCEL_BYPASS_SECRET }}
       E2E_CLIENT_EMAIL: ${{ secrets.E2E_CLIENT_EMAIL }}
@@ -27,6 +28,7 @@ jobs:
       E2E_PRO_PASSWORD: ${{ secrets.E2E_PRO_PASSWORD }}
       E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
       E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+      E2E_ADMIN_TOTP_SECRET: ${{ secrets.E2E_ADMIN_TOTP_SECRET }}
 
     steps:
       - name: Check out repository
