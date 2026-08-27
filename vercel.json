@@ -3,12 +3,15 @@
   "framework": "vite",
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
-  "rewrites": [
+  "redirects": [
     {
       "source": "/",
       "has": [{ "type": "host", "value": "admin.glossed.app" }],
-      "destination": "/admin.html"
-    },
+      "destination": "/admin.html",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
     {
       "source": "/(.*)",
       "has": [{ "type": "host", "value": "admin.glossed.app" }],
