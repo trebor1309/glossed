@@ -10,6 +10,15 @@ const adminClient = read("src/admin/adminSupabase.js");
 const verification = read("src/admin/VerificationReviewPage.jsx");
 const vite = read("vite.config.js");
 const vercel = read("vercel.json");
+const vercelConfig = JSON.parse(vercel);
+const adminRootRewrite = vercelConfig.rewrites.find(
+  (rewrite) =>
+    rewrite.source === "/" &&
+    rewrite.destination === "/admin.html" &&
+    rewrite.has?.some((condition) =>
+      condition.type === "host" && condition.value === "admin.glossed.app"
+    )
+);
 
 const requirements = [
   [migration.includes("create table public.admin_accounts"), "separate admin accounts"],
@@ -28,6 +37,7 @@ const requirements = [
   [adminApp.includes('path="verifications"') && adminApp.includes('path="finance"') && adminApp.includes('path="audit"'), "reserved admin navigation routes"],
   [vite.includes('admin: path.resolve(__dirname, "admin.html")'), "separate Vite admin entry"],
   [vercel.includes('"value": "admin.glossed.app"') && vercel.includes('"destination": "/admin.html"'), "Vercel admin host entry"],
+  [adminRootRewrite, "Vercel admin root host entry"],
   [adminClient.includes("VITE_SUPABASE_ANON_KEY") && !adminClient.includes("SERVICE_ROLE"), "browser uses anon key only"],
   [verification.includes("adminSupabase") && verification.includes("review_professional_verification"), "operational migrated verification UI"],
   [!router.includes("/admin/verifications") && !clientSidebar.includes("/admin/verifications") && !providerSidebar.includes("/admin/verifications"), "admin removed from consumer app and sidebars"],

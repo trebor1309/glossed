@@ -5,6 +5,11 @@
   "buildCommand": "npm run build",
   "rewrites": [
     {
+      "source": "/",
+      "has": [{ "type": "host", "value": "admin.glossed.app" }],
+      "destination": "/admin.html"
+    },
+    {
       "source": "/(.*)",
       "has": [{ "type": "host", "value": "admin.glossed.app" }],
       "destination": "/admin.html"
