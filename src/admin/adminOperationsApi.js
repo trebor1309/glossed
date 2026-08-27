@@ -90,6 +90,36 @@ export const createAdminConfigurationVersion = (configurationType, version, payl
     p_reason: reason,
   });
 
+export const listAdministrators = (query = "", limit = 50, offset = 0) =>
+  rpc("admin_list_administrators", {
+    p_query: query.trim() || null,
+    p_limit: limit,
+    p_offset: offset,
+  });
+export const getAdministratorCatalog = () => rpc("admin_get_administrator_catalog");
+export const previewAdministratorChange = ({
+  action,
+  targetUserId = null,
+  targetEmail = null,
+  displayName = null,
+  roles = null,
+  status = null,
+}) =>
+  rpc("admin_preview_administrator_change", {
+    p_action: action,
+    p_target_user_id: targetUserId,
+    p_target_email: targetEmail,
+    p_display_name: displayName,
+    p_roles: roles,
+    p_status: status,
+  });
+export const executeAdministratorChange = (previewId, reason, operationId) =>
+  rpc("admin_execute_administrator_change", {
+    p_preview_id: previewId,
+    p_reason: reason,
+    p_operation_id: operationId,
+  });
+
 export const listAdminDisputeCases = (queue = "disputes", limit = 50, offset = 0) =>
   rpc("admin_list_dispute_cases", { p_queue: queue, p_limit: limit, p_offset: offset });
 export const getAdminDisputeCase = (disputeId) =>

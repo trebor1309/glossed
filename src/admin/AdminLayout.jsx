@@ -14,6 +14,7 @@ import {
   Menu,
   Settings2,
   ShieldAlert,
+  UserCog,
   Users,
   X,
 } from "lucide-react";
@@ -31,6 +32,7 @@ const navigation = [
   { to: "/incidents", label: "Incidents", icon: AlertTriangle, permission: "incidents.read" },
   { to: "/audit", label: "Audit", icon: BookOpenCheck, permission: "audit.read" },
   { to: "/configuration", label: "Configuration / conformité", icon: Settings2, permission: "configuration.read" },
+  { to: "/administrateurs", label: "Administrateurs", icon: UserCog, permission: "administrators.read" },
 ];
 
 export default function AdminLayout() {

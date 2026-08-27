@@ -18,6 +18,7 @@ import AdminIncidentsPage from "./AdminIncidentsPage";
 import AdminIncidentDetailPage from "./AdminIncidentDetailPage";
 import AdminAuditPage from "./AdminAuditPage";
 import AdminConfigurationPage from "./AdminConfigurationPage";
+import AdminAdministratorsPage from "./AdminAdministratorsPage";
 
 const allowedHosts = new Set([
   "admin.glossed.app",
@@ -55,6 +56,7 @@ function AdminWorkspace() {
         <Route path="incidents/:incidentKey" element={<PermissionRoute permission="incidents.read"><AdminIncidentDetailPage /></PermissionRoute>} />
         <Route path="audit" element={<PermissionRoute permission="audit.read"><AdminAuditPage /></PermissionRoute>} />
         <Route path="configuration" element={<PermissionRoute permission="configuration.read"><AdminConfigurationPage /></PermissionRoute>} />
+        <Route path="administrateurs" element={<PermissionRoute permission="administrators.read"><AdminAdministratorsPage /></PermissionRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
