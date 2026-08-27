@@ -42,14 +42,16 @@ function RoleSelector({ catalog, selected, onChange }) {
 }
 
 export default function AdminAdministratorsPage() {
-  const { factors, verifyMfa } = useAdminAuth();
+  const { factors, verifyMfa, refreshMfaFactors } = useAdminAuth();
   const [data, setData] = useState(null);
   const [catalog, setCatalog] = useState(null);
   const [query, setQuery] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState("");
   const [activation, setActivation] = useState(emptyActivation);
   const [selected, setSelected] = useState(null);
   const [draft, setDraft] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [executionOperationId, setExecutionOperationId] = useState(null);
   const [reason, setReason] = useState("");
   const [mfaCode, setMfaCode] = useState("");
   const [needsMfa, setNeedsMfa] = useState(false);
@@ -60,7 +62,7 @@ export default function AdminAdministratorsPage() {
     setError(null);
     try {
       const [accounts, roleCatalog] = await Promise.all([
-        listAdministrators(query),
+        listAdministrators(submittedQuery),
         getAdministratorCatalog(),
       ]);
       setData(accounts);
@@ -68,7 +70,7 @@ export default function AdminAdministratorsPage() {
     } catch (loadError) {
       setError(loadError.message);
     }
-  }, [query]);
+  }, [submittedQuery]);
   useEffect(() => {
     load();
   }, [load]);
@@ -83,8 +85,10 @@ export default function AdminAdministratorsPage() {
     setBusy(true);
     setError(null);
     setPreview(null);
+    setExecutionOperationId(null);
     try {
       setPreview(await previewAdministratorChange(request));
+      setExecutionOperationId(crypto.randomUUID());
       setNeedsMfa(false);
     } catch (previewError) {
       setError(previewError.message);
@@ -123,7 +127,8 @@ export default function AdminAdministratorsPage() {
     setBusy(true);
     setError(null);
     try {
-      await verifyMfa(mfaCode, factors[0]?.id);
+      const availableFactors = factors.length > 0 ? factors : await refreshMfaFactors();
+      await verifyMfa(mfaCode, availableFactors[0]?.id);
       setMfaCode("");
       setNeedsMfa(false);
     } catch (mfaError) {
@@ -137,8 +142,9 @@ export default function AdminAdministratorsPage() {
     setBusy(true);
     setError(null);
     try {
-      await executeAdministratorChange(preview.id, reason.trim(), crypto.randomUUID());
+      await executeAdministratorChange(preview.id, reason.trim(), executionOperationId);
       setPreview(null);
+      setExecutionOperationId(null);
       setReason("");
       setSelected(null);
       setDraft(null);
@@ -236,7 +242,7 @@ export default function AdminAdministratorsPage() {
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            load();
+            setSubmittedQuery(query.trim());
           }}
           className="mb-4 flex gap-2"
         >
@@ -396,6 +402,7 @@ export default function AdminAdministratorsPage() {
               type="button"
               onClick={() => {
                 setPreview(null);
+                setExecutionOperationId(null);
                 setReason("");
               }}
               className="rounded-xl border px-4 py-2 font-semibold"

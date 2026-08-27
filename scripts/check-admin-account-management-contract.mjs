@@ -59,6 +59,16 @@ const requirements = [
     "controlled activation and confirmation UX",
   ],
   [
+    page.includes("executionOperationId") &&
+      page.includes("executeAdministratorChange(preview.id, reason.trim(), executionOperationId)"),
+    "stable browser idempotency key across retries",
+  ],
+  [
+    page.includes("refreshMfaFactors") && page.includes("availableFactors"),
+    "on-demand MFA factor loading",
+  ],
+  [page.includes("submittedQuery"), "submitted rather than per-keystroke audited search"],
+  [
     api.includes("admin_preview_administrator_change") &&
       api.includes("admin_execute_administrator_change"),
     "server RPC-only browser mutations",
