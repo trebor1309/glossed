@@ -165,6 +165,7 @@ export function AdminAuthProvider({ children }) {
     logout,
     beginMfaEnrollment,
     verifyMfa,
+    refreshMfaFactors: loadFactors,
     refreshAccess,
     hasPermission: (permission) => permissions.includes(permission),
   };
