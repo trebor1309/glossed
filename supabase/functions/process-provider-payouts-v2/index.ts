@@ -12,6 +12,15 @@ function requireServiceRole(req: Request) {
   }
 }
 
+function messageFor(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = String(error.message ?? "").trim();
+    if (message) return message;
+  }
+  return fallback;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
   try {
@@ -48,7 +57,7 @@ Deno.serve(async (req) => {
         results.push({
           provider_id: candidate.provider_id,
           status: "error",
-          message: error instanceof Error ? error.message : "Unknown standard payout failure",
+          message: messageFor(error, "Unknown standard payout failure"),
         });
       }
     }
@@ -66,7 +75,7 @@ Deno.serve(async (req) => {
         results.push({
           payout_id: payout.payout_id,
           status: "error",
-          message: error instanceof Error ? error.message : "Unknown payout retry failure",
+          message: messageFor(error, "Unknown payout retry failure"),
         });
       }
     }

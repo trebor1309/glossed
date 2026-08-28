@@ -236,6 +236,32 @@ begin
 end
 $$;
 
+-- Stripe can expose funds as Instant Payout eligible while they are still
+-- pending for a standard payout. These two balance views are intentionally
+-- reconciled independently.
+select public.record_provider_balance_snapshot_v2(
+  'acct_PayoutV2Test', 'eur', 0, 18000, 18000, 17820,
+  'ba_PayoutV2Test', 'bank_account',
+  '{"pending":{"card":18000},"instant":{"card":18000}}'::jsonb,
+  false, 'payout-v2-test:snapshot:instant-while-standard-pending'
+);
+
+do $$
+begin
+  if not exists (
+    select 1 from public.provider_balance_snapshots_v2
+    where retrieval_key = 'payout-v2-test:snapshot:instant-while-standard-pending'
+      and stripe_available_amount_cents = 0
+      and stripe_pending_amount_cents = 18000
+      and stripe_instant_available_gross_amount_cents = 18000
+      and stripe_instant_available_net_amount_cents = 17820
+      and stripe_instant_fee_amount_cents = 180
+  ) then
+    raise exception 'Instant balance was incorrectly coupled to standard available balance';
+  end if;
+end
+$$;
+
 begin;
 set local role authenticated;
 select set_config('request.jwt.claim.sub',

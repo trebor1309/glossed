@@ -93,7 +93,6 @@ export async function dispatchProviderTransferV2(paymentId: string, transferId: 
         currency: reservation.currency,
         destination: reservation.destination_account_id,
         source_transaction: reservation.source_transaction_charge_id,
-        transfer_group: `glossed_payment_${paymentId}`,
         metadata: {
           financial_flow_version: "marketplace_v2",
           checkout_v2_payment_id: paymentId,
