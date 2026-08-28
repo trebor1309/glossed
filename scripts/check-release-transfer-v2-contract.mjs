@@ -30,7 +30,12 @@ for (const required of [
 ]) {
   if (!shared.includes(required)) throw new Error(`Deferred transfer is missing ${required}`);
 }
-for (const forbidden of ["stripe.payouts", "payment_method_types:", "transfer_data:"]) {
+for (const forbidden of [
+  "stripe.payouts",
+  "payment_method_types:",
+  "transfer_data:",
+  "transfer_group:",
+]) {
   if (shared.includes(forbidden) || actions.includes(forbidden) || worker.includes(forbidden)) {
     throw new Error(`Tranche 4 must not contain ${forbidden}`);
   }

@@ -29,7 +29,12 @@ for (const required of [
 ]) {
   if (!shared.includes(required)) throw new Error(`Remediation Stripe helper is missing ${required}`);
 }
-for (const forbidden of ["reverse_transfer:", "refund_application_fee:", "stripe.payouts"] ) {
+for (const forbidden of [
+  "reverse_transfer:",
+  "refund_application_fee:",
+  "stripe.payouts",
+  "transfer_group:",
+]) {
   if (shared.includes(forbidden) || endpoint.includes(forbidden)) {
     throw new Error(`Tranche 5 must not contain ${forbidden}`);
   }
