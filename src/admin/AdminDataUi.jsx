@@ -1,3 +1,5 @@
+import { adminLabel, humanizeAdminError } from "./adminPresentation";
+
 export function formatDate(value) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("fr-BE", { dateStyle: "medium", timeStyle: "short" }).format(
@@ -15,7 +17,7 @@ export function shortId(value) {
   return value.length > 16 ? `${value.slice(0, 8)}…${value.slice(-5)}` : value;
 }
 
-export function StateBadge({ value }) {
+export function StateBadge({ value, label }) {
   const normalized = String(value || "inconnu").toLowerCase();
   const positive = ["active", "accepted", "available", "complete", "completed", "paid", "verified"];
   const warning = ["pending", "payment_pending", "creating", "incomplete", "admin_review", "blocked"];
@@ -24,7 +26,7 @@ export function StateBadge({ value }) {
     : warning.includes(normalized)
       ? "border-amber-200 bg-amber-50 text-amber-700"
       : "border-slate-200 bg-slate-50 text-slate-700";
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${tone}`}>{value || "Inconnu"}</span>;
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${tone}`}>{label || adminLabel(value)}</span>;
 }
 
 export function DefinitionList({ items }) {
@@ -57,9 +59,10 @@ export function LoadingPanel({ label = "Chargement…" }) {
 }
 
 export function ErrorPanel({ error, retry }) {
+  const message = humanizeAdminError(error);
   return (
     <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
-      <p>Impossible de charger ces données : {error}</p>
+      <p>{message}</p>
       {retry && <button type="button" onClick={retry} className="mt-3 rounded-lg bg-red-700 px-3 py-2 font-semibold text-white">Réessayer</button>}
     </div>
   );

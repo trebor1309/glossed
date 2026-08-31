@@ -2,6 +2,8 @@ import { useState } from "react";
 import { LockKeyhole, ShieldCheck } from "lucide-react";
 import { ErrorPanel, DefinitionList, formatCents, formatDate } from "./AdminDataUi";
 import { useAdminAuth } from "./AdminAuthContext";
+import AdminMfaReauthentication from "./AdminMfaReauthentication";
+import { isRecentMfaError } from "./adminPresentation";
 import {
   executeAdminFinancialOperation,
   previewAdminFinancialOperation,
@@ -14,11 +16,10 @@ const labels = {
 };
 
 export default function AdminFinancialAction({ operationType, operationId, requiresRisk, onComplete }) {
-  const { hasPermission, verifyMfa, factors } = useAdminAuth();
+  const { hasPermission } = useAdminAuth();
   const [preview, setPreview] = useState(null);
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
-  const [mfaCode, setMfaCode] = useState("");
   const [needsMfa, setNeedsMfa] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -37,18 +38,9 @@ export default function AdminFinancialAction({ operationType, operationId, requi
       setPreview(await previewAdminFinancialOperation(operationType, operationId));
       setNeedsMfa(false); setConfirmed(false);
     } catch (previewError) {
-      setError(previewError.message);
-      if (/MFA|permission/i.test(previewError.message)) setNeedsMfa(true);
+      if (isRecentMfaError(previewError)) { setNeedsMfa(true); setError(null); }
+      else setError(previewError.message);
     } finally { setBusy(false); }
-  };
-
-  const reauthenticate = async () => {
-    setBusy(true); setError(null);
-    try {
-      await verifyMfa(mfaCode, factors[0]?.id);
-      setMfaCode(""); setNeedsMfa(false);
-    } catch (mfaError) { setError(mfaError.message); }
-    finally { setBusy(false); }
   };
 
   const execute = async () => {
@@ -57,16 +49,16 @@ export default function AdminFinancialAction({ operationType, operationId, requi
       await executeAdminFinancialOperation(preview.id, reason.trim(), crypto.randomUUID());
       setPreview(null); setReason(""); setConfirmed(false);
       await onComplete?.();
-    } catch (executeError) { setError(executeError.message); }
+    } catch (executeError) {
+      if (isRecentMfaError(executeError)) { setNeedsMfa(true); setError(null); }
+      else setError(executeError.message);
+    }
     finally { setBusy(false); }
   };
 
   return <div className="space-y-3">
     {!preview && <button type="button" disabled={busy} onClick={makePreview} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{labels[operationType]}</button>}
-    {needsMfa && <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
-      <p className="font-semibold">Réauthentification MFA récente requise</p>
-      <div className="mt-3 flex max-w-sm gap-2"><input value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} inputMode="numeric" className="min-w-0 flex-1 rounded-lg border border-indigo-300 px-3 py-2" placeholder="Code MFA" /><button type="button" disabled={busy || !mfaCode.trim()} onClick={reauthenticate} className="rounded-lg bg-indigo-800 px-3 py-2 font-semibold text-white disabled:opacity-50">Vérifier</button></div>
-    </div>}
+    {needsMfa && <AdminMfaReauthentication required onVerified={() => setNeedsMfa(false)} />}
     {preview && <div className="space-y-4 rounded-2xl border-2 border-rose-200 bg-rose-50 p-5">
       <p className="flex items-center gap-2 font-bold text-rose-950"><ShieldCheck size={20} />Prévisualisation serveur immuable</p>
       <DefinitionList items={[

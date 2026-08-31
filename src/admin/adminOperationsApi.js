@@ -7,11 +7,20 @@ async function rpc(name, parameters = {}) {
 }
 
 export const getOperationsOverview = () => rpc("admin_get_operations_overview");
+export const getConnectActionQueue = (limit = 10) =>
+  rpc("admin_get_connect_action_queue", { p_limit: limit });
 export const globalAdminSearch = (query, limit = 12) =>
   rpc("admin_global_search", { p_query: query, p_limit: limit });
 export const listAdminUsers = (query = "", limit = 50, offset = 0) =>
   rpc("admin_list_users", { p_query: query || null, p_limit: limit, p_offset: offset });
 export const getAdminUser = (userId) => rpc("admin_get_user_detail", { p_user_id: userId });
+export async function refreshAdminConnectAccount(providerId) {
+  const { data, error } = await adminSupabase.functions.invoke("check-stripe-account", {
+    body: { provider_id: providerId, requested_from: "admin" },
+  });
+  if (error) throw error;
+  return data;
+}
 export const listAdminMissions = (query = "", limit = 50, offset = 0) =>
   rpc("admin_list_missions", { p_query: query || null, p_limit: limit, p_offset: offset });
 export const getAdminMission = (missionId) =>
@@ -97,6 +106,8 @@ export const listAdministrators = (query = "", limit = 50, offset = 0) =>
     p_offset: offset,
   });
 export const getAdministratorCatalog = () => rpc("admin_get_administrator_catalog");
+export const getAdministratorHistory = (userId, limit = 25) =>
+  rpc("admin_get_administrator_history", { p_target_user_id: userId, p_limit: limit });
 export const previewAdministratorChange = ({
   action,
   targetUserId = null,
@@ -105,7 +116,7 @@ export const previewAdministratorChange = ({
   roles = null,
   status = null,
 }) =>
-  rpc("admin_preview_administrator_change", {
+  rpc("admin_preview_administrator_change_ux_v1", {
     p_action: action,
     p_target_user_id: targetUserId,
     p_target_email: targetEmail,

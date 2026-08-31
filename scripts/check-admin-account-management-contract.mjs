@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(path, "utf8");
 const migration = read("supabase/migrations/20260827010000_admin_account_management.sql");
 const page = read("src/admin/AdminAdministratorsPage.jsx");
+const mfa = read("src/admin/AdminMfaReauthentication.jsx");
 const app = read("src/admin/AdminApp.jsx");
 const layout = read("src/admin/AdminLayout.jsx");
 const api = read("src/admin/adminOperationsApi.js");
@@ -55,7 +56,7 @@ const requirements = [
   [
     page.includes("préprovisionnée") &&
       page.includes("Prévisualiser") &&
-      page.includes("Confirmer explicitement"),
+      page.includes("confirmationLabel(preview)"),
     "controlled activation and confirmation UX",
   ],
   [
@@ -64,8 +65,8 @@ const requirements = [
     "stable browser idempotency key across retries",
   ],
   [
-    page.includes("refreshMfaFactors") && page.includes("availableFactors"),
-    "on-demand MFA factor loading",
+    mfa.includes("refreshMfaFactors") && mfa.includes("availableFactors"),
+    "shared on-demand MFA factor loading",
   ],
   [page.includes("submittedQuery"), "submitted rather than per-keystroke audited search"],
   [

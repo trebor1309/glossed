@@ -39,9 +39,8 @@ export function AdminAuthProvider({ children }) {
       await adminSupabase.auth.signOut({ scope: "local" });
       throw new Error("Ce compte n’est pas autorisé à accéder à l’administration Glossed.");
     }
-    if (!data.authorized) await loadFactors();
     return data;
-  }, [loadFactors]);
+  }, []);
 
   const hydrate = useCallback(
     async (nextSession) => {
@@ -56,13 +55,14 @@ export function AdminAuthProvider({ children }) {
       setError(null);
       try {
         await loadAccess();
+        await loadFactors();
       } catch (hydrateError) {
         setError(hydrateError.message);
       } finally {
         setLoading(false);
       }
     },
-    [loadAccess]
+    [loadAccess, loadFactors]
   );
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export function AdminAuthProvider({ children }) {
     });
     const { data: listener } = adminSupabase.auth.onAuthStateChange((event, nextSession) => {
       if (event === "TOKEN_REFRESHED") {
-        setSession(nextSession);
+        queueMicrotask(() => hydrate(nextSession));
         return;
       }
       if (["SIGNED_IN", "SIGNED_OUT", "INITIAL_SESSION", "MFA_CHALLENGE_VERIFIED"].includes(event)) {
@@ -126,8 +126,12 @@ export function AdminAuthProvider({ children }) {
         code: code.trim(),
       });
       if (verifyError) throw verifyError;
-      const { data, error: refreshError } = await adminSupabase.auth.refreshSession();
-      if (refreshError) throw refreshError;
+      // challengeAndVerify has already persisted the newly issued JWT. Refreshing
+      // it immediately can retain the previous AMR timestamp, so hydrate from the
+      // verified session itself to preserve the renewed MFA window server-side.
+      const { data, error: sessionError } = await adminSupabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!data.session) throw new Error("La session MFA vérifiée est indisponible.");
       setEnrollment(null);
       await hydrate(data.session);
     } finally {

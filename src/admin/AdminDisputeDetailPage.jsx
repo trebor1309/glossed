@@ -3,6 +3,8 @@ import { ArrowLeft, ExternalLink, FilePlus2, LockKeyhole, ShieldCheck } from "lu
 import { Link, useParams } from "react-router-dom";
 import { AdminPanel, DefinitionList, ErrorPanel, LoadingPanel, StateBadge, formatCents, formatDate } from "./AdminDataUi";
 import { useAdminAuth } from "./AdminAuthContext";
+import AdminMfaReauthentication from "./AdminMfaReauthentication";
+import { isRecentMfaError } from "./adminPresentation";
 import {
   addAdminDisputeEvidence, decideAdminDispute, getAdminCancellationCase,
   getAdminDisputeCase, getAdminEvidenceUrl, previewDisputeAllocation,
@@ -27,13 +29,13 @@ function EvidenceLink({ reference }) {
 }
 
 function AllocationPreview({ disputeId, data, reload }) {
-  const { hasPermission, verifyMfa, factors } = useAdminAuth();
+  const { hasPermission } = useAdminAuth();
   const [decision, setDecision] = useState("provider_full");
   const [amounts, setAmounts] = useState({ gross: "", withholding: "0", tax: "0" });
   const [preview, setPreview] = useState(null);
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
-  const [mfaCode, setMfaCode] = useState("");
+  const [needsMfa, setNeedsMfa] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const hasRoles = hasPermission("disputes.allocate") && hasPermission("finance.execute");
@@ -46,27 +48,18 @@ function AllocationPreview({ disputeId, data, reload }) {
         provider_statutory_withholding_amount_cents: toCents(amounts.withholding),
         client_tax_allocated_amount_cents: toCents(amounts.tax),
       } : {}));
-    } catch (previewError) { setError(previewError.message); }
-    finally { setBusy(false); }
-  };
-  const reauthenticate = async () => {
-    setBusy(true); setError(null);
-    try { await verifyMfa(mfaCode, factors[0]?.id); setMfaCode(""); await reload(); }
-    catch (mfaError) { setError(mfaError.message); }
+    } catch (previewError) { if (isRecentMfaError(previewError)) { setNeedsMfa(true); setError(null); } else setError(previewError.message); }
     finally { setBusy(false); }
   };
   const commit = async () => {
     if (!confirmed) return;
     setBusy(true); setError(null);
     try { await decideAdminDispute(preview.id, reason, { evidence_ids: data.evidence.map((item) => item.id) }); await reload(); }
-    catch (commitError) { setError(commitError.message); }
+    catch (commitError) { if (isRecentMfaError(commitError)) { setNeedsMfa(true); setError(null); } else setError(commitError.message); }
     finally { setBusy(false); }
   };
   if (!hasRoles) return <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><LockKeyhole size={18} className="mb-2" />La décision financière exige simultanément les permissions <code>disputes.allocate</code> et <code>finance.execute</code>.</div>;
-  if (!data.can_allocate) return <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
-    <p className="font-semibold">Réauthentification MFA récente requise</p><p className="mt-1">Saisissez un nouveau code avant de prévisualiser ou confirmer une allocation.</p>
-    <div className="mt-3 flex max-w-sm gap-2"><input value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} inputMode="numeric" className="min-w-0 flex-1 rounded-lg border border-indigo-300 px-3 py-2" placeholder="Code MFA" /><button type="button" disabled={busy || !mfaCode.trim()} onClick={reauthenticate} className="rounded-lg bg-indigo-800 px-3 py-2 font-semibold text-white disabled:opacity-50">Vérifier</button></div>{error && <p className="mt-2 text-red-700">{error}</p>}
-  </div>;
+  if (!data.can_allocate || needsMfa) return <AdminMfaReauthentication required description="Saisissez un nouveau code avant de prévisualiser ou confirmer une allocation." onVerified={async () => { setNeedsMfa(false); await reload(); }} />;
   const currency = (preview?.currency || data.mission_detail?.financial?.terms_snapshot?.currency || "eur").toUpperCase();
   return <div className="space-y-4">
     <div><label className="text-sm font-semibold" htmlFor="decision">Décision</label><select id="decision" value={decision} onChange={(e) => { setDecision(e.target.value); setPreview(null); }} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">{decisions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
