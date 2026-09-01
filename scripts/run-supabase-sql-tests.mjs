@@ -23,6 +23,7 @@ const localTests = [
   "admin_finance_payment_disputes.sql",
   "admin_incidents_audit_configuration.sql",
   "admin_account_management.sql",
+  "admin_ux_consolidation_1.sql",
 ];
 
 function run(command, args, options = {}) {

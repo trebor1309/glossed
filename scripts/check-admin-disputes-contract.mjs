@@ -5,6 +5,7 @@ const migration = read("supabase/migrations/20260814210000_admin_disputes_cancel
 const endpoint = read("supabase/functions/financial-remediation-v2/index.ts");
 const app = read("src/admin/AdminApp.jsx");
 const page = read("src/admin/AdminDisputeDetailPage.jsx");
+const mfa = read("src/admin/AdminMfaReauthentication.jsx");
 const api = read("src/admin/adminOperationsApi.js");
 
 const requirements = [
@@ -20,7 +21,7 @@ const requirements = [
   [endpoint.includes("execute_admin_service_dispute_decision_v2") && endpoint.includes("executeOperations(result)"), "existing v2 workflow execution"],
   [endpoint.includes("Direct dispute allocations are disabled"), "legacy direct allocation endpoint disabled"],
   [app.includes('path="litiges/:caseType/:caseId"') && page.includes("Prévisualiser chaque centime"), "operational admin dispute UI"],
-  [page.includes("confirmed") && page.includes("Justification obligatoire") && page.includes("Réauthentification MFA récente requise"), "confirmation, justification and MFA UX"],
+  [page.includes("confirmed") && page.includes("Justification obligatoire") && page.includes("AdminMfaReauthentication") && mfa.includes("Réauthentification MFA récente requise"), "confirmation, justification and shared MFA UX"],
   [api.includes('functions.invoke("financial-remediation-v2"') && !page.includes("stripe."), "no browser Stripe operation"],
   [!migration.includes("financial_feature_flags") && !migration.includes("set enabled = true"), "no financial feature flag activation"],
 ];
