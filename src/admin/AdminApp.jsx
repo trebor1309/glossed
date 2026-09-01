@@ -19,6 +19,7 @@ import AdminIncidentDetailPage from "./AdminIncidentDetailPage";
 import AdminAuditPage from "./AdminAuditPage";
 import AdminConfigurationPage from "./AdminConfigurationPage";
 import AdminAdministratorsPage from "./AdminAdministratorsPage";
+import { AdminI18nProvider } from "./AdminI18nContext";
 
 const allowedHosts = new Set([
   "admin.glossed.app",
@@ -71,5 +72,5 @@ export default function AdminApp() {
       </main>
     );
   }
-  return <AdminAuthProvider><AdminWorkspace /></AdminAuthProvider>;
+  return <AdminI18nProvider><AdminAuthProvider><AdminWorkspace /></AdminAuthProvider></AdminI18nProvider>;
 }

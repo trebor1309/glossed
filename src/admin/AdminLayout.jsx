@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useAdminAuth } from "./AdminAuthContext";
 import AdminGlobalSearch from "./AdminGlobalSearch";
+import { adminRoleLabel } from "./adminPresentation";
 
 const navigation = [
   { to: "/", label: "Vue d’ensemble", icon: LayoutDashboard, permission: "admin.access", end: true },
@@ -70,7 +71,7 @@ export default function AdminLayout() {
         <div className="border-t border-slate-800 p-4">
           <div className="mb-3 rounded-xl bg-slate-900 p-3 text-xs text-slate-400">
             <p className="truncate font-semibold text-slate-200">{access.display_name || session.user.email}</p>
-            <p className="mt-1">{(access.roles || []).join(" · ")}</p>
+            <p className="mt-1">{(access.roles || []).map(adminRoleLabel).join(" · ")}</p>
             <p className="mt-2 flex items-center gap-1 text-emerald-400"><Activity size={13} /> MFA active</p>
           </div>
           <button type="button" onClick={logout} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-300 hover:bg-slate-900 hover:text-white">
