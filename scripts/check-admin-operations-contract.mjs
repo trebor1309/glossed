@@ -22,7 +22,7 @@ const requirements = [
   [layout.includes("AdminGlobalSearch"), "global search in admin layout"],
   [overview.includes("financial_incidents") && overview.includes("connect_actions") && overview.includes("mission_anomalies"), "required overview queues"],
   [users.includes("Éligibilité prestataire") && users.includes("Compte Stripe Connect") && users.includes("Activité Glossed"), "complete user operations view"],
-  [missions.includes("Machines d’état") && missions.includes("Instantané contractuel") && missions.includes("Finance — lecture seule"), "complete mission operations view"],
+  [missions.includes("Machines d’état") && missions.includes("Instantané contractuel") && missions.includes('title="Finance"') && missions.includes("Mission historique"), "complete mission operations view"],
   [api.includes("VITE_SUPABASE") === false && api.includes("adminSupabase.rpc"), "admin RPC client reuses protected session"],
   [!missions.includes("refund-stripe-payment") && !missions.includes("create-transfer") && !missions.includes("allocate-dispute"), "no financial mutation UI"],
 ];

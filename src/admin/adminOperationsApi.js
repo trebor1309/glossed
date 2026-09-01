@@ -21,8 +21,27 @@ export async function refreshAdminConnectAccount(providerId) {
   if (error) throw error;
   return data;
 }
-export const listAdminMissions = (query = "", limit = 50, offset = 0) =>
-  rpc("admin_list_missions", { p_query: query || null, p_limit: limit, p_offset: offset });
+export const listAdminMissions = ({
+  query = "",
+  status = "all",
+  flowVersion = "all",
+  partyQuery = "",
+  dateFrom = null,
+  dateTo = null,
+  attentionOnly = false,
+  limit = 25,
+  offset = 0,
+} = {}) => rpc("admin_list_missions_ux_v2", {
+  p_query: query || null,
+  p_status: status,
+  p_flow_version: flowVersion,
+  p_party_query: partyQuery || null,
+  p_date_from: dateFrom,
+  p_date_to: dateTo,
+  p_attention_only: attentionOnly,
+  p_limit: limit,
+  p_offset: offset,
+});
 export const getAdminMission = (missionId) =>
   rpc("admin_get_mission_detail", { p_mission_id: missionId });
 
@@ -32,6 +51,7 @@ export const getAdminFinancialPayment = (paymentId) =>
   rpc("admin_get_financial_payment_detail", { p_payment_id: paymentId });
 export const listAdminPaymentDisputes = (queue = "open", limit = 50, offset = 0) =>
   rpc("admin_list_payment_disputes", { p_queue: queue, p_limit: limit, p_offset: offset });
+export const getAdminPaymentDisputeCounts = () => rpc("admin_get_payment_dispute_counts_ux_v2");
 export const getAdminPaymentDispute = (disputeId) =>
   rpc("admin_get_payment_dispute_detail", { p_dispute_id: disputeId });
 export const previewAdminFinancialOperation = (operationType, operationId) =>
@@ -56,6 +76,7 @@ export async function executeAdminFinancialOperation(previewId, reason, operatio
 
 export const listAdminFinancialIncidents = (queue = "open", limit = 50, offset = 0) =>
   rpc("admin_list_financial_incidents", { p_queue: queue, p_limit: limit, p_offset: offset });
+export const getAdminIncidentCounts = () => rpc("admin_get_incident_counts_ux_v2");
 export const getAdminFinancialIncident = (incidentKey) =>
   rpc("admin_get_financial_incident_detail", { p_incident_key: incidentKey });
 export const reconcileAdminFinancialIncident = (incidentKey) =>
@@ -83,13 +104,25 @@ export async function executeAdminControlReactivation(previewId, reason, operati
   return data;
 }
 
-export const searchAdminAudit = (query = "", source = "all", limit = 50, offset = 0) =>
-  rpc("admin_search_audit", {
-    p_query: query.trim() || null,
-    p_source: source,
-    p_limit: limit,
-    p_offset: offset,
-  });
+export const searchAdminAudit = ({
+  query = "",
+  source = "all",
+  outcome = "all",
+  actorQuery = "",
+  dateFrom = null,
+  dateTo = null,
+  limit = 50,
+  offset = 0,
+} = {}) => rpc("admin_search_audit_ux_v2", {
+  p_query: query.trim() || null,
+  p_source: source,
+  p_outcome: outcome,
+  p_actor_query: actorQuery.trim() || null,
+  p_date_from: dateFrom,
+  p_date_to: dateTo,
+  p_limit: limit,
+  p_offset: offset,
+});
 export const getAdminConfiguration = () => rpc("admin_get_configuration_catalog");
 export const createAdminConfigurationVersion = (configurationType, version, payload, reason) =>
   rpc("admin_create_configuration_version", {
@@ -131,8 +164,15 @@ export const executeAdministratorChange = (previewId, reason, operationId) =>
     p_operation_id: operationId,
   });
 
-export const listAdminDisputeCases = (queue = "disputes", limit = 50, offset = 0) =>
-  rpc("admin_list_dispute_cases", { p_queue: queue, p_limit: limit, p_offset: offset });
+export const listAdminDisputeCases = (queue = "disputes_open", limit = 50, offset = 0) =>
+  rpc("admin_list_dispute_cases_ux_v2", { p_queue: queue, p_limit: limit, p_offset: offset });
+export const getAdminDisputeQueueCounts = () => rpc("admin_get_dispute_queue_counts_ux_v2");
+export const listAdminProfessionalVerifications = (view = "open", limit = 50, offset = 0) =>
+  rpc("admin_list_professional_verifications_ux_v2", {
+    p_view: view,
+    p_limit: limit,
+    p_offset: offset,
+  });
 export const getAdminDisputeCase = (disputeId) =>
   rpc("admin_get_dispute_case", { p_dispute_id: disputeId });
 export const getAdminCancellationCase = (cancellationId) =>

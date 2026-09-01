@@ -24,6 +24,7 @@ const localTests = [
   "admin_incidents_audit_configuration.sql",
   "admin_account_management.sql",
   "admin_ux_consolidation_1.sql",
+  "admin_ux_consolidation_2.sql",
 ];
 
 function run(command, args, options = {}) {
