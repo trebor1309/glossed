@@ -12,6 +12,7 @@ const migration = read("supabase/migrations/20260901090000_admin_ux_consolidatio
 
 const requirements = [
   [auth.includes("challengeAndVerify") && auth.includes("getSession()") && !auth.includes("refreshSession()"), "verified MFA JWT is retained without an immediate stale refresh"],
+  [auth.includes('event === "TOKEN_REFRESHED"') && auth.includes("refreshHydratedSession(nextSession)"), "silent token refresh preserves the authorized admin workspace"],
   [auth.includes("await loadFactors()"), "MFA configuration is loaded for authorized sessions"],
   [mfa.includes('event.key === "Enter"') && mfa.includes("mfa_recent"), "shared Enter-capable configured/recent MFA control"],
   [overview.includes("getConnectActionQueue") && overview.includes("Ouvrir le compte à traiter"), "actionable Connect dashboard shortcuts"],

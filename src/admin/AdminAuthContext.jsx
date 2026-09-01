@@ -65,6 +65,26 @@ export function AdminAuthProvider({ children }) {
     [loadAccess, loadFactors]
   );
 
+  const refreshHydratedSession = useCallback(
+    async (nextSession) => {
+      setSession(nextSession || null);
+      if (!nextSession) {
+        await hydrate(null);
+        return;
+      }
+      setError(null);
+      try {
+        // A silent token refresh must not clear the current authorized workspace:
+        // doing so would unmount the active page and discard pending admin input.
+        await loadAccess();
+        await loadFactors();
+      } catch (refreshError) {
+        setError(refreshError.message);
+      }
+    },
+    [hydrate, loadAccess, loadFactors]
+  );
+
   useEffect(() => {
     let active = true;
     adminSupabase.auth.getSession().then(({ data }) => {
@@ -72,7 +92,7 @@ export function AdminAuthProvider({ children }) {
     });
     const { data: listener } = adminSupabase.auth.onAuthStateChange((event, nextSession) => {
       if (event === "TOKEN_REFRESHED") {
-        queueMicrotask(() => hydrate(nextSession));
+        queueMicrotask(() => refreshHydratedSession(nextSession));
         return;
       }
       if (["SIGNED_IN", "SIGNED_OUT", "INITIAL_SESSION", "MFA_CHALLENGE_VERIFIED"].includes(event)) {
@@ -83,7 +103,7 @@ export function AdminAuthProvider({ children }) {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [hydrate]);
+  }, [hydrate, refreshHydratedSession]);
 
   const login = async (email, password) => {
     setLoading(true);
