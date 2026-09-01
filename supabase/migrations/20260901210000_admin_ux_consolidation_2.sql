@@ -334,7 +334,11 @@ begin
     select event.*,auth_user.email::text as actor_email from events event
     left join auth.users auth_user on auth_user.id=event.actor_id
     where (p_source='all' or event.source=p_source)
-      and (p_outcome='all' or event.outcome=p_outcome)
+      and (
+        p_outcome='all'
+        or (p_outcome='success' and event.outcome='success')
+        or (p_outcome='failed' and event.outcome<>'success')
+      )
       and (p_date_from is null or event.occurred_at>=p_date_from)
       and (p_date_to is null or event.occurred_at<=p_date_to)
       and (v_actor='' or concat_ws(' ',auth_user.email,event.actor_id::text) ilike '%'||v_actor||'%')

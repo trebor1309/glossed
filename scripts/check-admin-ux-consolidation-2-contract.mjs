@@ -25,6 +25,7 @@ const requirements = [
   [audit.includes("actorQuery") && audit.includes("dateFrom") && audit.includes('role="dialog"'), "filtered audit with readable event detail"],
   [api.includes("admin_list_missions_ux_v2") && api.includes("admin_search_audit_ux_v2"), "server-backed operational read models"],
   [migration.includes("assert_admin_permission") && migration.includes("record_admin_read_audit"), "RBAC and read auditing preserved"],
+  [migration.includes("p_outcome='failed' and event.outcome<>'success'"), "failure audit filter includes denied and MFA challenge outcomes"],
   [!migration.includes("set enabled = true") && !migration.includes("STRIPE_LIVE"), "no production financial activation"],
 ];
 

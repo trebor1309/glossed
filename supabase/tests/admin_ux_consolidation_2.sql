@@ -3,6 +3,9 @@
 alter table public.admin_audit_log disable trigger admin_audit_log_immutable;
 delete from public.admin_audit_log where admin_account_id::text like '89200000-%' or entity_id like '89200000-%';
 alter table public.admin_audit_log enable trigger admin_audit_log_immutable;
+alter table public.admin_auth_events disable trigger admin_auth_events_immutable;
+delete from public.admin_auth_events where user_id::text like '89200000-%';
+alter table public.admin_auth_events enable trigger admin_auth_events_immutable;
 delete from public.professional_verification_reviews where professional_id::text like '89200000-%' or reviewer_id::text like '89200000-%';
 delete from public.missions where id::text like '89200000-%';
 delete from public.admin_account_roles where user_id::text like '89200000-%';
@@ -19,6 +22,9 @@ insert into auth.users (id,email,email_confirmed_at,raw_app_meta_data,raw_user_m
 update public.users set role='pro',active_role='pro' where id='89200000-0000-0000-0000-000000000003';
 insert into public.admin_accounts(user_id,display_name) values ('89200000-0000-0000-0000-000000000001','UX2 administrator');
 insert into public.admin_account_roles(user_id,role_code) values ('89200000-0000-0000-0000-000000000001','super_admin');
+insert into public.admin_auth_events(user_id,admin_account_id,event_type,outcome,session_id,aal,deduplication_key) values
+  ('89200000-0000-0000-0000-000000000001','89200000-0000-0000-0000-000000000001','access_denied','denied','ux2-denied','aal1','ux2-auth-denied'),
+  ('89200000-0000-0000-0000-000000000001','89200000-0000-0000-0000-000000000001','mfa_required','challenge_required','ux2-challenge','aal1','ux2-auth-challenge');
 insert into public.missions(id,client_id,pro_id,service,date,status,financial_flow_version) values
   ('89200000-0000-0000-0000-000000000101','89200000-0000-0000-0000-000000000002','89200000-0000-0000-0000-000000000003','Legacy UX mission',clock_timestamp()+interval '2 days','confirmed','legacy_v1'),
   ('89200000-0000-0000-0000-000000000102','89200000-0000-0000-0000-000000000002','89200000-0000-0000-0000-000000000003','Marketplace UX mission',clock_timestamp()+interval '3 days','proposed','marketplace_v2');
@@ -48,6 +54,11 @@ begin
   if not (v_counts ?& array['open','all','blocking','critical']) then raise exception 'Incident counters incomplete'; end if;
   v_result:=public.admin_search_audit_ux_v2(null,'all','success','ux2-admin@example.test',null,null,50,0);
   if (v_result->>'total')::integer<1 or v_result->'items'->0->>'actor_email'<>'ux2-admin@example.test' then raise exception 'Filtered audit actor projection failed'; end if;
+  v_result:=public.admin_search_audit_ux_v2(null,'authentication','failed','ux2-admin@example.test',null,null,50,0);
+  if (v_result->>'total')::integer<>2
+     or not (v_result->'items' @> '[{"outcome":"denied"}]'::jsonb)
+     or not (v_result->'items' @> '[{"outcome":"challenge_required"}]'::jsonb)
+  then raise exception 'Failure filter omitted non-success audit outcomes'; end if;
 end $$;
 commit;
 
@@ -66,6 +77,9 @@ commit;
 alter table public.admin_audit_log disable trigger admin_audit_log_immutable;
 delete from public.admin_audit_log where admin_account_id::text like '89200000-%' or entity_id like '89200000-%';
 alter table public.admin_audit_log enable trigger admin_audit_log_immutable;
+alter table public.admin_auth_events disable trigger admin_auth_events_immutable;
+delete from public.admin_auth_events where user_id::text like '89200000-%';
+alter table public.admin_auth_events enable trigger admin_auth_events_immutable;
 delete from public.professional_verification_reviews where professional_id::text like '89200000-%' or reviewer_id::text like '89200000-%';
 delete from public.missions where id::text like '89200000-%';
 delete from public.admin_account_roles where user_id::text like '89200000-%';
