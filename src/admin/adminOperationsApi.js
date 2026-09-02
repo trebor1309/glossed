@@ -31,17 +31,18 @@ export const listAdminMissions = ({
   attentionOnly = false,
   limit = 25,
   offset = 0,
-} = {}) => rpc("admin_list_missions_ux_v2", {
-  p_query: query || null,
-  p_status: status,
-  p_flow_version: flowVersion,
-  p_party_query: partyQuery || null,
-  p_date_from: dateFrom,
-  p_date_to: dateTo,
-  p_attention_only: attentionOnly,
-  p_limit: limit,
-  p_offset: offset,
-});
+} = {}) =>
+  rpc("admin_list_missions_ux_v2", {
+    p_query: query || null,
+    p_status: status,
+    p_flow_version: flowVersion,
+    p_party_query: partyQuery || null,
+    p_date_from: dateFrom,
+    p_date_to: dateTo,
+    p_attention_only: attentionOnly,
+    p_limit: limit,
+    p_offset: offset,
+  });
 export const getAdminMission = (missionId) =>
   rpc("admin_get_mission_detail", { p_mission_id: missionId });
 
@@ -113,17 +114,18 @@ export const searchAdminAudit = ({
   dateTo = null,
   limit = 50,
   offset = 0,
-} = {}) => rpc("admin_search_audit_ux_v2", {
-  p_query: query.trim() || null,
-  p_source: source,
-  p_outcome: outcome,
-  p_actor_query: actorQuery.trim() || null,
-  p_date_from: dateFrom,
-  p_date_to: dateTo,
-  p_limit: limit,
-  p_offset: offset,
-});
-export const getAdminConfiguration = () => rpc("admin_get_configuration_catalog");
+} = {}) =>
+  rpc("admin_search_audit_ux_v2", {
+    p_query: query.trim() || null,
+    p_source: source,
+    p_outcome: outcome,
+    p_actor_query: actorQuery.trim() || null,
+    p_date_from: dateFrom,
+    p_date_to: dateTo,
+    p_limit: limit,
+    p_offset: offset,
+  });
+export const getAdminConfiguration = () => rpc("admin_get_configuration_catalog_ux_v3");
 export const createAdminConfigurationVersion = (configurationType, version, payload, reason) =>
   rpc("admin_create_configuration_version", {
     p_configuration_type: configurationType,
@@ -131,6 +133,15 @@ export const createAdminConfigurationVersion = (configurationType, version, payl
     p_payload: payload,
     p_reason: reason,
   });
+export const getMyAdminPreferences = () => rpc("admin_get_my_preferences");
+export const updateMyAdminPreferences = (interfaceLocale, theme, operationId) => {
+  if (!operationId) throw new Error("A stable preference operation ID is required.");
+  return rpc("admin_update_my_preferences", {
+    p_interface_locale: interfaceLocale,
+    p_theme: theme,
+    p_operation_id: operationId,
+  });
+};
 
 export const listAdministrators = (query = "", limit = 50, offset = 0) =>
   rpc("admin_list_administrators", {
@@ -181,12 +192,10 @@ export const previewDisputeAllocation = (disputeId, decisionCode, amounts = {}) 
   rpc("admin_preview_service_dispute_allocation_v2", {
     p_dispute_id: disputeId,
     p_decision_code: decisionCode,
-    p_provider_awarded_gross_amount_cents:
-      amounts.provider_awarded_gross_amount_cents ?? null,
+    p_provider_awarded_gross_amount_cents: amounts.provider_awarded_gross_amount_cents ?? null,
     p_provider_statutory_withholding_amount_cents:
       amounts.provider_statutory_withholding_amount_cents ?? null,
-    p_client_tax_allocated_amount_cents:
-      amounts.client_tax_allocated_amount_cents ?? null,
+    p_client_tax_allocated_amount_cents: amounts.client_tax_allocated_amount_cents ?? null,
   });
 
 export async function addAdminDisputeEvidence(disputeId, statement, attachments) {
@@ -221,12 +230,20 @@ export async function decideAdminDispute(previewId, reason, evidenceManifest = {
 export async function uploadAdminDisputeEvidence(disputeId, userId, file) {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
   const path = `${disputeId}/${userId}/${crypto.randomUUID()}-${safeName}`;
-  const { error } = await adminSupabase.storage.from("service-dispute-evidence").upload(path, file, {
-    contentType: file.type,
-    upsert: false,
-  });
+  const { error } = await adminSupabase.storage
+    .from("service-dispute-evidence")
+    .upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
   if (error) throw error;
-  return { bucket: "service-dispute-evidence", path, name: file.name, mime_type: file.type, size: file.size };
+  return {
+    bucket: "service-dispute-evidence",
+    path,
+    name: file.name,
+    mime_type: file.type,
+    size: file.size,
+  };
 }
 
 export async function getAdminEvidenceUrl(reference) {

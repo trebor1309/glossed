@@ -29,3 +29,49 @@
 .animate-bounce-slow {
   animation: bounce-slow 2s infinite;
 }
+
+/* The admin app is a separate entry point. Account-scoped theme preferences
+   are applied only below #admin-root and never alter the public application. */
+[data-admin-theme="dark"] #admin-root {
+  color-scheme: dark;
+}
+[data-admin-theme="dark"] #admin-root .bg-slate-100 {
+  background-color: #020617;
+}
+[data-admin-theme="dark"] #admin-root .bg-white {
+  background-color: #0f172a;
+}
+[data-admin-theme="dark"] #admin-root .bg-slate-50 {
+  background-color: #1e293b;
+}
+[data-admin-theme="dark"] #admin-root .border-slate-100,
+[data-admin-theme="dark"] #admin-root .border-slate-200,
+[data-admin-theme="dark"] #admin-root .border-slate-300 {
+  border-color: #334155;
+}
+[data-admin-theme="dark"] #admin-root .text-slate-950,
+[data-admin-theme="dark"] #admin-root .text-slate-900 {
+  color: #f8fafc;
+}
+[data-admin-theme="dark"] #admin-root .text-slate-600,
+[data-admin-theme="dark"] #admin-root .text-slate-500 {
+  color: #cbd5e1;
+}
+[data-admin-theme="dark"] #admin-root .text-slate-700,
+[data-admin-theme="dark"] #admin-root .text-slate-800 {
+  color: #e2e8f0;
+}
+[data-admin-theme="dark"] #admin-root .text-black {
+  color: #f8fafc;
+}
+[data-admin-theme="dark"] #admin-root input,
+[data-admin-theme="dark"] #admin-root select,
+[data-admin-theme="dark"] #admin-root textarea {
+  background-color: #0f172a;
+  color: #f8fafc;
+  border-color: #475569;
+}
+[data-admin-theme="dark"] #admin-root input::placeholder,
+[data-admin-theme="dark"] #admin-root textarea::placeholder {
+  color: #94a3b8;
+}
