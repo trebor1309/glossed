@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { adminSupabase } from "./adminSupabase";
+import { useAdminI18n } from "./AdminI18nContext";
 
 const AdminAuthContext = createContext(null);
 
@@ -12,6 +13,7 @@ function clientContext() {
 }
 
 export function AdminAuthProvider({ children }) {
+  const { applyPreferences } = useAdminI18n();
   const [session, setSession] = useState(null);
   const [access, setAccess] = useState(null);
   const [factors, setFactors] = useState([]);
@@ -39,8 +41,16 @@ export function AdminAuthProvider({ children }) {
       await adminSupabase.auth.signOut({ scope: "local" });
       throw new Error("Ce compte n’est pas autorisé à accéder à l’administration Glossed.");
     }
+    if (data?.authorized) {
+      const { data: preferences, error: preferencesError } = await adminSupabase.rpc(
+        "admin_get_my_preferences"
+      );
+      // Preferences must never prevent MFA factors or the secured workspace from
+      // hydrating. The dedicated settings page still surfaces persistence errors.
+      if (!preferencesError) applyPreferences(preferences);
+    }
     return data;
-  }, []);
+  }, [applyPreferences]);
 
   const hydrate = useCallback(
     async (nextSession) => {
@@ -95,7 +105,9 @@ export function AdminAuthProvider({ children }) {
         queueMicrotask(() => refreshHydratedSession(nextSession));
         return;
       }
-      if (["SIGNED_IN", "SIGNED_OUT", "INITIAL_SESSION", "MFA_CHALLENGE_VERIFIED"].includes(event)) {
+      if (
+        ["SIGNED_IN", "SIGNED_OUT", "INITIAL_SESSION", "MFA_CHALLENGE_VERIFIED"].includes(event)
+      ) {
         queueMicrotask(() => hydrate(nextSession));
       }
     });
