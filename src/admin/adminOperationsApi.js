@@ -134,16 +134,14 @@ export const createAdminConfigurationVersion = (configurationType, version, payl
     p_reason: reason,
   });
 export const getMyAdminPreferences = () => rpc("admin_get_my_preferences");
-export const updateMyAdminPreferences = (
-  interfaceLocale,
-  theme,
-  operationId = crypto.randomUUID()
-) =>
-  rpc("admin_update_my_preferences", {
+export const updateMyAdminPreferences = (interfaceLocale, theme, operationId) => {
+  if (!operationId) throw new Error("A stable preference operation ID is required.");
+  return rpc("admin_update_my_preferences", {
     p_interface_locale: interfaceLocale,
     p_theme: theme,
     p_operation_id: operationId,
   });
+};
 
 export const listAdministrators = (query = "", limit = 50, offset = 0) =>
   rpc("admin_list_administrators", {

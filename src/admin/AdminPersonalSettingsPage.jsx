@@ -1,21 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Moon, Palette, Save, Sun } from "lucide-react";
 import { AdminPanel, ErrorPanel, LoadingPanel, formatDate } from "./AdminDataUi";
 import { useAdminI18n } from "./AdminI18nContext";
 import { getMyAdminPreferences, updateMyAdminPreferences } from "./adminOperationsApi";
+import { AVAILABLE_ADMIN_INTERFACE_LOCALES } from "./adminI18n";
 
-const localeOptions = [
+const localeLabels = new Map([
   ["fr", "Français"],
   ["nl", "Nederlands"],
   ["de", "Deutsch"],
   ["en", "English"],
-];
+]);
+const localeOptions = AVAILABLE_ADMIN_INTERFACE_LOCALES.map((locale) => [
+  locale,
+  localeLabels.get(locale),
+]);
 
 export default function AdminPersonalSettingsPage() {
   const { locale, theme, setLocale, setTheme, t } = useAdminI18n();
   const [saved, setSaved] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const saveOperation = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -36,8 +42,13 @@ export default function AdminPersonalSettingsPage() {
     event.preventDefault();
     setBusy(true);
     setError(null);
+    const payloadKey = `${locale}:${theme}`;
+    if (!saveOperation.current || saveOperation.current.payloadKey !== payloadKey) {
+      saveOperation.current = { payloadKey, operationId: crypto.randomUUID() };
+    }
     try {
-      setSaved(await updateMyAdminPreferences(locale, theme));
+      setSaved(await updateMyAdminPreferences(locale, theme, saveOperation.current.operationId));
+      saveOperation.current = null;
     } catch (saveError) {
       setError(saveError.message);
     } finally {
@@ -72,6 +83,7 @@ export default function AdminPersonalSettingsPage() {
               ))}
             </select>
           </label>
+          <p className="text-sm text-slate-500">{t("preferences.languages_coming")}</p>
           <fieldset>
             <legend className="text-sm font-semibold">{t("preferences.theme")}</legend>
             <div className="mt-2 grid max-w-xl gap-3 sm:grid-cols-2">

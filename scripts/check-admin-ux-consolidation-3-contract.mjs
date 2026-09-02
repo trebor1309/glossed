@@ -3,8 +3,10 @@ const read = (path) => readFileSync(path, "utf8");
 const configuration = read("src/admin/AdminConfigurationPage.jsx");
 const preferences = read("src/admin/AdminPersonalSettingsPage.jsx");
 const context = read("src/admin/AdminI18nContext.jsx");
+const i18n = read("src/admin/adminI18n.js");
 const layout = read("src/admin/AdminLayout.jsx");
 const api = read("src/admin/adminOperationsApi.js");
+const styles = read("src/index.css");
 const migration = read("supabase/migrations/20260901230000_admin_ux_consolidation_3.sql");
 const requirements = [
   [
@@ -37,10 +39,31 @@ const requirements = [
     "account preference screen",
   ],
   [
+    preferences.includes("useRef") &&
+      preferences.includes("saveOperation.current.operationId") &&
+      preferences.includes("payloadKey") &&
+      !api.includes("operationId = crypto.randomUUID()"),
+    "stable preference operation ID across retries",
+  ],
+  [
+    i18n.includes('SUPPORTED_ADMIN_LOCALES = Object.freeze(["fr", "nl", "de", "en"])') &&
+      i18n.includes('AVAILABLE_ADMIN_INTERFACE_LOCALES = Object.freeze(["fr"])') &&
+      context.includes("normalizeAvailableAdminLocale") &&
+      preferences.includes("AVAILABLE_ADMIN_INTERFACE_LOCALES.map"),
+    "four-locale infrastructure with French-only complete interface exposure",
+  ],
+  [
     context.includes("dataset.adminTheme") && context.includes("applyPreferences"),
     "preference hydration and scoped theme",
   ],
   [layout.includes('labelKey: "nav.preferences"'), "separate personal settings navigation"],
+  [
+    styles.includes("#admin-root .text-slate-700") &&
+      styles.includes("#admin-root .text-slate-800") &&
+      styles.includes("#admin-root .text-black") &&
+      styles.includes("input::placeholder"),
+    "dark-theme foreground contrast coverage",
+  ],
   [
     api.includes("admin_get_configuration_catalog_ux_v3") &&
       api.includes("admin_update_my_preferences"),

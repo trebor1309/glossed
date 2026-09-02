@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import {
   ADMIN_LOCALE_STORAGE_KEY,
   DEFAULT_ADMIN_LOCALE,
-  normalizeAdminLocale,
+  normalizeAvailableAdminLocale,
   translateAdmin,
 } from "./adminI18n";
 
@@ -11,7 +11,7 @@ const ADMIN_THEME_STORAGE_KEY = "glossed-admin-theme";
 
 function initialLocale() {
   try {
-    return normalizeAdminLocale(localStorage.getItem(ADMIN_LOCALE_STORAGE_KEY));
+    return normalizeAvailableAdminLocale(localStorage.getItem(ADMIN_LOCALE_STORAGE_KEY));
   } catch {
     return DEFAULT_ADMIN_LOCALE;
   }
@@ -27,7 +27,7 @@ export function AdminI18nProvider({ children }) {
     }
   });
   const setLocale = useCallback((nextLocale) => {
-    const normalized = normalizeAdminLocale(nextLocale);
+    const normalized = normalizeAvailableAdminLocale(nextLocale);
     setLocaleState(normalized);
     try {
       localStorage.setItem(ADMIN_LOCALE_STORAGE_KEY, normalized);

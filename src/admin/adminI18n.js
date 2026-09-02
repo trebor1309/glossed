@@ -1,4 +1,5 @@
 export const SUPPORTED_ADMIN_LOCALES = Object.freeze(["fr", "nl", "de", "en"]);
+export const AVAILABLE_ADMIN_INTERFACE_LOCALES = Object.freeze(["fr"]);
 export const DEFAULT_ADMIN_LOCALE = "fr";
 export const ADMIN_LOCALE_STORAGE_KEY = "glossed-admin-locale";
 
@@ -85,10 +86,12 @@ const fr = {
   "preferences.save": "Enregistrer mes préférences",
   "preferences.saving": "Enregistrement…",
   "preferences.saved_at": "Dernière sauvegarde : {date}",
+  "preferences.languages_coming":
+    "Le néerlandais, l’allemand et l’anglais seront proposés lorsque tout le back-office sera traduit.",
 };
 
-// Tranche 2 establishes independent admin catalogs and locale fallback. The
-// remaining translations and the preference UI belong to tranche 3.
+// The four catalogs remain ready for progressive translation, but only a
+// complete catalog may be exposed as a selectable admin interface language.
 const nl = {
   "nav.overview": "Overzicht",
   "nav.users": "Gebruikers",
@@ -178,6 +181,11 @@ export function normalizeAdminLocale(locale) {
     .toLowerCase()
     .split("-")[0];
   return SUPPORTED_ADMIN_LOCALES.includes(normalized) ? normalized : DEFAULT_ADMIN_LOCALE;
+}
+
+export function normalizeAvailableAdminLocale(locale) {
+  const normalized = normalizeAdminLocale(locale);
+  return AVAILABLE_ADMIN_INTERFACE_LOCALES.includes(normalized) ? normalized : DEFAULT_ADMIN_LOCALE;
 }
 
 export function translateAdmin(locale, key, parameters) {
