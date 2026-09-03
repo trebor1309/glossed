@@ -8,3 +8,13 @@ verify_jwt = false
 # verifies Stripe-Signature against STRIPE_CONNECT_WEBHOOK_SECRET and retrieves
 # the current related account from Stripe before applying the event.
 verify_jwt = false
+
+[functions.process-release-deadlines-v2]
+# Internal worker: the gateway verifies the JWT, then the handler requires the
+# service_role claim.
+verify_jwt = true
+
+[functions.process-provider-payouts-v2]
+# Internal worker: the gateway verifies the JWT, then the handler requires the
+# service_role claim.
+verify_jwt = true

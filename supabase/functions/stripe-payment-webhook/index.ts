@@ -3,11 +3,65 @@ import {
   dispatchProviderRetransferV2,
   dispatchTransferReversalV2,
 } from "../_shared/financial-remediation-v2.ts";
+import {
+  dispatchProviderTransferV2,
+  refreshConnectForRelease,
+} from "../_shared/release-transfer-v2.ts";
 import { admin } from "../_shared/supabase.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { maxNetworkRetries: 2 });
 const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET")!;
 const cryptoProvider = Stripe.createSubtleCryptoProvider();
+
+async function finalizeRefundResolution(refundId: string, eventId: string) {
+  const { data: refund, error: refundError } = await admin
+    .from("refunds_v2")
+    .select("resolution_id, payment_id")
+    .eq("id", refundId)
+    .single();
+  if (refundError) throw refundError;
+  const { data: resolution, error: resolutionError } = await admin
+    .from("financial_resolutions_v2")
+    .select("provider_transfer_amount_cents")
+    .eq("id", refund.resolution_id)
+    .single();
+  if (resolutionError) throw resolutionError;
+
+  const expectedConnectRevision = Number(resolution.provider_transfer_amount_cents) > 0
+    ? (await refreshConnectForRelease(refund.payment_id)).connect_revision
+    : null;
+  const finalizationKey = `refund-v2-event:${eventId}:finalize`;
+  const { data, error } = await admin.rpc("finalize_financial_resolution_v2", {
+    p_resolution_id: refund.resolution_id,
+    p_expected_connect_revision: expectedConnectRevision,
+    p_deduplication_key: finalizationKey,
+  });
+  if (error) throw error;
+  let finalization = data?.[0];
+  let transfer;
+  if (
+    finalization?.provider_transfer_id &&
+    ["reserved", "submitted", "failed_retryable"].includes(
+      finalization.provider_transfer_status,
+    )
+  ) {
+    transfer = await dispatchProviderTransferV2(
+      refund.payment_id,
+      finalization.provider_transfer_id,
+    );
+    const { data: completed, error: completionError } = await admin.rpc(
+      "finalize_financial_resolution_v2",
+      {
+        p_resolution_id: refund.resolution_id,
+        p_expected_connect_revision: expectedConnectRevision,
+        p_deduplication_key: `${finalizationKey}:completed`,
+      },
+    );
+    if (completionError) throw completionError;
+    finalization = completed?.[0] ?? finalization;
+  }
+  return { finalization, transfer };
+}
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -117,7 +171,7 @@ Deno.serve(async (req) => {
         p_stripe_refund_id: refund.id,
         p_refund_status: refund.status ?? "pending",
         p_amount_cents: refund.amount,
-        p_failure_reason: refund.failure_reason,
+        p_failure_reason: refund.failure_reason ?? null,
         p_payload_summary: {
           status: refund.status,
           reason: refund.reason,
@@ -127,10 +181,15 @@ Deno.serve(async (req) => {
         },
       });
       if (error) throw error;
+      const result = data?.[0];
+      const resolution = result?.refund_id && result.outcome === "succeeded"
+        ? await finalizeRefundResolution(result.refund_id, event.id)
+        : null;
       return response({
         ok: true,
-        duplicate: data?.[0]?.duplicate ?? false,
-        outcome: data?.[0]?.outcome,
+        duplicate: result?.duplicate ?? false,
+        outcome: result?.outcome,
+        resolution,
       });
     }
 

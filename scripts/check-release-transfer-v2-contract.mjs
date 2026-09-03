@@ -12,6 +12,14 @@ const worker = readFileSync(
   new URL("../supabase/functions/process-release-deadlines-v2/index.ts", import.meta.url),
   "utf8"
 );
+const serviceRole = readFileSync(
+  new URL("../supabase/functions/_shared/service_role.ts", import.meta.url),
+  "utf8"
+);
+const config = readFileSync(
+  new URL("../supabase/config.toml", import.meta.url),
+  "utf8"
+);
 const migration = readFileSync(
   new URL(
     "../supabase/migrations/20260813200000_completion_release_deferred_transfer.sql",
@@ -27,6 +35,7 @@ for (const required of [
   "refreshConnectForRelease",
   "complete_provider_transfer_v2",
   "fail_provider_transfer_v2",
+  "isRetryableStripeBalanceOperationFailure",
 ]) {
   if (!shared.includes(required)) throw new Error(`Deferred transfer is missing ${required}`);
 }
@@ -51,13 +60,21 @@ for (const required of [
   if (!actions.includes(required)) throw new Error(`Completion endpoint is missing ${required}`);
 }
 for (const required of [
-  "SUPABASE_SERVICE_ROLE_KEY",
+  'requireServiceRole } from "../_shared/service_role.ts"',
   "list_due_fund_releases_v2",
   'candidate.release_trigger === "client_confirmation"',
   "reserve_client_confirmed_fund_release_v2",
   "list_provider_transfers_v2_for_dispatch",
 ]) {
   if (!worker.includes(required)) throw new Error(`Release worker is missing ${required}`);
+}
+for (const required of ["role === \"service_role\""]) {
+  if (!serviceRole.includes(required)) {
+    throw new Error(`Service role guard is missing ${required}`);
+  }
+}
+if (!/\[functions\.process-release-deadlines-v2\][\s\S]*?verify_jwt\s*=\s*true/.test(config)) {
+  throw new Error("Release worker must keep Supabase gateway JWT verification enabled");
 }
 for (const required of [
   "'completion_release_v2', false",
