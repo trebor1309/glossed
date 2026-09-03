@@ -411,10 +411,28 @@ Deno.serve(async (req) => {
       if (error) throw error;
       const result = data?.[0];
       let transfer;
-      if (result?.provider_transfer_id && result.provider_transfer_status !== "succeeded") {
+      if (
+        result?.provider_transfer_id &&
+        ["reserved", "submitted", "failed_retryable"].includes(
+          result.provider_transfer_status
+        )
+      ) {
         transfer = await dispatchProviderTransferV2(context.paymentId, result.provider_transfer_id);
       }
-      return json(req, { resolution: result, transfer }, 202);
+      let resolution = result;
+      if (transfer?.status === "succeeded") {
+        const { data: completed, error: completionError } = await admin.rpc(
+          "finalize_financial_resolution_v2",
+          {
+            p_resolution_id: body.resolution_id,
+            p_expected_connect_revision: expectedRevision,
+            p_deduplication_key: `remediation-v2:finalize:${operationId}:completed`,
+          }
+        );
+        if (completionError) throw completionError;
+        resolution = completed?.[0] ?? result;
+      }
+      return json(req, { resolution, transfer }, 202);
     }
     throw new HttpError(400, "Unsupported action");
   } catch (error) {

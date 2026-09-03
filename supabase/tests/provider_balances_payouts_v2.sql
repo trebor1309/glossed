@@ -233,6 +233,11 @@ begin
       where deduplication_key = 'provider-payout-v2-event:evt_payout_v2_same:audit') <> 1 then
     raise exception 'Payout webhook audit was duplicated';
   end if;
+  if pg_get_functiondef(
+       'public.provider_internal_balance_v2(uuid,text)'::regprocedure
+     ) like '%payout.paid_at is null%' then
+    raise exception 'Paid payouts must remain deducted from the provider balance';
+  end if;
 end
 $$;
 

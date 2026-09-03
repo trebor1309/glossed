@@ -45,6 +45,8 @@ for (const required of [
   'action === "decide_service_dispute"',
   "dispatchTransferReversalV2",
   "dispatchRefundV2",
+  "finalize_financial_resolution_v2",
+  'p_deduplication_key: `remediation-v2:finalize:${operationId}:completed`',
 ]) {
   if (!endpoint.includes(required)) throw new Error(`Remediation endpoint is missing ${required}`);
 }
@@ -55,6 +57,9 @@ for (const required of [
   'event.type.startsWith("charge.dispute.")',
   "process_payment_dispute_v2_event",
   "process_refund_v2_event",
+  "p_failure_reason: refund.failure_reason ?? null",
+  "finalizeRefundResolution",
+  'p_deduplication_key: `${finalizationKey}:completed`',
 ]) {
   if (!webhook.includes(required)) throw new Error(`Signed Stripe webhook is missing ${required}`);
 }
