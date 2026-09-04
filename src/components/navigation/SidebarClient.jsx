@@ -10,6 +10,7 @@ import {
   MessageSquare,
   CreditCard,
   Bell,
+  Search,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -23,6 +24,7 @@ export default function SidebarClient() {
 
   const links = [
     { to: "/dashboard", label: "Dashboard", icon: Home },
+    { to: "/dashboard/discover", label: "Find a Professional", icon: Search },
 
     {
       to: "/dashboard/reservations",

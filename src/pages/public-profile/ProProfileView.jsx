@@ -1,5 +1,6 @@
 import { MessageCircle, Calendar, CheckCircle2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { v4 as uuid } from "uuid";
 import { useUser } from "@/context/UserContext";
 import useStartChat from "@/components/chat/hooks/useStartChat";
 
@@ -9,6 +10,7 @@ import ProfileMap from "./ProfileMap";
 
 export default function ProProfileView({ profile, reviews }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const startChat = useStartChat();
   const { user, isPro } = useUser();
 
@@ -40,7 +42,10 @@ export default function ProProfileView({ profile, reviews }) {
   const handleBooking = () => {
     if (!user) return navigate("/login");
 
-    navigate(`/dashboard/new?pro=${profile.id}`);
+    const params = new URLSearchParams({ pro: profile.id, operation: uuid() });
+    const serviceCode = searchParams.get("service");
+    if (serviceCode) params.set("service", serviceCode);
+    navigate(`/dashboard/new?${params.toString()}`);
   };
 
   return (
@@ -49,6 +54,7 @@ export default function ProProfileView({ profile, reviews }) {
       <div className="text-center space-y-3">
         <img
           src={profile.profile_photo || "/default-avatar.png"}
+          alt={profile.business_name || profile.username || "Professional profile"}
           className="w-28 h-28 rounded-full mx-auto object-cover"
         />
 
