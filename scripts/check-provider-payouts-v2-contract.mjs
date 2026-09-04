@@ -8,24 +8,19 @@ const paidBalanceMigration = readFileSync(
   "supabase/migrations/20260903020000_provider_paid_payout_balance.sql",
   "utf8"
 );
+const returnedPayoutMigration = readFileSync(
+  "supabase/migrations/20260904020000_provider_payout_returned_after_paid.sql",
+  "utf8"
+);
 const shared = readFileSync("supabase/functions/_shared/provider-payouts-v2.ts", "utf8");
 const webhook = readFileSync("supabase/functions/stripe-connect-webhook/index.ts", "utf8");
 const payoutWorker = readFileSync(
   "supabase/functions/process-provider-payouts-v2/index.ts",
   "utf8"
 );
-const session = readFileSync(
-  "supabase/functions/create-stripe-account-session/index.ts",
-  "utf8"
-);
-const accountCreation = readFileSync(
-  "supabase/functions/create-stripe-account/index.ts",
-  "utf8"
-);
-const gains = readFileSync(
-  "src/pages/prodashboard/components/ProviderGainsV2.jsx",
-  "utf8"
-);
+const session = readFileSync("supabase/functions/create-stripe-account-session/index.ts", "utf8");
+const accountCreation = readFileSync("supabase/functions/create-stripe-account/index.ts", "utf8");
+const gains = readFileSync("src/pages/prodashboard/components/ProviderGainsV2.jsx", "utf8");
 const config = readFileSync("supabase/config.toml", "utf8");
 
 const requirements = [
@@ -34,18 +29,88 @@ const requirements = [
   [migration, /minimum_payout_amount_cents[^;]+default 0/s, "initial threshold must be zero"],
   [migration, /provider_payouts_v2_active_uidx/, "one active payout lock is required"],
   [migration, /provider_payout_block_reasons_v2/, "financial blocks must be revalidated"],
-  [migration, /stripe_instant_available_net_amount_cents/, "exact Stripe net balance must be stored"],
-  [migration, /instant_payout_margin_bps[^;]+check \(instant_payout_margin_bps = 0\)/s, "Glossed Instant Payout margin must be zero"],
+  [
+    migration,
+    /stripe_instant_available_net_amount_cents/,
+    "exact Stripe net balance must be stored",
+  ],
+  [
+    migration,
+    /instant_payout_margin_bps[^;]+check \(instant_payout_margin_bps = 0\)/s,
+    "Glossed Instant Payout margin must be zero",
+  ],
   [migration, /process_provider_payout_v2_event/, "signed payout event RPC is required"],
-  [migration, /Recheck the event claim inside that serialization boundary/, "webhook race recheck is required"],
-  [shared, /expand: \["instant_available\.net_available"\]/, "Stripe exact net balance expansion is required"],
-  [shared, /schedule: \{ interval: "manual" \}/, "Glossed-controlled schedule requires Stripe manual mode"],
-  [shared, /idempotencyKey: reservation\.idempotency_key/, "Stripe payout idempotency key must be stable"],
-  [shared, /isRetryableStripeBalanceOperationFailure/, "transient balance failures must remain retryable"],
-  [webhook, /payout\.created.*payout\.updated.*payout\.paid.*payout\.failed/s, "all payout lifecycle events must be handled"],
-  [payoutWorker, /requireServiceRole.*_shared\/service_role\.ts/, "payout worker must use the verified service-role claim guard"],
-  [session, /instant_payouts: false/, "embedded components must not bypass server Instant Payout checks"],
-  [session, /standard_payouts: false/, "embedded components must not create manual standard payouts"],
+  [
+    migration,
+    /Recheck the event claim inside that serialization boundary/,
+    "webhook race recheck is required",
+  ],
+  [
+    returnedPayoutMigration,
+    /'payout_returned_after_paid'.*'paid'.*'failed'/s,
+    "paid-to-failed payout transition is required",
+  ],
+  [
+    returnedPayoutMigration,
+    /paid_at is null or failed_at is null or failed_at >= paid_at/,
+    "late failure chronology must be constrained",
+  ],
+  [
+    returnedPayoutMigration,
+    /v_workflow\.current_state in \('submitted', 'paid'\)/,
+    "signed failure must cover previously paid payouts",
+  ],
+  [
+    returnedPayoutMigration,
+    /case when v_returned_after_paid then 'returned'/,
+    "returned payout outcome must be explicit",
+  ],
+  [returnedPayoutMigration, /'payout\.returned'/, "returned payout audit must be explicit"],
+  [
+    returnedPayoutMigration,
+    /where payout\.failed_at is not null and payout\.cancelled_at is null/,
+    "returned payout must be visible in incidents",
+  ],
+  [
+    shared,
+    /expand: \["instant_available\.net_available"\]/,
+    "Stripe exact net balance expansion is required",
+  ],
+  [
+    shared,
+    /schedule: \{ interval: "manual" \}/,
+    "Glossed-controlled schedule requires Stripe manual mode",
+  ],
+  [
+    shared,
+    /idempotencyKey: reservation\.idempotency_key/,
+    "Stripe payout idempotency key must be stable",
+  ],
+  [
+    shared,
+    /isRetryableStripeBalanceOperationFailure/,
+    "transient balance failures must remain retryable",
+  ],
+  [
+    webhook,
+    /payout\.created.*payout\.updated.*payout\.paid.*payout\.failed/s,
+    "all payout lifecycle events must be handled",
+  ],
+  [
+    payoutWorker,
+    /requireServiceRole.*_shared\/service_role\.ts/,
+    "payout worker must use the verified service-role claim guard",
+  ],
+  [
+    session,
+    /instant_payouts: false/,
+    "embedded components must not bypass server Instant Payout checks",
+  ],
+  [
+    session,
+    /standard_payouts: false/,
+    "embedded components must not create manual standard payouts",
+  ],
   [
     accountCreation,
     /idempotencyKey: reservation\.creation_idempotency_key/,
@@ -80,9 +145,13 @@ if (!/\[functions\.process-provider-payouts-v2\][\s\S]*?verify_jwt\s*=\s*true/.t
 if (
   !/committed_payouts[\s\S]+payout\.failed_at is null and payout\.cancelled_at is null/.test(
     paidBalanceMigration
-  ) || /payout\.paid_at is null/.test(paidBalanceMigration)
+  ) ||
+  /payout\.paid_at is null/.test(paidBalanceMigration)
 ) {
   throw new Error("Paid payouts must remain deducted from the provider internal balance");
+}
+if (!/committed_payouts[\s\S]+payout\.failed_at is null/.test(paidBalanceMigration)) {
+  throw new Error("A failed or returned payout must release its internal balance debit");
 }
 
 process.stdout.write("Provider balances and payouts v2 contract checks passed.\n");

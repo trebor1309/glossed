@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { Save, Edit2, ShieldCheck, AlertCircle, Link as LinkIcon } from "lucide-react";
 import Toast from "@/components/ui/Toast";
+import ProviderEligibilityDeclaration from "./ProviderEligibilityDeclaration";
 
 export default function LegalBilling() {
   const { user, session, fetchUserProfile } = useUser();
@@ -11,6 +12,7 @@ export default function LegalBilling() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const [eligibilityDeclarationReady, setEligibilityDeclarationReady] = useState(false);
 
   const [form, setForm] = useState({
     company_number: "",
@@ -100,12 +102,22 @@ export default function LegalBilling() {
      🔗 STRIPE — CONNECT
   ------------------------------------------------------------------- */
   const handleStripeConnect = async () => {
+    if (!form.stripe_account_id && !eligibilityDeclarationReady) {
+      setToast({
+        type: "error",
+        message: "Save your provider eligibility declaration before starting Stripe onboarding.",
+      });
+      return;
+    }
     setSaving(true);
     const { data, error } = await supabase.functions.invoke("create-stripe-account", { body: {} });
     setSaving(false);
 
     if (error || !data?.url) {
-      setToast({ type: "error", message: data?.error || error?.message || "Stripe connection failed." });
+      setToast({
+        type: "error",
+        message: data?.error || error?.message || "Stripe connection failed.",
+      });
       return;
     }
     window.location.assign(data.url);
@@ -116,11 +128,16 @@ export default function LegalBilling() {
   ------------------------------------------------------------------- */
   const handleStripeDisconnect = async () => {
     setSaving(true);
-    const { data, error } = await supabase.functions.invoke("disconnect-stripe-account", { body: {} });
+    const { data, error } = await supabase.functions.invoke("disconnect-stripe-account", {
+      body: {},
+    });
     setSaving(false);
 
     if (error || !data?.success) {
-      setToast({ type: "error", message: data?.error || error?.message || "Stripe disconnection failed." });
+      setToast({
+        type: "error",
+        message: data?.error || error?.message || "Stripe disconnection failed.",
+      });
     } else {
       setToast({ type: "success", message: "Stripe account disconnected." });
       setForm((f) => ({
@@ -159,6 +176,22 @@ export default function LegalBilling() {
           {editing ? (saving ? "Saving..." : "Save") : "Modify"}
         </button>
       </div>
+
+      <ProviderEligibilityDeclaration
+        businessRegistrationNumber={form.company_number}
+        vatNumber={form.no_vat ? "" : form.vat_number}
+        onReadyChange={setEligibilityDeclarationReady}
+      />
+
+      {!form.stripe_account_id && !eligibilityDeclarationReady && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <AlertCircle className="mt-0.5 shrink-0" size={17} />
+          <span>
+            Save the declaration above before connecting Stripe. Glossed will assess eligibility
+            separately; the declaration alone does not approve your account.
+          </span>
+        </div>
+      )}
 
       {/* READ MODE */}
       {!editing ? (
