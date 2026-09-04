@@ -110,6 +110,43 @@ begin
 end
 $$;
 
+do $$
+declare v_latest public.provider_eligibility_declarations%rowtype;
+begin
+  select * into v_latest
+  from public.get_my_latest_provider_eligibility_declaration();
+  if v_latest.provider_id <> '72000000-0000-0000-0000-000000000020'
+     or v_latest.revision <> 1
+     or v_latest.residence_country_code <> 'BE' then
+    raise exception 'Provider could not retrieve the latest own declaration';
+  end if;
+end
+$$;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"72000000-0000-0000-0000-000000000030","role":"authenticated"}',
+  false
+);
+select set_config(
+  'request.jwt.claim.sub', '72000000-0000-0000-0000-000000000030', false
+);
+do $$
+begin
+  if exists (select 1 from public.get_my_latest_provider_eligibility_declaration()) then
+    raise exception 'Provider declaration read model exposed another provider declaration';
+  end if;
+end
+$$;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"72000000-0000-0000-0000-000000000020","role":"authenticated"}',
+  false
+);
+select set_config(
+  'request.jwt.claim.sub', '72000000-0000-0000-0000-000000000020', false
+);
+
 select set_config('request.jwt.claim.role', 'service_role', false);
 select public.record_provider_eligibility_assessment(
   '72000000-0000-0000-0000-000000000020',

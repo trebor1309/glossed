@@ -241,6 +241,81 @@ begin
 end
 $$;
 
+do $$
+declare v_balance record;
+begin
+  select * into v_balance from public.provider_internal_balance_v2(
+    '76000000-0000-0000-0000-000000000020', 'eur'
+  );
+  if v_balance.reserved_payout_amount_cents <> 100 then
+    raise exception 'A paid payout was not retained as an internal balance debit';
+  end if;
+end
+$$;
+
+select * from public.process_provider_payout_v2_event(
+  'evt_payout_v2_returned', 'payout.failed', 'acct_PayoutV2Test',
+  now() + interval '1 hour', false, 'po_PayoutV2Test', null, 100, 'eur',
+  'standard', 'failed', current_date, 'bank_returned',
+  'The destination bank returned the payout.', null, null,
+  'txn_PayoutV2Test', 0, '{"delivery":1,"previous_status":"paid"}'::jsonb
+);
+select * from public.process_provider_payout_v2_event(
+  'evt_payout_v2_returned', 'payout.failed', 'acct_PayoutV2Test',
+  now() + interval '1 hour', false, 'po_PayoutV2Test', null, 100, 'eur',
+  'standard', 'failed', current_date, 'bank_returned',
+  'The destination bank returned the payout.', null, null,
+  'txn_PayoutV2Test', 0, '{"delivery":2,"previous_status":"paid"}'::jsonb
+);
+
+do $$
+declare v_balance record;
+begin
+  if (select current_state from public.workflow_instances workflow
+      join public.provider_payouts_v2 payout
+        on payout.workflow_instance_id = workflow.id
+      where payout.stripe_payout_id = 'po_PayoutV2Test') <> 'failed' then
+    raise exception 'A returned paid payout did not enter the failed workflow state';
+  end if;
+  if not exists (
+    select 1 from public.provider_payouts_v2 payout
+    where payout.stripe_payout_id = 'po_PayoutV2Test'
+      and payout.paid_at is not null and payout.failed_at is not null
+      and payout.failed_at >= payout.paid_at and payout.stripe_status = 'failed'
+  ) then
+    raise exception 'Late payout failure did not preserve paid and returned chronology';
+  end if;
+  if (select count(*) from public.provider_payout_attempts_v2
+      where outcome = 'returned') <> 1
+     or (select count(*) from public.stripe_payout_v2_webhook_events
+         where event_id = 'evt_payout_v2_returned' and outcome = 'returned') <> 1
+     or (select count(*) from public.workflow_transition_events
+         where transition_code = 'payout_returned_after_paid') <> 1
+     or (select count(*) from public.financial_audit_log
+         where deduplication_key =
+           'provider-payout-v2-event:evt_payout_v2_returned:audit'
+           and event_type = 'payout.returned') <> 1 then
+    raise exception 'Returned payout webhook was not idempotent and uniquely audited';
+  end if;
+  if not exists (
+    select 1 from public.admin_financial_incident_sources_v2 incident
+    where incident.incident_key like 'payout_failure:%'
+      and incident.source_id = (
+        select id::text from public.provider_payouts_v2
+        where stripe_payout_id = 'po_PayoutV2Test'
+      ) and incident.is_open
+  ) then
+    raise exception 'Returned paid payout was not exposed as an admin incident';
+  end if;
+  select * into v_balance from public.provider_internal_balance_v2(
+    '76000000-0000-0000-0000-000000000020', 'eur'
+  );
+  if v_balance.reserved_payout_amount_cents <> 0 then
+    raise exception 'Returned payout funds were not released exactly once';
+  end if;
+end
+$$;
+
 -- Stripe can expose funds as Instant Payout eligible while they are still
 -- pending for a standard payout. These two balance views are intentionally
 -- reconciled independently.
