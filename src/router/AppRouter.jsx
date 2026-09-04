@@ -40,6 +40,7 @@ const OnboardingPage = lazy(() => import("@/pages/auth/OnboardingPage"));
 
 const DashboardLayout = lazy(() => import("@/pages/dashboard/DashboardLayout"));
 const DashboardHome = lazy(() => import("@/pages/dashboard/pages/DashboardHome"));
+const DashboardDiscover = lazy(() => import("@/pages/dashboard/pages/DashboardDiscover"));
 const DashboardNew = lazy(() => import("@/pages/dashboard/pages/DashboardNew"));
 const DashboardReservations = lazy(() => import("@/pages/dashboard/pages/DashboardReservations"));
 const DashboardAccount = lazy(() => import("@/pages/dashboard/pages/DashboardAccount"));
@@ -145,6 +146,7 @@ export default function AppRouter({ onOpenLogin, onOpenSignup, onOpenDownload })
           }
         >
           <Route index element={<DashboardHome />} />
+          <Route path="discover" element={<DashboardDiscover />} />
           <Route path="new" element={<DashboardNew />} />
           <Route path="reservations" element={<DashboardReservations />} />
           <Route path="account" element={<DashboardAccount />} />

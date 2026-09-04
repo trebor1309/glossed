@@ -9,6 +9,7 @@ const allowedSupabasePosts = new Set([
   "/auth/v1/token",
   "/rest/v1/bookings",
   "/rest/v1/booking_notifications",
+  "/rest/v1/rpc/create_targeted_booking_request",
   "/rest/v1/rpc/cancel_mission_proposal",
   "/rest/v1/rpc/create_mission_proposal",
   "/rest/v1/rpc/get_my_chat_summaries",
@@ -16,6 +17,7 @@ const allowedSupabasePosts = new Set([
   "/rest/v1/rpc/get_public_profile",
   "/rest/v1/rpc/get_user_summary",
   "/rest/v1/rpc/is_app_admin",
+  "/rest/v1/rpc/list_service_categories",
   "/rest/v1/rpc/mark_notifications_read",
 ]);
 
@@ -107,7 +109,6 @@ test("client booking becomes a professional proposal and a payable client offer"
 }) => {
   const runId = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
   const marker = `[E2E:${runId}]`;
-  const address = `${marker} Brussels test address`;
   const date = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const contexts = [];
   const guards = [];
@@ -145,7 +146,7 @@ test("client booking becomes a professional proposal and a payable client offer"
 
     const serviceButton = clientPage.locator('button[aria-pressed="false"]').first();
     await expect(serviceButton).toBeVisible({ timeout: 20_000 });
-    const service = (await serviceButton.innerText()).trim();
+    const service = (await serviceButton.locator("span").first().innerText()).trim();
     await serviceButton.click();
     await clientPage.getByRole("button", { name: /Next/ }).click();
 
@@ -153,19 +154,24 @@ test("client booking becomes a professional proposal and a payable client offer"
     await clientPage.getByRole("button", { name: "Morning (8–12)" }).click();
     await clientPage.getByRole("button", { name: /Next/ }).click();
 
-    await clientPage.getByPlaceholder("Enter your address").fill(address);
+    const addressInput = clientPage.getByPlaceholder("Enter your address");
+    const address = await addressInput.inputValue();
+    expect(address.trim()).not.toBe("");
     await clientPage
       .getByPlaceholder("Additional notes...")
       .fill(`${marker} disposable booking-offer lifecycle`);
     await clientPage.getByRole("button", { name: /Next/ }).click();
 
-    const bookingRequest = clientPage.waitForRequest(
-      (request) =>
-        request.method() === "POST" && new URL(request.url()).pathname === "/rest/v1/bookings"
+    const bookingResponsePromise = clientPage.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === "/rest/v1/rpc/create_targeted_booking_request"
     );
-    await clientPage.getByRole("button", { name: "Confirm Booking" }).click();
-    const bookingPayload = (await bookingRequest).postDataJSON();
-    bookingId = (Array.isArray(bookingPayload) ? bookingPayload[0] : bookingPayload)?.id;
+    await clientPage.getByRole("button", { name: "Send request" }).click();
+    const bookingResponse = await bookingResponsePromise;
+    expect(bookingResponse.ok()).toBe(true);
+    const bookingPayload = await bookingResponse.json();
+    bookingId = (Array.isArray(bookingPayload) ? bookingPayload[0] : bookingPayload)?.booking_id;
     expect(bookingId).toBeTruthy();
 
     await expect(clientPage).toHaveURL(/\/dashboard\/reservations$/, { timeout: 20_000 });

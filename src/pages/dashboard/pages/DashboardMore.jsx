@@ -12,6 +12,7 @@ import {
   Repeat,
   LogOut,
   Bell,
+  Search,
 } from "lucide-react";
 
 export default function DashboardMore() {
@@ -30,6 +31,7 @@ export default function DashboardMore() {
     {
       title: "My Activity",
       items: [
+        { label: "Find a Professional", icon: Search, to: "/dashboard/discover" },
         { label: "My Reservations", icon: CalendarDays, to: "/dashboard/reservations" },
         { label: "Messages", icon: MessageSquare, to: "/dashboard/messages" },
         { label: "Payments", icon: CreditCard, to: "/dashboard/payments" },

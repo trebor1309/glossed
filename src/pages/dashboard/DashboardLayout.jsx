@@ -15,7 +15,7 @@ export default function DashboardLayout() {
   const [isDesktop, setIsDesktop] = useState(false);
   const isMessagesPage = location.pathname.includes("/messages");
 
-  const { isLoaded, loadError } = useJsApiLoader({
+  const { loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
     libraries,
   });
@@ -32,20 +32,6 @@ export default function DashboardLayout() {
     window.addEventListener("open-new-booking-modal", handleOpenModal);
     return () => window.removeEventListener("open-new-booking-modal", handleOpenModal);
   }, []);
-
-  if (loadError)
-    return (
-      <div className="flex items-center justify-center h-screen text-gray-600">
-        ❌ Google Maps failed to load.
-      </div>
-    );
-
-  if (!isLoaded)
-    return (
-      <div className="flex items-center justify-center h-screen text-gray-600">
-        Loading Google Maps...
-      </div>
-    );
 
   return (
     <>
@@ -78,8 +64,17 @@ export default function DashboardLayout() {
 
       <BottomNav />
 
+      {loadError && (
+        <div
+          role="status"
+          className="fixed bottom-20 left-1/2 z-[9998] -translate-x-1/2 rounded-full bg-amber-50 px-4 py-2 text-xs text-amber-800 shadow md:bottom-6"
+        >
+          Address suggestions are temporarily unavailable. Saved locations still work.
+        </div>
+      )}
+
       {/* Modal: NEW BOOKING */}
-      {isDesktop && showNewBookingModal && isLoaded && (
+      {isDesktop && showNewBookingModal && (
         <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
           <DashboardNew
             isModal={true}

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/lib/supabaseClient";
-import { Calendar, Clock, CheckCircle, Sparkles } from "lucide-react";
+import { Search, Clock, CheckCircle, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Toast from "@/components/ui/Toast";
 
@@ -158,10 +158,10 @@ export default function DashboardHome() {
         />
 
         <DashboardCard
-          title="Book a Service"
-          icon={<Calendar className="text-green-500" size={24} />}
+          title="Find a Professional"
+          icon={<Search className="text-green-500" size={24} />}
           color="from-green-400 to-green-600"
-          onClick={() => navigate("/dashboard/new")}
+          onClick={() => navigate("/dashboard/discover")}
           cta
         />
       </div>
@@ -200,7 +200,7 @@ function DashboardCard({ title, value, icon, color, onClick, cta = false }) {
       </div>
 
       {cta ? (
-        <span className="text-sm opacity-90 mt-1">Click to book now</span>
+        <span className="text-sm opacity-90 mt-1">Search by service and location</span>
       ) : (
         <p className="text-3xl font-bold">{value}</p>
       )}
