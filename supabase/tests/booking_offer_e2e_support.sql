@@ -23,6 +23,14 @@ insert into auth.users (id, email, raw_user_meta_data) values
    '{"requested_role":"client"}'::jsonb);
 
 update public.users set onboarding_completed = true where id::text like '60000000-%';
+update public.users
+set verification_status = 'verified',
+    accepting_clients = true,
+    business_type = array['Hair Stylist'],
+    latitude = 50.8503,
+    longitude = 4.3517,
+    radius_km = 20
+where id = '60000000-0000-0000-0000-000000000020';
 insert into public.app_admins (user_id)
 values ('60000000-0000-0000-0000-000000000030');
 

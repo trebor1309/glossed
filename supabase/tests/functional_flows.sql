@@ -46,7 +46,8 @@ update public.users
 set latitude = 50.85,
     longitude = 4.35,
     radius_km = 25,
-    business_type = array['Functional service'],
+    business_type = array['Hair Stylist'],
+    verification_status = 'verified',
     accepting_clients = true
 where id in (
   '20000000-0000-0000-0000-000000000020',
@@ -95,7 +96,7 @@ insert into public.booking_notifications (booking_id, pro_id) values
 do $$
 begin
   if (select count(*) from public.find_matching_pro_ids(
-      array['Functional service'], 50.85, 4.35)) <> 2 then
+      array['Hair Stylist'], 50.85, 4.35)) <> 2 then
     raise exception 'Server-side professional matching returned an unexpected result';
   end if;
   if (select count(*) from public.users
