@@ -56,6 +56,51 @@ where id = '39000000-0000-0000-0000-000000000070';
 update public.users set onboarding_completed = false
 where id = '39000000-0000-0000-0000-000000000080';
 
+-- Simulate a successfully completed operation whose originally valid requested
+-- date has since passed. A replay must return its immutable result before
+-- applying validations that are only relevant to a new operation.
+insert into public.bookings (
+  id, client_id, pro_id, service, date, time_slot, address, notes,
+  client_lat, client_lng, status
+) values (
+  '39000000-0000-0000-0000-000000000910',
+  '39000000-0000-0000-0000-000000000010',
+  '39000000-0000-0000-0000-000000000060',
+  'Hair Stylist', current_date - 1, '09:00',
+  'Historical private address', 'Historical replay',
+  50.8503, 4.3517, 'pending'
+);
+
+insert into public.booking_notifications (id, booking_id, pro_id)
+values (
+  '39000000-0000-0000-0000-000000000911',
+  '39000000-0000-0000-0000-000000000910',
+  '39000000-0000-0000-0000-000000000060'
+);
+
+insert into public.targeted_booking_operations (
+  client_id, operation_id, provider_id, request_fingerprint,
+  booking_id, notification_id, created_at, completed_at
+) values (
+  '39000000-0000-0000-0000-000000000010',
+  '39000000-0000-0000-0000-000000000110',
+  '39000000-0000-0000-0000-000000000060',
+  encode(sha256(convert_to(jsonb_build_object(
+    'provider_id', '39000000-0000-0000-0000-000000000060'::uuid,
+    'service_codes', array['hair_stylist']::text[],
+    'date', current_date - 1,
+    'time_slot', '09:00',
+    'address', 'Historical private address',
+    'notes', 'Historical replay',
+    'client_latitude', 50.8503::double precision,
+    'client_longitude', 4.3517::double precision
+  )::text, 'UTF8')), 'hex'),
+  '39000000-0000-0000-0000-000000000910',
+  '39000000-0000-0000-0000-000000000911',
+  clock_timestamp() - interval '2 days',
+  clock_timestamp() - interval '2 days'
+);
+
 do $$
 begin
   if (select count(*) from public.service_categories) <> 9 then
@@ -132,10 +177,37 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', '39000000-0000-0000-0000-000000000010', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
 
+create temporary table historical_replay_result as
+select * from public.create_targeted_booking_request(
+  '39000000-0000-0000-0000-000000000110',
+  '39000000-0000-0000-0000-000000000060',
+  array['hair_stylist'], current_date - 1, '09:00',
+  'Historical private address', 'Historical replay', 50.8503, 4.3517
+);
+
 do $$
 declare
   v_result jsonb;
 begin
+  if not (select idempotent from historical_replay_result)
+     or (select booking_id from historical_replay_result)
+        <> '39000000-0000-0000-0000-000000000910'
+     or (select notification_id from historical_replay_result)
+        <> '39000000-0000-0000-0000-000000000911' then
+    raise exception 'Completed historical operation did not replay its original result';
+  end if;
+
+  begin
+    perform * from public.create_targeted_booking_request(
+      '39000000-0000-0000-0000-000000000111',
+      '39000000-0000-0000-0000-000000000060',
+      array['hair_stylist'], current_date - 1, '09:00',
+      'Historical private address', 'New past request', 50.8503, 4.3517
+    );
+    raise exception 'A new targeted request accepted a past date';
+  exception when invalid_parameter_value then null;
+  end;
+
   if (select count(*) from public.list_service_categories()) <> 9 then
     raise exception 'Authenticated client cannot load the canonical taxonomy';
   end if;

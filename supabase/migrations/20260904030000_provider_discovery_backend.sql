@@ -561,6 +561,7 @@ set search_path = public, extensions, pg_temp
 as $$
 declare
   v_client_id uuid := auth.uid();
+  v_request_service_codes text[];
   v_service_codes text[];
   v_requested_service_count integer;
   v_service_labels text;
@@ -572,59 +573,21 @@ begin
   if v_client_id is null then
     raise exception 'Authentication required' using errcode = '28000';
   end if;
-  if p_operation_id is null or p_provider_id is null then
-    raise exception 'Operation and provider identifiers are required' using errcode = '22023';
-  end if;
-  if p_provider_id = v_client_id then
-    raise exception 'A client cannot target their own provider profile' using errcode = '22023';
-  end if;
-  if p_service_codes is null or cardinality(p_service_codes) = 0 then
-    raise exception 'At least one service category is required' using errcode = '22023';
-  end if;
-  if p_date is null or p_date < current_date then
-    raise exception 'The requested date must not be in the past' using errcode = '22023';
-  end if;
-  if nullif(trim(coalesce(p_time_slot, '')), '') is null
-     or length(trim(p_time_slot)) > 120 then
-    raise exception 'A valid time slot is required' using errcode = '22023';
-  end if;
-  if nullif(trim(coalesce(p_address, '')), '') is null
-     or length(trim(p_address)) > 500 then
-    raise exception 'A valid private service address is required' using errcode = '22023';
-  end if;
-  if p_notes is not null and length(p_notes) > 5000 then
-    raise exception 'Booking notes are too long' using errcode = '22023';
-  end if;
-  if p_client_latitude is null or p_client_latitude not between -90 and 90
-     or p_client_longitude is null or p_client_longitude not between -180 and 180 then
-    raise exception 'Client coordinates are invalid' using errcode = '22023';
+  if p_operation_id is null then
+    raise exception 'Operation identifier is required' using errcode = '22023';
   end if;
 
-  select count(distinct lower(trim(requested)))
-  into v_requested_service_count
-  from unnest(p_service_codes) requested
-  where nullif(trim(requested), '') is not null;
-
-  select array_agg(sc.code order by sc.sort_order, sc.code),
-         string_agg(sc.fallback_label, ', ' order by sc.sort_order, sc.code)
-  into v_service_codes, v_service_labels
-  from public.service_categories sc
-  where sc.active
-    and sc.code in (
-      select distinct lower(trim(requested))
-      from unnest(p_service_codes) requested
-      where nullif(trim(requested), '') is not null
-    );
-
-  if v_service_codes is null
-     or cardinality(v_service_codes) <> v_requested_service_count then
-    raise exception 'One or more service categories are unknown or inactive'
-      using errcode = '22023';
-  end if;
+  select coalesce(array_agg(normalized.code order by normalized.code), '{}'::text[])
+  into v_request_service_codes
+  from (
+    select distinct lower(trim(requested)) as code
+    from unnest(coalesce(p_service_codes, '{}'::text[])) requested
+    where nullif(trim(requested), '') is not null
+  ) normalized;
 
   v_fingerprint := encode(sha256(convert_to(jsonb_build_object(
       'provider_id', p_provider_id,
-      'service_codes', v_service_codes,
+      'service_codes', v_request_service_codes,
       'date', p_date,
       'time_slot', trim(p_time_slot),
       'address', trim(p_address),
@@ -651,6 +614,49 @@ begin
 
     return query select v_operation.booking_id, v_operation.notification_id, true;
     return;
+  end if;
+
+  if p_provider_id is null then
+    raise exception 'Provider identifier is required' using errcode = '22023';
+  end if;
+  if p_provider_id = v_client_id then
+    raise exception 'A client cannot target their own provider profile' using errcode = '22023';
+  end if;
+  if p_service_codes is null or cardinality(p_service_codes) = 0 then
+    raise exception 'At least one service category is required' using errcode = '22023';
+  end if;
+  if p_date is null or p_date < current_date then
+    raise exception 'The requested date must not be in the past' using errcode = '22023';
+  end if;
+  if nullif(trim(coalesce(p_time_slot, '')), '') is null
+     or length(trim(p_time_slot)) > 120 then
+    raise exception 'A valid time slot is required' using errcode = '22023';
+  end if;
+  if nullif(trim(coalesce(p_address, '')), '') is null
+     or length(trim(p_address)) > 500 then
+    raise exception 'A valid private service address is required' using errcode = '22023';
+  end if;
+  if p_notes is not null and length(p_notes) > 5000 then
+    raise exception 'Booking notes are too long' using errcode = '22023';
+  end if;
+  if p_client_latitude is null or p_client_latitude not between -90 and 90
+     or p_client_longitude is null or p_client_longitude not between -180 and 180 then
+    raise exception 'Client coordinates are invalid' using errcode = '22023';
+  end if;
+
+  v_requested_service_count := cardinality(v_request_service_codes);
+
+  select array_agg(sc.code order by sc.sort_order, sc.code),
+         string_agg(sc.fallback_label, ', ' order by sc.sort_order, sc.code)
+  into v_service_codes, v_service_labels
+  from public.service_categories sc
+  where sc.active
+    and sc.code = any(v_request_service_codes);
+
+  if v_service_codes is null
+     or cardinality(v_service_codes) <> v_requested_service_count then
+    raise exception 'One or more service categories are unknown or inactive'
+      using errcode = '22023';
   end if;
 
   perform 1
