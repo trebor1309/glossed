@@ -29,6 +29,11 @@ const requirements = [
     "authenticated execute grant is required",
   ],
   [
+    migration,
+    /v_assessment\.declaration_id is distinct from v_declaration\.id[\s\S]+eligibility_assessment_stale/,
+    "paid proposal readiness must reject assessments of older declaration revisions",
+  ],
+  [
     component,
     /submit_provider_eligibility_declaration/,
     "provider declaration submission is required",

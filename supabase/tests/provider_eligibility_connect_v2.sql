@@ -441,6 +441,57 @@ begin
 end
 $$;
 
+select public.submit_provider_eligibility_declaration(
+  'be', array['be'], 'be', 'test_status_revised', 'test_trader_classification',
+  null, null, '{"test":true,"revision_reason":"status_changed"}'::jsonb,
+  'eligibility-test:declaration:2'
+);
+
+do $$
+declare v_readiness record;
+begin
+  select * into v_readiness
+  from public.get_provider_paid_proposal_readiness(
+    '72000000-0000-0000-0000-000000000020',
+    'test.eu.launch.v1', 'BE', 'hair.custom'
+  );
+  if v_readiness.ready
+     or v_readiness.blocker_codes <> array['eligibility_assessment_stale']::text[] then
+    raise exception 'A revised declaration reused an assessment of an older revision: %',
+      v_readiness.blocker_codes;
+  end if;
+end
+$$;
+
+select set_config('request.jwt.claim.role', 'service_role', false);
+select public.record_provider_eligibility_assessment(
+  '72000000-0000-0000-0000-000000000020',
+  'test.eu.launch.v1',
+  (select id from public.provider_eligibility_declarations
+   where provider_id = '72000000-0000-0000-0000-000000000020'
+   order by revision desc limit 1),
+  'BE', 'hair.custom', 'eligible', now() + interval '30 days',
+  'Test-only reassessment of revised declaration.',
+  '{"source":"sql_test","reassessment":true}'::jsonb,
+  'system', null, 'eligibility-test:assessment:2'
+);
+
+select set_config('request.jwt.claim.role', 'authenticated', false);
+do $$
+declare v_readiness record;
+begin
+  select * into v_readiness
+  from public.get_provider_paid_proposal_readiness(
+    '72000000-0000-0000-0000-000000000020',
+    'test.eu.launch.v1', 'BE', 'hair.custom'
+  );
+  if not v_readiness.ready then
+    raise exception 'Reassessment of the latest declaration did not restore readiness: %',
+      v_readiness.blocker_codes;
+  end if;
+end
+$$;
+
 begin;
 set local role authenticated;
 select set_config(
