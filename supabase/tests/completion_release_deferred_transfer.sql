@@ -591,6 +591,52 @@ begin
 end
 $$;
 
+-- Reputation eligibility follows the explicit service outcome, not the money.
+-- Both normal conclusion paths are eligible; a reported problem remains
+-- ineligible until a later business decision explicitly establishes delivery.
+do $$
+begin
+  if not public.is_review_eligible_v1(
+       '74000000-0000-0000-0000-000000000201',
+       '74000000-0000-0000-0000-000000000010'
+     )
+     or (select outcome from public.service_delivery_outcomes_v1
+         where mission_id = '74000000-0000-0000-0000-000000000201')
+       <> 'performed'
+     or (select evidence ->> 'release_trigger'
+         from public.service_delivery_outcomes_v1
+         where mission_id = '74000000-0000-0000-0000-000000000201')
+       <> 'client_confirmation' then
+    raise exception 'Client-confirmed service was not review eligible';
+  end if;
+
+  if not public.is_review_eligible_v1(
+       '74000000-0000-0000-0000-000000000202',
+       '74000000-0000-0000-0000-000000000010'
+     )
+     or (select outcome from public.service_delivery_outcomes_v1
+         where mission_id = '74000000-0000-0000-0000-000000000202')
+       <> 'performed'
+     or (select evidence ->> 'release_trigger'
+         from public.service_delivery_outcomes_v1
+         where mission_id = '74000000-0000-0000-0000-000000000202')
+       <> 'provider_timeout_48h' then
+    raise exception '48-hour timeout service was not review eligible';
+  end if;
+
+  if public.is_review_eligible_v1(
+       '74000000-0000-0000-0000-000000000203',
+       '74000000-0000-0000-0000-000000000010'
+     )
+     or exists (
+       select 1 from public.service_delivery_outcomes_v1
+       where mission_id = '74000000-0000-0000-0000-000000000203'
+     ) then
+    raise exception 'Problem case became review eligible without an explicit outcome';
+  end if;
+end
+$$;
+
 -- A financial block prevents release without losing the client confirmation.
 select public.open_checkout_v2_financial_hold(
   '74000000-0000-0000-0000-000000000605', 'payment_issue',

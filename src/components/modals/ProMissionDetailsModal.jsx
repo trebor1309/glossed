@@ -1,6 +1,6 @@
 // src/components/modals/ProMissionDetailsModal.jsx
 import { motion } from "framer-motion";
-import { X, Calendar, Clock, MapPin, FileText, MessageSquare, Star, Trash2 } from "lucide-react";
+import { X, Calendar, Clock, MapPin, FileText, MessageSquare, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -23,7 +23,6 @@ const fmtDate = (d) => {
 export default function ProMissionDetailsModal({
   booking,
   onClose,
-  onEvaluate,
   onProposalCancelled,
   lifecycle,
   onLifecycleChanged,
@@ -340,11 +339,7 @@ export default function ProMissionDetailsModal({
             </p>
           )}
 
-          <MissionLifecycleV2Panel
-            lifecycle={lifecycle}
-            onChanged={onLifecycleChanged}
-            onEvaluate={() => onEvaluate?.(booking)}
-          />
+          <MissionLifecycleV2Panel lifecycle={lifecycle} onChanged={onLifecycleChanged} />
         </div>
 
         {/* ACTIONS */}
@@ -398,21 +393,6 @@ export default function ProMissionDetailsModal({
               className="px-4 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.03] transition flex items-center gap-2"
             >
               <MessageSquare size={16} /> Chat
-            </button>
-          )}
-
-          {/* Evaluate */}
-          {!lifecycle && status === "completed" && (
-            <button
-              onClick={() => {
-                setLoading(true);
-                onEvaluate?.(booking);
-                setTimeout(() => setLoading(false), 300);
-              }}
-              disabled={loading}
-              className="px-4 py-2 bg-amber-500 text-white rounded-full font-semibold hover:bg-amber-600 transition disabled:opacity-60 flex items-center gap-2"
-            >
-              <Star size={16} /> Evaluate
             </button>
           )}
 

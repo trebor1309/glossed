@@ -13,7 +13,14 @@ begin
 end
 $$;
 
+select set_config('app.review_maintenance_v1', 'on', false);
+delete from public.review_status_events_v1 where review_id in (
+  select id from public.reviews where reviewer_id::text like '20000000-%'
+);
+delete from public.review_submission_operations_v1
+where client_id::text like '20000000-%';
 delete from public.reviews where reviewer_id::text like '20000000-%';
+select set_config('app.review_maintenance_v1', 'off', false);
 delete from public.messages where sender_id::text like '20000000-%';
 delete from public.chats where client_id::text like '20000000-%' or pro_id::text like '20000000-%';
 delete from public.missions where client_id::text like '20000000-%' or pro_id::text like '20000000-%';
@@ -418,15 +425,14 @@ select set_config(
 
 begin;
 set local role authenticated;
-select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000020', true);
+select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000010', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
-insert into public.reviews (mission_id, reviewer_id, target_id, rating, comment)
-select id,
-       '20000000-0000-0000-0000-000000000020',
-       '20000000-0000-0000-0000-000000000010', 5, 'Functional review'
-from public.missions
-where booking_id = '20000000-0000-0000-0000-000000000100'
-  and pro_id = '20000000-0000-0000-0000-000000000020';
+select * from public.submit_review_v1(
+  '20000000-0000-0000-0000-000000000401',
+  current_setting('app.test_mission_id')::uuid,
+  5::smallint,
+  'Functional review'
+);
 commit;
 
 begin;
@@ -436,10 +442,11 @@ select set_config('request.jwt.claim.role', 'authenticated', true);
 do $$
 begin
   begin
-    insert into public.reviews (mission_id, reviewer_id, target_id, rating) values (
+    perform * from public.submit_review_v1(
+      '20000000-0000-0000-0000-000000000402',
       current_setting('app.test_mission_id')::uuid,
-      '20000000-0000-0000-0000-000000000030',
-      '20000000-0000-0000-0000-000000000010', 1
+      1::smallint,
+      null
     );
     raise exception 'An unrelated user reviewed a mission';
   exception when insufficient_privilege then null;
@@ -456,7 +463,7 @@ begin
     raise exception 'Anonymous public profile RPC is unavailable';
   end if;
   if (select count(*) from public.get_public_reviews(
-      '20000000-0000-0000-0000-000000000010')) <> 1 then
+      '20000000-0000-0000-0000-000000000020')) <> 1 then
     raise exception 'Anonymous public reviews RPC is unavailable';
   end if;
 end
@@ -485,7 +492,14 @@ begin
 end
 $$;
 
+select set_config('app.review_maintenance_v1', 'on', false);
+delete from public.review_status_events_v1 where review_id in (
+  select id from public.reviews where reviewer_id::text like '20000000-%'
+);
+delete from public.review_submission_operations_v1
+where client_id::text like '20000000-%';
 delete from public.reviews where reviewer_id::text like '20000000-%';
+select set_config('app.review_maintenance_v1', 'off', false);
 delete from public.messages where sender_id::text like '20000000-%';
 delete from public.chats where client_id::text like '20000000-%' or pro_id::text like '20000000-%';
 delete from public.missions where client_id::text like '20000000-%' or pro_id::text like '20000000-%';
