@@ -1,40 +1,32 @@
 import { motion } from "framer-motion";
 import { X, Star } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { v4 as uuid } from "uuid";
 import { supabase } from "@/lib/supabaseClient";
-import { useUser } from "@/context/UserContext";
 
 /* ---------------------------------------------------------
    ⭐ Modal d'évaluation client (Pro)
 --------------------------------------------------------- */
 export default function ProEvaluationModal({ booking, onClose, onSuccess }) {
-  const { user } = useUser();
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const operationIdRef = useRef(uuid());
 
   if (!booking) return null;
-
-  const reviewerIsClient = user?.id === booking.client_id;
-  const targetId = reviewerIsClient ? booking.pro_id : booking.client_id;
-  const targetLabel = reviewerIsClient ? "provider" : "client";
 
   const handleSubmit = async () => {
     if (submitting) return;
     setSubmitting(true);
 
     try {
-      // ✅ insertion dans table reviews
-      const { error } = await supabase.from("reviews").insert([
-        {
-          mission_id: booking.id,
-          reviewer_id: user.id,
-          target_id: targetId,
-          rating,
-          comment,
-        },
-      ]);
+      const { error } = await supabase.rpc("submit_review_v1", {
+        p_operation_id: operationIdRef.current,
+        p_mission_id: booking.id,
+        p_rating: rating,
+        p_comment: comment,
+      });
 
       if (error) throw error;
 
@@ -72,12 +64,10 @@ export default function ProEvaluationModal({ booking, onClose, onSuccess }) {
         </button>
 
         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <Star size={20} className="text-amber-500" /> Rate your {targetLabel}
+          <Star size={20} className="text-amber-500" /> Rate your provider
         </h2>
 
-        <p className="text-gray-600 text-sm mb-4">
-          How was your experience with this {targetLabel}?
-        </p>
+        <p className="text-gray-600 text-sm mb-4">How was your experience with this provider?</p>
 
         {/* ⭐ Notation */}
         <div className="flex justify-center gap-2 mb-6">
@@ -105,6 +95,7 @@ export default function ProEvaluationModal({ booking, onClose, onSuccess }) {
           placeholder="Leave a comment (optional)"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
+          maxLength={2000}
           rows="3"
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none"
         />

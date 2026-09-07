@@ -41,20 +41,16 @@ export async function fetchPublicProfile(username) {
    ------------------------------------------------------- */
 
 export async function fetchReviews(targetUserId) {
-  const { data, error } = await supabase
-    .from("reviews")
-    .select(
-      `
-      id,
-      rating,
-      comment,
-      created_at,
-      reviewer:users ( username, profile_photo )
-    `
-    )
-    .eq("target_id", targetUserId)
-    .order("created_at", { ascending: false });
+  const { data, error } = await supabase.rpc("get_public_reviews", {
+    p_target_id: targetUserId,
+  });
 
   if (error) throw error;
-  return data;
+  return (data || []).map((review) => ({
+    ...review,
+    reviewer: {
+      username: review.reviewer_username,
+      profile_photo: review.reviewer_profile_photo,
+    },
+  }));
 }

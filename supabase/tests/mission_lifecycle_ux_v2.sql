@@ -74,12 +74,10 @@ begin
 end
 $$;
 
-insert into public.reviews (
-  mission_id, reviewer_id, target_id, rating, comment
-) values (
+select * from public.submit_review_v1(
+  '74000000-0000-0000-0000-000000000801',
   '74000000-0000-0000-0000-000000000201',
-  '74000000-0000-0000-0000-000000000010',
-  '74000000-0000-0000-0000-000000000020', 5,
+  5::smallint,
   'Lifecycle v2 concluded review.'
 );
 
@@ -93,16 +91,14 @@ begin
     raise exception 'Submitted review is absent from the lifecycle projection';
   end if;
   begin
-    insert into public.reviews (
-      mission_id, reviewer_id, target_id, rating, comment
-    ) values (
+    perform * from public.submit_review_v1(
+      '74000000-0000-0000-0000-000000000802',
       '74000000-0000-0000-0000-000000000203',
-      '74000000-0000-0000-0000-000000000010',
-      '74000000-0000-0000-0000-000000000020', 1,
+      1::smallint,
       'This unresolved mission must reject the review.'
     );
     raise exception 'A review was accepted before the v2 mission concluded';
-  exception when insufficient_privilege then null;
+  exception when check_violation then null;
   end;
 end
 $$;
@@ -129,6 +125,12 @@ begin
       and not can_provider_complete
   ) then
     raise exception 'Provider action became available before completion_not_before_at';
+  end if;
+  if exists (
+    select 1 from public.get_my_mission_lifecycle_v2()
+    where review_available
+  ) then
+    raise exception 'Provider received a public review action';
   end if;
 end
 $$;
