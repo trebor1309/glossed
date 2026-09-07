@@ -69,6 +69,22 @@ export default function DashboardReservations() {
     );
   }, []);
 
+  const markReviewSubmitted = useCallback((missionId) => {
+    setLifecyclesByMission((current) => {
+      const next = new Map(current);
+      const lifecycle = next.get(missionId);
+      if (lifecycle) next.set(missionId, { ...lifecycle, reviewed_by_me: true });
+      return next;
+    });
+    setBookings((current) =>
+      current.map((item) =>
+        item.id === missionId && item.lifecycle_v2
+          ? { ...item, lifecycle_v2: { ...item.lifecycle_v2, reviewed_by_me: true } }
+          : item
+      )
+    );
+  }, []);
+
   useEffect(() => {
     if (clientId) markEventTypesRead(reservationNotificationTypes);
   }, [clientId, markEventTypesRead]);
@@ -401,6 +417,8 @@ export default function DashboardReservations() {
           booking={selectedEvaluation}
           onClose={() => setSelectedEvaluation(null)}
           onSuccess={async () => {
+            const missionId = selectedEvaluation.id;
+            markReviewSubmitted(missionId);
             setSelectedEvaluation(null);
             await refreshLifecycles();
             setToast({ message: "Review submitted!", type: "success" });

@@ -38,7 +38,11 @@ insert into auth.users (id, email, raw_user_meta_data) values
    '{"requested_role":"client","username":"reputation-outsider"}'::jsonb);
 
 update public.users
-set role = 'pro', active_role = 'pro', onboarding_completed = true
+set role = 'pro', active_role = 'pro', onboarding_completed = true,
+    verification_status = 'verified', accepting_clients = true,
+    business_type = array['Hair Stylist'],
+    latitude = 50.8503, longitude = 4.3517, radius_km = 25,
+    city = 'Brussels', country = 'BE', show_city = true, show_country = true
 where id = '41000000-0000-0000-0000-000000000020';
 update public.users set onboarding_completed = true
 where id in (
@@ -114,6 +118,24 @@ end
 $$;
 commit;
 
+do $$
+begin
+  if (select count(*) from public.notifications
+      where event_type = 'review_received'
+        and recipient_id = '41000000-0000-0000-0000-000000000020'
+        and source_table = 'reviews'
+        and entity_type = 'review') <> 1
+     or not exists (
+       select 1 from public.notifications
+       where event_type = 'review_received'
+         and metadata ->> 'path' =
+           '/profile/41000000-0000-0000-0000-000000000020'
+     ) then
+    raise exception 'Published review did not create the provider notification';
+  end if;
+end
+$$;
+
 -- A completed replay is resolved before current mission eligibility. The
 -- canonical trimmed payload remains identical.
 update public.missions set status = 'cancelled'
@@ -136,7 +158,6 @@ begin
      or v_result.review_id <> (select review_id from first_review_result) then
     raise exception 'Completed review replay did not return the retained review';
   end if;
-
   begin
     perform * from public.submit_review_v1(
       '41000000-0000-0000-0000-000000000201',
@@ -202,6 +223,16 @@ select * from public.submit_review_v1(
   'Partially performed but explicitly established'
 );
 commit;
+
+do $$
+begin
+  if (select count(*) from public.notifications
+      where event_type = 'review_received'
+        and source_id = (select review_id::text from first_review_result)) <> 1 then
+    raise exception 'Review replay duplicated the provider notification';
+  end if;
+end
+$$;
 
 -- Provider and unrelated users can never author the public provider review.
 begin;
@@ -305,6 +336,34 @@ begin
   end;
 end
 $$;
+
+begin;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '41000000-0000-0000-0000-000000000010', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+do $$
+declare v_result jsonb;
+begin
+  select to_jsonb(result) into v_result
+  from public.search_provider_profiles(
+    'hair_stylist', 50.8503, 4.3517, 20, 1, 20
+  ) result
+  where result.provider_id = '41000000-0000-0000-0000-000000000020';
+
+  if v_result is null
+     or (v_result ->> 'average_rating')::numeric <> 4.0
+     or (v_result ->> 'review_count')::bigint <> 3 then
+    raise exception 'Discovery did not reuse the published public reputation aggregate';
+  end if;
+  if v_result ?| array[
+    'mission_id', 'reviewer_id', 'target_id', 'latitude', 'longitude',
+    'address', 'business_address'
+  ] then
+    raise exception 'Discovery reputation result exposed private data';
+  end if;
+end
+$$;
+commit;
 
 -- Concurrent retries with the same operation identity converge on one review.
 create or replace function public.reputation_test_submit_concurrently()

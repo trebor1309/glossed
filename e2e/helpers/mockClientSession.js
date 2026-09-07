@@ -165,13 +165,41 @@ export async function installMockClientSession(page, options = {}) {
               verification_status: "verified",
               distance_km: 2.3,
               public_service_radius_km: 25,
+              average_rating: 4.8,
+              review_count: 27,
               total_count: 1,
             },
           ];
       return json(response);
     }
-    if (url.pathname === "/rest/v1/rpc/get_public_profile") return json([providerProfile]);
-    if (url.pathname === "/rest/v1/rpc/get_public_reviews") return json([]);
+    if (url.pathname === "/rest/v1/rpc/get_public_profile") {
+      return json([options.publicProfile || providerProfile]);
+    }
+    if (url.pathname === "/rest/v1/rpc/get_public_review_summary") {
+      const response = options.reviewSummaryResponse
+        ? await options.reviewSummaryResponse(body, calls)
+        : [{ average_rating: null, review_count: 0 }];
+      return json(response);
+    }
+    if (url.pathname === "/rest/v1/rpc/get_public_reviews") {
+      const response = options.publicReviewsResponse
+        ? await options.publicReviewsResponse(body, calls)
+        : [];
+      return json(response);
+    }
+    if (url.pathname === "/rest/v1/rpc/get_my_mission_lifecycle_v2") {
+      const response = options.lifecycleResponse
+        ? await options.lifecycleResponse(body, calls)
+        : [];
+      return json(response);
+    }
+    if (url.pathname === "/rest/v1/rpc/submit_review_v1") {
+      if (options.submitReviewResponse) {
+        const response = await options.submitReviewResponse(body, calls);
+        return json(response.body, response.status || 200);
+      }
+      return json([]);
+    }
     if (url.pathname === "/rest/v1/rpc/create_targeted_booking_request") {
       if (options.targetedResponse) {
         const response = await options.targetedResponse(body, calls);
@@ -184,6 +212,12 @@ export async function installMockClientSession(page, options = {}) {
           idempotent: false,
         },
       ]);
+    }
+    if (url.pathname === "/rest/v1/bookings") {
+      return json(options.bookingsResponse || []);
+    }
+    if (url.pathname === "/rest/v1/missions") {
+      return json(options.missionsResponse || []);
     }
     if (url.pathname.startsWith("/rest/v1/")) return json([]);
 

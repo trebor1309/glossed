@@ -19,10 +19,13 @@ function relativeTime(value) {
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function safeDashboardPath(value) {
+function safeNotificationPath(value) {
   if (typeof value !== "string") return null;
   if (value === "/dashboard" || value.startsWith("/dashboard/")) return value;
   if (value === "/prodashboard" || value.startsWith("/prodashboard/")) return value;
+  if (/^\/profile\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    return value;
+  }
   return null;
 }
 
@@ -78,7 +81,7 @@ export default function DashboardNotifications() {
       await refreshSummary();
     }
 
-    const path = safeDashboardPath(notification.metadata?.path);
+    const path = safeNotificationPath(notification.metadata?.path);
     if (path) navigate(path);
   };
 
@@ -138,7 +141,7 @@ export default function DashboardNotifications() {
         ) : (
           <ul className="divide-y divide-gray-100">
             {items.map((notification) => {
-              const path = safeDashboardPath(notification.metadata?.path);
+              const path = safeNotificationPath(notification.metadata?.path);
               return (
                 <li key={notification.id}>
                   <button

@@ -26,6 +26,8 @@ test("searches by canonical service, saved location and radius with pagination",
           verification_status: "verified",
           distance_km: body.p_page === 1 ? 2.3 : 4.8,
           public_service_radius_km: 25,
+          average_rating: body.p_page === 1 ? 4.8 : null,
+          review_count: body.p_page === 1 ? 27 : 0,
           total_count: 7,
         },
       ];
@@ -37,6 +39,7 @@ test("searches by canonical service, saved location and radius with pagination",
 
   await expect(page.getByText("7 professionals found")).toBeVisible();
   await expect(page.getByText("about 2.3 km away")).toBeVisible();
+  await expect(page.getByText("4.8 (27)")).toBeVisible();
   await expect(page.getByText("Accepting new requests")).toBeVisible();
   await expect(page.getByText("Page 1 of 2")).toBeVisible();
 
@@ -49,6 +52,7 @@ test("searches by canonical service, saved location and radius with pagination",
     p_page: 1,
     p_page_size: 6,
   });
+  expect(calls.some((call) => call.path.endsWith("get_public_review_summary"))).toBe(false);
 
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Studio Iris")).toBeVisible();

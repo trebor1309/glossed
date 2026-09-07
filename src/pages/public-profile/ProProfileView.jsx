@@ -7,8 +7,9 @@ import useStartChat from "@/components/chat/hooks/useStartChat";
 import ProfilePortfolio from "./ProfilePortfolio";
 import ProfileReviews from "./ProfileReviews";
 import ProfileMap from "./ProfileMap";
+import RatingStars from "@/components/reputation/RatingStars";
 
-export default function ProProfileView({ profile, reviews }) {
+export default function ProProfileView({ profile, reviewSummary }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const startChat = useStartChat();
@@ -71,6 +72,18 @@ export default function ProProfileView({ profile, reviews }) {
           <p className="text-gray-600 max-w-xl mx-auto">{profile.description}</p>
         )}
 
+        {Number(reviewSummary?.review_count || 0) > 0 ? (
+          <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-gray-700">
+            <RatingStars value={reviewSummary.average_rating} size={17} />
+            <span className="font-semibold">
+              {Number(reviewSummary.average_rating).toFixed(1)} · {reviewSummary.review_count}{" "}
+              {Number(reviewSummary.review_count) === 1 ? "review" : "reviews"}
+            </span>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">No reviews yet</p>
+        )}
+
         <div className="flex justify-center gap-2 mt-3 flex-wrap">
           {profile.services?.map((s, i) => (
             <span key={i} className="px-3 py-1 rounded-full bg-rose-100 text-rose-600 text-sm">
@@ -120,7 +133,7 @@ export default function ProProfileView({ profile, reviews }) {
       {/* Reviews */}
       <div>
         <h2 className="text-lg font-semibold mb-3">Reviews</h2>
-        <ProfileReviews reviews={reviews} />
+        <ProfileReviews targetUserId={profile.id} />
       </div>
     </div>
   );
