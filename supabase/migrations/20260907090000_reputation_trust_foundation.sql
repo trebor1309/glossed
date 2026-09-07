@@ -107,7 +107,7 @@ declare
   v_workflow public.workflow_instances%rowtype;
 begin
   if new.released_at is null
-     or new.release_trigger not in ('client_confirmation', 'provider_timeout') then
+     or new.release_trigger not in ('client_confirmation', 'provider_timeout_48h') then
     return new;
   end if;
 
@@ -170,7 +170,7 @@ where workflow.machine_code = 'service_execution'
   and workflow.current_state = 'concluded'
   and execution.problem_reported_at is null
   and release.released_at is not null
-  and release.release_trigger in ('client_confirmation', 'provider_timeout')
+  and release.release_trigger in ('client_confirmation', 'provider_timeout_48h')
 on conflict (mission_id) do nothing;
 
 create table public.review_submission_operations_v1 (

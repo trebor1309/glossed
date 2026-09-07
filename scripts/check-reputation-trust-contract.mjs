@@ -30,11 +30,16 @@ for (const required of [
   "get_public_review_summary",
   "verified_glossed_service",
   "round(avg(review.rating)::numeric, 1)",
+  "provider_timeout_48h",
   "on delete restrict",
 ]) {
   if (!migration.includes(required)) {
     throw new Error(`Reputation migration is missing ${required}`);
   }
+}
+
+if (migration.includes("'provider_timeout'")) {
+  throw new Error("Reputation eligibility must use the canonical provider_timeout_48h trigger");
 }
 
 if (!/revoke all on public\.reviews from public, anon, authenticated/.test(migration)) {
