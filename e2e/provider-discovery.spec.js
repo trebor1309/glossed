@@ -7,6 +7,12 @@ async function searchFromSavedLocation(page, service = "hair_stylist") {
   await page.getByRole("button", { name: "Search", exact: true }).click();
 }
 
+async function ratingFills(ratingElement) {
+  return ratingElement.locator("[data-rating-fill]").evaluateAll((elements) =>
+    elements.map((element) => Number(element.getAttribute("data-rating-fill")))
+  );
+}
+
 test("searches by canonical service, saved location and radius with pagination", async ({
   page,
 }) => {
@@ -40,6 +46,9 @@ test("searches by canonical service, saved location and radius with pagination",
   await expect(page.getByText("7 professionals found")).toBeVisible();
   await expect(page.getByText("about 2.3 km away")).toBeVisible();
   await expect(page.getByText("4.8 (27)")).toBeVisible();
+  const fractionalRating = page.getByRole("img", { name: "4.8 out of 5 stars" });
+  await expect(fractionalRating).toBeVisible();
+  expect(await ratingFills(fractionalRating)).toEqual([100, 100, 100, 100, 80]);
   await expect(page.getByText("Accepting new requests")).toBeVisible();
   await expect(page.getByText("Page 1 of 2")).toBeVisible();
 

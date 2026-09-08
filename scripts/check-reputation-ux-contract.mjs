@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { ratingFillPercentage } from "../src/components/reputation/ratingStarFill.js";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
@@ -10,6 +11,7 @@ const providerMissions = read("src/pages/prodashboard/pages/ProDashboardMissions
 const profile = read("src/pages/public-profile/UserPublicProfile.jsx");
 const reviews = read("src/pages/public-profile/ProfileReviews.jsx");
 const discovery = read("src/pages/dashboard/pages/DashboardDiscover.jsx");
+const ratingStars = read("src/components/reputation/RatingStars.jsx");
 
 for (const required of [
   "review_received",
@@ -18,6 +20,9 @@ for (const required of [
   "cross join lateral public.get_public_review_summary",
   "average_rating numeric",
   "review_count bigint",
+  "reviews_public_provider_feed_idx",
+  "on public.reviews (target_id, created_at desc, id desc)",
+  "where review_direction = 'client_to_provider' and status = 'published'",
 ]) {
   if (!migration.includes(required)) {
     throw new Error(`Reputation UX migration is missing ${required}`);
@@ -50,6 +55,22 @@ if (!/p_before_created_at/.test(reviews) || !/Show more reviews/.test(reviews)) 
 }
 if (!/provider\.average_rating/.test(discovery) || !/provider\.review_count/.test(discovery)) {
   throw new Error("Discovery cards must render embedded public reputation summaries");
+}
+if (!/ratingFillPercentage/.test(ratingStars) || !/data-rating-fill/.test(ratingStars)) {
+  throw new Error("Rating stars must render the real fractional fill");
+}
+
+const expectedFills = new Map([
+  [0, [0, 0, 0, 0, 0]],
+  [1, [100, 0, 0, 0, 0]],
+  [4.8, [100, 100, 100, 100, 80]],
+  [5, [100, 100, 100, 100, 100]],
+]);
+for (const [rating, expected] of expectedFills) {
+  const actual = [1, 2, 3, 4, 5].map((star) => ratingFillPercentage(rating, star));
+  if (actual.join(",") !== expected.join(",")) {
+    throw new Error(`Fractional star fill is incorrect for ${rating}: ${actual.join(",")}`);
+  }
 }
 
 process.stdout.write("Reputation UX and professional profile contract checks passed.\n");

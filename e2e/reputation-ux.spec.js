@@ -55,6 +55,12 @@ async function openCompletedMission(page) {
   await completedSection.getByTitle("View details").click();
 }
 
+async function ratingFills(ratingElement) {
+  return ratingElement.locator("[data-rating-fill]").evaluateAll((elements) =>
+    elements.map((element) => Number(element.getAttribute("data-rating-fill")))
+  );
+}
+
 test("uses server review availability instead of inferring eligibility from completed status", async ({
   page,
 }) => {
@@ -153,6 +159,9 @@ test("retries one logical review, updates the mission, profile and discovery", a
 
   await page.goto(`/profile/${providerId}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByText("5.0 · 1 review")).toBeVisible();
+  const perfectRatings = page.getByRole("img", { name: "5.0 out of 5 stars" });
+  await expect(perfectRatings).toHaveCount(2);
+  expect(await ratingFills(perfectRatings.first())).toEqual([100, 100, 100, 100, 100]);
   await expect(page.getByText(publicReview.comment)).toBeVisible();
   await expect(page.getByText("Service completed through Glossed")).toBeVisible();
   await expect(page.getByText("Private client address")).toHaveCount(0);
@@ -214,7 +223,7 @@ test("shows a neutral empty profile reputation state", async ({ page }) => {
 test("paginates public reviews by cursor without duplicate cards", async ({ page }) => {
   const rows = Array.from({ length: 6 }, (_, index) => ({
     id: `40000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
-    rating: 5 - (index % 2),
+    rating: index === 5 ? 1 : 5 - (index % 2),
     comment: `Published review ${index + 1}`,
     created_at: new Date(Date.UTC(2026, 8, 6 - index, 12)).toISOString(),
     reviewer_username: `client-${index + 1}`,
@@ -241,6 +250,9 @@ test("paginates public reviews by cursor without duplicate cards", async ({ page
 
   await page.getByRole("button", { name: "Show more reviews" }).click();
   await expect(page.getByText("Published review 6")).toBeVisible();
+  const oneStarRating = page.getByRole("img", { name: "1.0 out of 5 stars" });
+  await expect(oneStarRating).toBeVisible();
+  expect(await ratingFills(oneStarRating)).toEqual([100, 0, 0, 0, 0]);
   await expect(page.getByRole("button", { name: "Show more reviews" })).toHaveCount(0);
   expect(cursors).toHaveLength(2);
   expect(cursors[1]).toEqual({ createdAt: rows[4].created_at, id: rows[4].id });

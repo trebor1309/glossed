@@ -3,6 +3,14 @@
 
 begin;
 
+-- One partial covering index serves both the per-provider aggregate used by
+-- discovery and the keyset-ordered public review feed. Unpublished and legacy
+-- provider-to-client rows stay outside this public hot path.
+create index reviews_public_provider_feed_idx
+on public.reviews (target_id, created_at desc, id desc)
+include (rating)
+where review_direction = 'client_to_provider' and status = 'published';
+
 alter table public.notifications drop constraint notifications_event_type_check;
 alter table public.notifications add constraint notifications_event_type_check
 check (event_type in (

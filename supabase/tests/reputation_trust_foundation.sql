@@ -312,6 +312,46 @@ end
 $$;
 reset role;
 
+-- The partial covering index must support both public aggregate lookup and
+-- keyset pagination without scanning the complete reviews table. Disabling
+-- sequential scans makes the expected access path deterministic for this
+-- deliberately small fixture.
+set enable_seqscan = off;
+do $$
+declare
+  v_aggregate_plan json;
+  v_page_plan json;
+begin
+  execute $plan$
+    explain (format json, costs off)
+    select round(avg(review.rating)::numeric, 1), count(*)
+    from public.reviews review
+    where review.target_id = '41000000-0000-0000-0000-000000000020'
+      and review.review_direction = 'client_to_provider'
+      and review.status = 'published'
+  $plan$ into v_aggregate_plan;
+
+  execute $plan$
+    explain (format json, costs off)
+    select review.id, review.rating, review.created_at
+    from public.reviews review
+    where review.target_id = '41000000-0000-0000-0000-000000000020'
+      and review.review_direction = 'client_to_provider'
+      and review.status = 'published'
+      and (review.created_at, review.id) <
+        ('2099-01-01 00:00:00+00'::timestamptz, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid)
+    order by review.created_at desc, review.id desc
+    limit 20
+  $plan$ into v_page_plan;
+
+  if v_aggregate_plan::text not like '%reviews_public_provider_feed_idx%'
+     or v_page_plan::text not like '%reviews_public_provider_feed_idx%' then
+    raise exception 'Public reputation queries do not use the provider review index';
+  end if;
+end
+$$;
+reset enable_seqscan;
+
 -- Hidden rows remain retained but are excluded from both public projection and
 -- aggregate. Direct hard deletion remains forbidden.
 select set_config('app.review_moderation_v1_mutation', 'on', false);
