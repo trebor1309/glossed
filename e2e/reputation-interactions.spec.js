@@ -4,6 +4,7 @@ import { installMockClientSession } from "./helpers/mockClientSession.js";
 const clientId = "40000000-0000-4000-8000-000000000010";
 const providerId = "40000000-0000-4000-8000-000000000020";
 const reviewId = "40000000-0000-4000-8000-000000000410";
+const missionId = "40000000-0000-4000-8000-000000000201";
 
 const baseReview = {
   id: reviewId,
@@ -28,6 +29,43 @@ const providerSessionProfile = {
   onboarding_completed: true,
   verification_status: "verified",
 };
+
+const completedMission = {
+  id: missionId,
+  booking_id: "40000000-0000-4000-8000-000000000101",
+  client_id: clientId,
+  pro_id: providerId,
+  service: "Hair Stylist",
+  description: "Completed reputation journey",
+  date: "2026-09-01",
+  time: "10:00:00",
+  address: "Private client address",
+  price: 90,
+  status: "completed",
+};
+
+function completedLifecycle(reviewedByMe) {
+  return {
+    payment_id: "40000000-0000-4000-8000-000000000301",
+    mission_id: missionId,
+    request_id: completedMission.booking_id,
+    actor_role: "client",
+    scheduled_start_at: "2026-09-01T08:00:00.000Z",
+    completion_not_before_at: "2026-09-01T08:00:00.000Z",
+    provider_completed_at: "2026-09-01T10:00:00.000Z",
+    client_confirmed_at: "2026-09-01T10:30:00.000Z",
+    execution_state: "concluded",
+    release_state: "released",
+    transfer_state: "succeeded",
+    release_trigger: "client_confirmation",
+    blocker_codes: [],
+    can_provider_complete: false,
+    can_client_confirm: false,
+    can_client_report_problem: false,
+    review_available: true,
+    reviewed_by_me: reviewedByMe,
+  };
+}
 
 async function openProviderProfile(page) {
   await page.goto(`/profile/${providerId}`, { waitUntil: "domcontentloaded" });
@@ -296,4 +334,125 @@ test("does not invent placeholders for hidden or removed reviews", async ({ page
   await page.goto(`/profile/${providerId}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByText("No reviews yet")).toHaveCount(2);
   await expect(page.getByText(/avis (masqué|retiré|supprimé)/i)).toHaveCount(0);
+});
+
+test("client publishes, provider replies, then client sees and reports the review", async ({
+  browser,
+}) => {
+  let publishedReview = null;
+  let providerReply = null;
+  let reported = false;
+  const publicReviews = () =>
+    publishedReview
+      ? [
+          {
+            ...baseReview,
+            ...publishedReview,
+            provider_reply: providerReply?.content || null,
+            provider_replied_at: providerReply?.created_at || null,
+          },
+        ]
+      : [];
+
+  const clientContext = await browser.newContext();
+  const clientPage = await clientContext.newPage();
+  await installMockClientSession(clientPage, {
+    missionsResponse: [completedMission],
+    lifecycleResponse: () => [completedLifecycle(Boolean(publishedReview))],
+    publicReviewsResponse: publicReviews,
+    reviewSummaryResponse: () => [
+      {
+        average_rating: publishedReview ? publishedReview.rating : null,
+        review_count: publishedReview ? 1 : 0,
+      },
+    ],
+    submitReviewResponse: async (body) => {
+      publishedReview = {
+        rating: body.p_rating,
+        comment: body.p_comment,
+        created_at: baseReview.created_at,
+      };
+      return {
+        body: [
+          {
+            review_id: reviewId,
+            ...publishedReview,
+            status: "published",
+            verified_glossed_service: true,
+            idempotent: false,
+          },
+        ],
+      };
+    },
+    reportReviewResponse: async (body) => {
+      reported = true;
+      return {
+        body: [
+          {
+            report_id: "40000000-0000-4000-8000-000000000419",
+            review_id: reviewId,
+            reason_code: body.p_reason_code,
+            status: "open",
+            created_at: "2026-09-02T11:00:00.000Z",
+            idempotent: false,
+          },
+        ],
+      };
+    },
+  });
+
+  await clientPage.goto("/dashboard/reservations", { waitUntil: "domcontentloaded" });
+  const completedSection = clientPage
+    .getByRole("heading", { name: "Completed Services" })
+    .locator("..");
+  await completedSection.getByTitle("View details").click();
+  await clientPage.getByRole("button", { name: "Leave a review" }).click();
+  await clientPage.getByRole("button", { name: "5 stars" }).click();
+  await clientPage
+    .getByPlaceholder("Tell other clients about your experience")
+    .fill("Parcours réputation complet.");
+  await clientPage.getByRole("button", { name: "Publish review" }).click();
+  await expect(clientPage.getByText("Review submitted", { exact: true })).toBeVisible();
+
+  const providerContext = await browser.newContext();
+  const providerPage = await providerContext.newPage();
+  await installMockClientSession(providerPage, {
+    currentProfile: providerSessionProfile,
+    publicReviewsResponse: publicReviews,
+    reviewSummaryResponse: () => [{ average_rating: 5, review_count: 1 }],
+    submitReviewReplyResponse: async (body) => {
+      providerReply = {
+        content: body.p_content,
+        created_at: "2026-09-02T10:30:00.000Z",
+      };
+      return {
+        body: [
+          {
+            reply_id: "40000000-0000-4000-8000-000000000418",
+            review_id: reviewId,
+            ...providerReply,
+            idempotent: false,
+          },
+        ],
+      };
+    },
+  });
+
+  await providerPage.goto(`/profile/${providerId}`, { waitUntil: "domcontentloaded" });
+  await providerPage.getByRole("button", { name: "Répondre" }).click();
+  await providerPage.getByLabel("Votre réponse").fill("Merci pour votre confiance.");
+  await providerPage.getByRole("button", { name: "Publier la réponse" }).click();
+  await expect(providerPage.getByText(providerReply.content)).toBeVisible();
+
+  await clientPage.goto(`/profile/${providerId}`, { waitUntil: "domcontentloaded" });
+  await expect(clientPage.getByText(providerReply.content)).toBeVisible();
+  await clientPage.getByRole("button", { name: "Signaler" }).click();
+  await clientPage.getByLabel("Motif du signalement").selectOption("spam_or_commercial");
+  await clientPage.getByRole("button", { name: "Envoyer le signalement" }).click();
+  await expect(clientPage.getByText("Signalement transmis à Glossed.")).toBeVisible();
+  await expect(clientPage.getByText("Parcours réputation complet.")).toBeVisible();
+  expect(reported).toBe(true);
+
+  await providerContext.close();
+  await clientContext.close();
 });
