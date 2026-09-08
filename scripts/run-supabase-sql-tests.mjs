@@ -16,6 +16,7 @@ const localTests = [
   "completion_release_deferred_transfer.sql",
   "mission_lifecycle_ux_v2.sql",
   "reputation_trust_foundation.sql",
+  "reputation_moderation_backend.sql",
   "financial_remediation_v2.sql",
   "provider_balances_payouts_v2.sql",
   "admin_backoffice_foundation.sql",
