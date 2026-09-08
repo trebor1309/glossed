@@ -36,6 +36,8 @@ function toastEnabled(preferences, eventType) {
       "payment_confirmed",
       "refund_completed",
       "review_received",
+      "review_reply_received",
+      "review_moderation_decided",
     ].includes(eventType)
   ) {
     return preferences.notif_booking_updates;

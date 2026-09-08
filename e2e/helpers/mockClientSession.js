@@ -68,17 +68,18 @@ function encode(value) {
   return Buffer.from(JSON.stringify(value)).toString("base64url");
 }
 
-function fakeAccessToken() {
+function fakeAccessToken(subject = clientId) {
   return `${encode({ alg: "HS256", typ: "JWT" })}.${encode({
     aud: "authenticated",
     exp: Math.floor(Date.now() / 1000) + 3600,
     role: "authenticated",
-    sub: clientId,
+    sub: subject,
   })}.test-signature`;
 }
 
 export async function installMockClientSession(page, options = {}) {
-  const accessToken = fakeAccessToken();
+  const currentProfile = options.currentProfile || clientProfile;
+  const accessToken = fakeAccessToken(currentProfile.id);
   const session = {
     access_token: accessToken,
     token_type: "bearer",
@@ -86,20 +87,23 @@ export async function installMockClientSession(page, options = {}) {
     expires_at: Math.floor(Date.now() / 1000) + 3600,
     refresh_token: "mock-refresh-token",
     user: {
-      id: clientId,
+      id: currentProfile.id,
       aud: "authenticated",
       role: "authenticated",
-      email: clientProfile.email,
+      email: currentProfile.email || `${currentProfile.id}@example.test`,
       app_metadata: {},
       user_metadata: {},
     },
   };
 
-  await page.addInitScript((storedSession) => {
-    window.localStorage.clear();
-    window.sessionStorage.clear();
-    window.localStorage.setItem("glossed.auth", JSON.stringify(storedSession));
-  }, session);
+  await page.addInitScript(
+    ({ storedSession, anonymous }) => {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+      if (!anonymous) window.localStorage.setItem("glossed.auth", JSON.stringify(storedSession));
+    },
+    { storedSession: session, anonymous: Boolean(options.anonymous) }
+  );
 
   const calls = [];
   await page.route("**/*", async (route) => {
@@ -134,7 +138,13 @@ export async function installMockClientSession(page, options = {}) {
       });
 
     if (url.pathname === "/auth/v1/user") return json(session.user);
-    if (url.pathname === "/rest/v1/users") return json(clientProfile);
+    if (url.pathname === "/rest/v1/users") return json(currentProfile);
+    if (url.pathname === "/rest/v1/notifications") {
+      const response = options.notificationsResponse
+        ? await options.notificationsResponse(body, calls)
+        : [];
+      return json(response);
+    }
     if (url.pathname === "/rest/v1/rpc/get_notification_summary") {
       return json([
         {
@@ -200,6 +210,21 @@ export async function installMockClientSession(page, options = {}) {
       }
       return json([]);
     }
+    if (url.pathname === "/rest/v1/rpc/submit_review_reply_v1") {
+      if (options.submitReviewReplyResponse) {
+        const response = await options.submitReviewReplyResponse(body, calls);
+        return json(response.body, response.status || 200);
+      }
+      return json([]);
+    }
+    if (url.pathname === "/rest/v1/rpc/report_review_v1") {
+      if (options.reportReviewResponse) {
+        const response = await options.reportReviewResponse(body, calls);
+        return json(response.body, response.status || 200);
+      }
+      return json([]);
+    }
+    if (url.pathname === "/rest/v1/rpc/mark_notification_read") return json(null);
     if (url.pathname === "/rest/v1/rpc/create_targeted_booking_request") {
       if (options.targetedResponse) {
         const response = await options.targetedResponse(body, calls);

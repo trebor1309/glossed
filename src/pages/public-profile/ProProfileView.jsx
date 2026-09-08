@@ -131,9 +131,9 @@ export default function ProProfileView({ profile, reviewSummary }) {
       )}
 
       {/* Reviews */}
-      <div>
+      <div id="reviews" className="scroll-mt-6">
         <h2 className="text-lg font-semibold mb-3">Reviews</h2>
-        <ProfileReviews targetUserId={profile.id} />
+        <ProfileReviews targetUserId={profile.id} currentUserId={user?.id || null} />
       </div>
     </div>
   );
