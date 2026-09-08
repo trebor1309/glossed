@@ -1,29 +1,20 @@
-// 📄 src/pages/public-profile/ClientProfileView.jsx
-import ProfileReviews from "./ProfileReviews";
-
-export default function ClientProfileView({ profile, reviews }) {
+export default function ClientProfileView({ profile }) {
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="text-center">
         <img
           src={profile.profile_photo || "/default-avatar.png"}
-          className="w-24 h-24 rounded-full mx-auto object-cover"
+          alt={profile.username || "Glossed client"}
+          className="mx-auto h-24 w-24 rounded-full object-cover"
         />
 
-        <h1 className="text-2xl font-bold mt-3">{profile.username}</h1>
+        <h1 className="mt-3 text-2xl font-bold">{profile.username}</h1>
 
         {profile.city && profile.country && (
           <p className="text-gray-500">
             {profile.city}, {profile.country}
           </p>
         )}
-      </div>
-
-      {/* Reviews */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Reviews</h2>
-        <ProfileReviews reviews={reviews} />
       </div>
     </div>
   );

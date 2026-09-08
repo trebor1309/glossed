@@ -12,8 +12,8 @@ const providerMission = readFileSync(
   new URL("../src/components/modals/ProMissionDetailsModal.jsx", import.meta.url),
   "utf8"
 );
-const legacyProfileHelper = readFileSync(
-  new URL("../src/pages/public-profile/profileHelpers.js", import.meta.url),
+const publicProfileReviews = readFileSync(
+  new URL("../src/pages/public-profile/ProfileReviews.jsx", import.meta.url),
   "utf8"
 );
 
@@ -51,7 +51,7 @@ if (!/operationIdRef = useRef\(uuid\(\)\)/.test(modal)) {
 if (!/supabase\.rpc\("submit_review_v1"/.test(modal)) {
   throw new Error("The browser must submit reviews through the trusted RPC");
 }
-for (const source of [modal, providerMission, legacyProfileHelper]) {
+for (const source of [modal, providerMission, publicProfileReviews]) {
   if (/\.from\(["']reviews["']\)/.test(source)) {
     throw new Error("Browser code must not access raw reviews directly");
   }

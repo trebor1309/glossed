@@ -11,6 +11,7 @@ import {
   UserRoundSearch,
 } from "lucide-react";
 import AddressAutocomplete from "@/components/forms/AddressAutocomplete";
+import RatingStars from "@/components/reputation/RatingStars";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/lib/supabaseClient";
 import { DISCOVERY_PAGE_SIZE, loadServiceCategories, serviceLabel } from "@/lib/providerDiscovery";
@@ -46,6 +47,16 @@ function ProviderCard({ provider, categories, serviceCode, onOpen }) {
                 <span>about {Number(provider.distance_km).toFixed(1)} km away</span>
               )}
             </p>
+          )}
+          {Number(provider.review_count || 0) > 0 ? (
+            <div className="mt-2 flex items-center gap-1.5 text-sm text-gray-700">
+              <RatingStars value={provider.average_rating} size={15} />
+              <span className="font-medium">
+                {Number(provider.average_rating).toFixed(1)} ({provider.review_count})
+              </span>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-gray-500">No reviews yet</p>
           )}
         </div>
       </div>

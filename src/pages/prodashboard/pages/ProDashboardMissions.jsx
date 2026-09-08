@@ -9,7 +9,6 @@ import Toast from "@/components/ui/Toast";
 
 import ProProposalModal from "@/components/modals/ProProposalModal";
 import ProMissionDetailsModal from "@/components/modals/ProMissionDetailsModal";
-import ProEvaluationModal from "@/components/modals/ProEvaluationModal";
 import ProBookingDetailsModal from "@/components/modals/ProBookingDetailsModal";
 import {
   fetchMyMissionLifecyclesV2,
@@ -54,7 +53,6 @@ export default function ProDashboardMissions() {
   const [selectedView, setSelectedView] = useState(null);
   const [proposalTarget, setProposalTarget] = useState(null);
   const [selectedMission, setSelectedMission] = useState(null);
-  const [selectedEvaluation, setSelectedEvaluation] = useState(null);
 
   // NEW badges pour nouvelles demandes (booking_notifications)
   const [newItems, setNewItems] = useState(() => new Set());
@@ -377,7 +375,6 @@ export default function ProDashboardMissions() {
         <ProMissionDetailsModal
           booking={selectedMission}
           onClose={() => setSelectedMission(null)}
-          onEvaluate={(b) => setSelectedEvaluation(b)}
           lifecycle={
             lifecyclesByMission.get(selectedMission.id) || selectedMission.lifecycle_v2 || null
           }
@@ -385,19 +382,6 @@ export default function ProDashboardMissions() {
           onProposalCancelled={() => {
             setSelectedMission(null);
             fetchMissions();
-          }}
-        />
-      )}
-
-      {/* EVALUATE modal */}
-      {selectedEvaluation && (
-        <ProEvaluationModal
-          booking={selectedEvaluation}
-          onClose={() => setSelectedEvaluation(null)}
-          onSuccess={async () => {
-            setSelectedEvaluation(null);
-            await refreshLifecycles();
-            setToast({ message: "⭐ Review submitted!", type: "success" });
           }}
         />
       )}

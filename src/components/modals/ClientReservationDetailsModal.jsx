@@ -1,6 +1,6 @@
 // src/components/modals/ClientReservationDetailsModal.jsx
 import { motion } from "framer-motion";
-import { X, Calendar, Clock, MapPin, FileText, MessageSquare, Star, Trash2 } from "lucide-react";
+import { X, Calendar, Clock, MapPin, FileText, MessageSquare, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -240,17 +240,6 @@ export default function ClientReservationDetailsModal({
               className="px-4 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.03] transition flex items-center gap-2"
             >
               <MessageSquare size={16} /> Chat
-            </button>
-          )}
-
-          {/* Evaluate at end */}
-          {!lifecycle && status === "completed" && (
-            <button
-              onClick={() => onEvaluate?.(booking)}
-              disabled={loading}
-              className="px-4 py-2 bg-amber-500 text-white rounded-full font-semibold hover:bg-amber-600 transition disabled:opacity-60 flex items-center gap-2"
-            >
-              <Star size={16} /> Evaluate
             </button>
           )}
 
