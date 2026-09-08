@@ -27,6 +27,7 @@ for (const required of [
   "resolved_hidden",
   "resolved_removed",
   "Removed reviews are terminal",
+  "Review moderation requires a prior report",
   "operation_id was already used with a different reply request",
   "operation_id was already used with a different report request",
   "operation_id was already used with a different moderation request",
@@ -65,6 +66,12 @@ if (!/perform public\.assert_admin_permission\('reputation\.read'\)/.test(migrat
 }
 if (!/perform public\.assert_admin_permission\('reputation\.moderate'\)/.test(migration)) {
   throw new Error("Moderation mutations must be protected by reputation.moderate");
+}
+if (!/p_view is null or p_limit is null or p_offset is null/.test(migration)) {
+  throw new Error("Admin moderation pagination must reject NULL parameters");
+}
+if (!/p_page_size is null or p_page_size not between 1 and 50/.test(migration)) {
+  throw new Error("Public review pagination must reject a NULL page size");
 }
 if (/assert_admin_permission\('reputation\.(read|moderate)',\s*true\)/.test(migration)) {
   throw new Error("Reputation moderation requires AAL2, not recent financial MFA");

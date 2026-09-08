@@ -509,7 +509,7 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if p_page_size not between 1 and 50 then
+  if p_page_size is null or p_page_size not between 1 and 50 then
     raise exception 'page_size must be between 1 and 50' using errcode = '22023';
   end if;
   if (p_before_created_at is null) <> (p_before_review_id is null) then
@@ -584,7 +584,9 @@ declare
   v_result jsonb;
 begin
   perform public.assert_admin_permission('reputation.read');
-  if p_view not in ('open', 'history') or p_limit not between 1 and 100 or p_offset < 0 then
+  if p_view is null or p_limit is null or p_offset is null
+     or p_view not in ('open', 'history')
+     or p_limit not between 1 and 100 or p_offset < 0 then
     raise exception 'Invalid reputation moderation pagination' using errcode = '22023';
   end if;
 
@@ -774,6 +776,12 @@ begin
   select * into v_review from public.reviews where id = p_review_id for update;
   if not found or v_review.review_direction <> 'client_to_provider' then
     raise exception 'Review not found' using errcode = 'P0002';
+  end if;
+  if not exists (
+    select 1 from public.review_reports_v1 report
+    where report.review_id = p_review_id
+  ) then
+    raise exception 'Review moderation requires a prior report' using errcode = '23514';
   end if;
   if v_review.status = 'removed' then
     raise exception 'Removed reviews are terminal' using errcode = '23514';

@@ -237,6 +237,13 @@ begin
      ] then
     raise exception 'Public reply projection is missing or exposes private data';
   end if;
+  begin
+    perform * from public.get_public_reviews(
+      '43000000-0000-0000-0000-000000000020', null, null, null
+    );
+    raise exception 'A NULL public review page size created an unbounded query';
+  exception when invalid_parameter_value then null;
+  end;
 end
 $$;
 reset role;
@@ -504,6 +511,36 @@ begin
      or v_detail ?| array['payment', 'transfer', 'refund', 'ledger'] then
     raise exception 'Admin moderation read models are incomplete or include finance data';
   end if;
+  begin
+    perform public.admin_list_reported_reviews(null, 10, 0);
+    raise exception 'A NULL moderation view bypassed pagination validation';
+  exception when invalid_parameter_value then null;
+  end;
+  begin
+    perform public.admin_list_reported_reviews('open', null, 0);
+    raise exception 'A NULL moderation limit created an unbounded query';
+  exception when invalid_parameter_value then null;
+  end;
+  begin
+    perform public.admin_list_reported_reviews('open', 10, null);
+    raise exception 'A NULL moderation offset bypassed pagination validation';
+  exception when invalid_parameter_value then null;
+  end;
+  begin
+    perform public.admin_list_reported_reviews('open', 101, 0);
+    raise exception 'A moderation limit above 100 was accepted';
+  exception when invalid_parameter_value then null;
+  end;
+  begin
+    perform * from public.admin_moderate_review_v1(
+      '43000000-0000-0000-0000-000000000400',
+      (select review_id from moderation_review_ids
+       where mission_id = '43000000-0000-0000-0000-000000000103'),
+      'hidden', 'This review was never reported.'
+    );
+    raise exception 'An administrator moderated a review that was never reported';
+  exception when check_violation then null;
+  end;
 end
 $$;
 commit;
