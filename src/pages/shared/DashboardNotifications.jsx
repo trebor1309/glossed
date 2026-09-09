@@ -13,6 +13,12 @@ import { useNotifications } from "@/context/NotificationContext";
 
 const PAGE_SIZE = 100;
 
+const SAFE_MODERATION_RESULTS = new Map([
+  ["A reported review was reviewed and remains published.", "Après examen, l’avis reste publié."],
+  ["A review was hidden following a moderation decision.", "Après examen, l’avis a été masqué."],
+  ["A review was removed following a moderation decision.", "Après examen, l’avis a été retiré."],
+]);
+
 function relativeTime(value) {
   const date = new Date(value);
   const seconds = Math.round((date.getTime() - Date.now()) / 1000);
@@ -53,7 +59,9 @@ function notificationPresentation(notification) {
   if (notification.event_type === "review_moderation_decided") {
     return {
       title: "Mise à jour concernant un avis",
-      body: "Glossed a terminé l’examen d’un avis signalé.",
+      body:
+        SAFE_MODERATION_RESULTS.get(notification.body) ||
+        "Glossed a terminé l’examen d’un avis signalé.",
       path: rawPath,
       Icon: ShieldCheck,
     };

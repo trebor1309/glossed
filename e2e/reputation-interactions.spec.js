@@ -30,6 +30,20 @@ const providerSessionProfile = {
   verification_status: "verified",
 };
 
+const tallPublicProviderProfile = {
+  ...providerSessionProfile,
+  business_name: "Studio Rose",
+  description: "Professional profile used to verify fragment navigation.",
+  profile_photo: null,
+  business_type: ["Hair Stylist"],
+  portfolio: Array.from(
+    { length: 8 },
+    (_, index) => `https://images.example.test/portfolio-${index}.jpg`
+  ),
+  latitude: null,
+  longitude: null,
+};
+
 const completedMission = {
   id: missionId,
   booking_id: "40000000-0000-4000-8000-000000000101",
@@ -107,6 +121,40 @@ test("only the reviewed professional sees the reply action", async ({ page }) =>
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Répondre à l’avis" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Répondre" })).toBeFocused();
+});
+
+test("keeps focus trapped through an idle to busy to idle submission", async ({ page }) => {
+  let finishRequest;
+  await installMockClientSession(page, {
+    currentProfile: providerSessionProfile,
+    publicReviewsResponse: () => [baseReview],
+    submitReviewReplyResponse: async () =>
+      new Promise((resolve) => {
+        finishRequest = () =>
+          resolve({ status: 503, body: { message: "Temporary reply interruption" } });
+      }),
+  });
+
+  await openProviderProfile(page);
+  const trigger = page.getByRole("button", { name: "Répondre" });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "Répondre à l’avis" });
+  await page.getByLabel("Votre réponse").fill("Réponse conservant le focus.");
+  const submit = page.getByRole("button", { name: "Publier la réponse" });
+  await submit.click();
+  await expect(page.getByRole("button", { name: "Publication…" })).toBeDisabled();
+  await expect.poll(() => typeof finishRequest).toBe("function");
+
+  await page.keyboard.press("Tab");
+  await expect(dialog).toBeFocused();
+  expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+
+  finishRequest();
+  await expect(page.getByRole("alert")).toContainText("n’a pas pu être publiée");
+  expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
 });
 
 test("another user cannot reply and an anonymous visitor cannot report", async ({ page }) => {
@@ -289,6 +337,7 @@ test("blocks an oversized report explanation and presents a repeated report clea
 
 test("renders safe reputation notifications and opens the review anchor", async ({ page }) => {
   const privateData = "PRIVATE REPORT REASON reporter@example.test admin note";
+  await page.setViewportSize({ width: 600, height: 400 });
   await installMockClientSession(page, {
     notificationsResponse: () => [
       {
@@ -303,19 +352,50 @@ test("renders safe reputation notifications and opens the review anchor", async 
       {
         id: "40000000-0000-4000-8000-000000000502",
         event_type: "review_moderation_decided",
-        title: privateData,
-        body: privateData,
+        title: "Raw moderation title",
+        body: "A reported review was reviewed and remains published.",
         metadata: { path: `/profile/${providerId}`, review_id: reviewId },
         read_at: "2026-09-08T09:01:00.000Z",
         created_at: "2026-09-08T09:01:00.000Z",
       },
+      {
+        id: "40000000-0000-4000-8000-000000000503",
+        event_type: "review_moderation_decided",
+        title: "Raw moderation title",
+        body: "A review was hidden following a moderation decision.",
+        metadata: { path: `/profile/${providerId}`, review_id: reviewId },
+        read_at: "2026-09-08T09:02:00.000Z",
+        created_at: "2026-09-08T09:02:00.000Z",
+      },
+      {
+        id: "40000000-0000-4000-8000-000000000504",
+        event_type: "review_moderation_decided",
+        title: "Raw moderation title",
+        body: "A review was removed following a moderation decision.",
+        metadata: { path: `/profile/${providerId}`, review_id: reviewId },
+        read_at: "2026-09-08T09:03:00.000Z",
+        created_at: "2026-09-08T09:03:00.000Z",
+      },
+      {
+        id: "40000000-0000-4000-8000-000000000505",
+        event_type: "review_moderation_decided",
+        title: privateData,
+        body: privateData,
+        metadata: { path: `/profile/${providerId}`, review_id: reviewId },
+        read_at: "2026-09-08T09:04:00.000Z",
+        created_at: "2026-09-08T09:04:00.000Z",
+      },
     ],
+    publicProfile: tallPublicProviderProfile,
     publicReviewsResponse: () => [baseReview],
   });
 
   await page.goto("/dashboard/notifications", { waitUntil: "domcontentloaded" });
   await expect(page.getByText("Réponse à votre avis", { exact: true })).toBeVisible();
-  await expect(page.getByText("Mise à jour concernant un avis", { exact: true })).toBeVisible();
+  await expect(page.getByText("Mise à jour concernant un avis", { exact: true })).toHaveCount(4);
+  await expect(page.getByText("Après examen, l’avis reste publié.")).toBeVisible();
+  await expect(page.getByText("Après examen, l’avis a été masqué.")).toBeVisible();
+  await expect(page.getByText("Après examen, l’avis a été retiré.")).toBeVisible();
   await expect(
     page.getByText("Glossed a terminé l’examen d’un avis signalé.", { exact: true })
   ).toBeVisible();
@@ -323,6 +403,11 @@ test("renders safe reputation notifications and opens the review anchor", async 
 
   await page.getByRole("button", { name: /Réponse à votre avis/ }).click();
   await expect(page).toHaveURL(new RegExp(`/profile/${providerId}#reviews$`));
+  const reviewsSection = page.locator("#reviews");
+  await expect(reviewsSection).toBeInViewport();
+  await expect
+    .poll(async () => (await reviewsSection.boundingBox())?.y ?? Number.POSITIVE_INFINITY)
+    .toBeLessThan(400);
 });
 
 test("does not invent placeholders for hidden or removed reviews", async ({ page }) => {

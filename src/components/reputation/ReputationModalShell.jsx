@@ -20,6 +20,10 @@ export default function ReputationModalShell({
 }) {
   const dialogRef = useRef(null);
   const returnFocusRef = useRef(null);
+  const busyRef = useRef(busy);
+  const onCloseRef = useRef(onClose);
+  busyRef.current = busy;
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     returnFocusRef.current = document.activeElement;
@@ -31,9 +35,9 @@ export default function ReputationModalShell({
     });
 
     const handleKeyDown = (event) => {
-      if (event.key === "Escape" && !busy) {
+      if (event.key === "Escape" && !busyRef.current) {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -63,7 +67,7 @@ export default function ReputationModalShell({
       document.body.style.overflow = previousOverflow;
       returnFocusRef.current?.focus?.();
     };
-  }, [busy, initialFocusRef, onClose]);
+  }, [initialFocusRef]);
 
   return (
     <div

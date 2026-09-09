@@ -4,6 +4,8 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 
 const profileReviews = read("src/pages/public-profile/ProfileReviews.jsx");
 const proProfile = read("src/pages/public-profile/ProProfileView.jsx");
+const publicProfile = read("src/pages/public-profile/UserPublicProfile.jsx");
+const scrollToTop = read("src/components/ScrollToTop.jsx");
 const replyModal = read("src/components/reputation/ReviewReplyModal.jsx");
 const reportModal = read("src/components/reputation/ReviewReportModal.jsx");
 const modalShell = read("src/components/reputation/ReputationModalShell.jsx");
@@ -58,15 +60,37 @@ for (const accessibilityContract of [
   'event.key === "Escape"',
   'event.key !== "Tab"',
   "returnFocusRef.current?.focus",
+  "busyRef.current",
 ]) {
   if (!modalShell.includes(accessibilityContract)) {
     throw new Error(`Reputation modals are missing ${accessibilityContract}`);
   }
 }
 
+if (/\}, \[busy,/.test(modalShell)) {
+  throw new Error("Modal focus lifecycle must not restart when busy changes");
+}
+
+if (
+  !publicProfile.includes('location.hash !== "#reviews"') ||
+  !publicProfile.includes("reviewsSection.scrollIntoView") ||
+  !scrollToTop.includes("if (!hash) window.scrollTo")
+) {
+  throw new Error("Async public profiles must handle the review fragment after rendering");
+}
+
 for (const notificationType of ["review_reply_received", "review_moderation_decided"]) {
   if (!notifications.includes(notificationType)) {
     throw new Error(`Notification presentation is missing ${notificationType}`);
+  }
+}
+for (const canonicalModerationMessage of [
+  "A reported review was reviewed and remains published.",
+  "A review was hidden following a moderation decision.",
+  "A review was removed following a moderation decision.",
+]) {
+  if (!notifications.includes(canonicalModerationMessage)) {
+    throw new Error(`Moderation notification whitelist is missing ${canonicalModerationMessage}`);
   }
 }
 if (!notifications.includes("#reviews") || !notifications.includes("Glossed a terminé l’examen")) {
