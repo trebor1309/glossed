@@ -175,6 +175,24 @@ export const executeAdministratorChange = (previewId, reason, operationId) =>
     p_operation_id: operationId,
   });
 
+export const getAdminReputationModerationCounts = () =>
+  rpc("admin_get_reputation_moderation_counts");
+export const listAdminReportedReviews = (view = "open", limit = 20, offset = 0) =>
+  rpc("admin_list_reported_reviews", {
+    p_view: view,
+    p_limit: limit,
+    p_offset: offset,
+  });
+export const getAdminReportedReviewDetail = (reviewId) =>
+  rpc("admin_get_reported_review_detail", { p_review_id: reviewId });
+export const moderateAdminReview = (operationId, reviewId, targetStatus, reason) =>
+  rpc("admin_moderate_review_v1", {
+    p_operation_id: operationId,
+    p_review_id: reviewId,
+    p_target_status: targetStatus,
+    p_reason: reason,
+  });
+
 export const listAdminDisputeCases = (queue = "disputes_open", limit = 50, offset = 0) =>
   rpc("admin_list_dispute_cases_ux_v2", { p_queue: queue, p_limit: limit, p_offset: offset });
 export const getAdminDisputeQueueCounts = () => rpc("admin_get_dispute_queue_counts_ux_v2");

@@ -20,6 +20,8 @@ import AdminAuditPage from "./AdminAuditPage";
 import AdminConfigurationPage from "./AdminConfigurationPage";
 import AdminAdministratorsPage from "./AdminAdministratorsPage";
 import AdminPersonalSettingsPage from "./AdminPersonalSettingsPage";
+import AdminReputationPage from "./AdminReputationPage";
+import AdminReputationDetailPage from "./AdminReputationDetailPage";
 import { AdminI18nProvider } from "./AdminI18nContext";
 
 const allowedHosts = new Set([
@@ -160,6 +162,22 @@ function AdminWorkspace() {
           element={
             <PermissionRoute permission="audit.read">
               <AdminAuditPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="reputation"
+          element={
+            <PermissionRoute permission="reputation.read">
+              <AdminReputationPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="reputation/:reviewId"
+          element={
+            <PermissionRoute permission="reputation.read">
+              <AdminReputationDetailPage />
             </PermissionRoute>
           }
         />
