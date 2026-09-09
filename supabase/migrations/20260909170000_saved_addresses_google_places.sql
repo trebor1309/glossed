@@ -129,8 +129,16 @@ select
   u.id,
   'Home',
   trim(u.address),
-  nullif(trim(u.city), ''),
-  nullif(trim(u.postal_code), ''),
+  case
+    when length(trim(coalesce(u.city, ''))) between 1 and 120
+      then trim(u.city)
+    else null
+  end,
+  case
+    when length(trim(coalesce(u.postal_code, ''))) between 1 and 32
+      then trim(u.postal_code)
+    else null
+  end,
   case
     when trim(coalesce(u.country, '')) ~ '^[A-Za-z]{2}$'
       then upper(trim(u.country))

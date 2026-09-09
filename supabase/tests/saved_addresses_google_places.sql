@@ -17,6 +17,12 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('46000000-0000-0000-0000-000000000030', 'addresses-provider@example.test',
    '{"requested_role":"pro","business_name":"Address Test Pro"}'::jsonb),
   ('46000000-0000-0000-0000-000000000040', 'invalid-legacy-address@example.test',
+   '{"requested_role":"client"}'::jsonb),
+  ('46000000-0000-0000-0000-000000000050', 'legacy-long-city@example.test',
+   '{"requested_role":"client"}'::jsonb),
+  ('46000000-0000-0000-0000-000000000060', 'legacy-long-postal@example.test',
+   '{"requested_role":"client"}'::jsonb),
+  ('46000000-0000-0000-0000-000000000070', 'legacy-long-city-postal@example.test',
    '{"requested_role":"client"}'::jsonb);
 
 update public.users
@@ -35,6 +41,33 @@ set address = 'Address without usable coordinates',
     longitude = null,
     onboarding_completed = true
 where id = '46000000-0000-0000-0000-000000000040';
+
+update public.users
+set address = '50 Long City Street, Brussels',
+    city = repeat('C', 121),
+    postal_code = '1000',
+    country = 'BE',
+    latitude = 50.851,
+    longitude = 4.352
+where id = '46000000-0000-0000-0000-000000000050';
+
+update public.users
+set address = '60 Long Postal Street, Brussels',
+    city = 'Brussels',
+    postal_code = repeat('P', 33),
+    country = 'BE',
+    latitude = 50.852,
+    longitude = 4.353
+where id = '46000000-0000-0000-0000-000000000060';
+
+update public.users
+set address = '70 Long Legacy Fields Street, Brussels',
+    city = repeat('C', 121),
+    postal_code = repeat('P', 33),
+    country = 'BE',
+    latitude = 50.853,
+    longitude = 4.354
+where id = '46000000-0000-0000-0000-000000000070';
 
 update public.users
 set onboarding_completed = true,
@@ -66,6 +99,47 @@ begin
   if exists (select 1 from public.user_addresses
       where user_id = '46000000-0000-0000-0000-000000000040') then
     raise exception 'Legacy address without coordinates became bookable';
+  end if;
+  if not exists (
+    select 1 from public.user_addresses
+    where user_id = '46000000-0000-0000-0000-000000000050'
+      and formatted_address = '50 Long City Street, Brussels'
+      and latitude = 50.851
+      and longitude = 4.352
+      and city is null
+      and postal_code = '1000'
+  ) then
+    raise exception 'Legacy long city was not safely omitted from the saved address';
+  end if;
+  if not exists (
+    select 1 from public.user_addresses
+    where user_id = '46000000-0000-0000-0000-000000000060'
+      and formatted_address = '60 Long Postal Street, Brussels'
+      and latitude = 50.852
+      and longitude = 4.353
+      and city = 'Brussels'
+      and postal_code is null
+  ) then
+    raise exception 'Legacy long postal code was not safely omitted from the saved address';
+  end if;
+  if not exists (
+    select 1 from public.user_addresses
+    where user_id = '46000000-0000-0000-0000-000000000070'
+      and formatted_address = '70 Long Legacy Fields Street, Brussels'
+      and latitude = 50.853
+      and longitude = 4.354
+      and city is null
+      and postal_code is null
+  ) then
+    raise exception 'Legacy long city and postal code prevented the valid address backfill';
+  end if;
+  if (select count(*) from public.user_addresses
+      where user_id in (
+        '46000000-0000-0000-0000-000000000050',
+        '46000000-0000-0000-0000-000000000060',
+        '46000000-0000-0000-0000-000000000070'
+      )) <> 3 then
+    raise exception 'Malformed legacy field backfill was not idempotent';
   end if;
 end
 $$;
