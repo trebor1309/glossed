@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Flag, MessageSquareWarning, RefreshCw } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ErrorPanel, LoadingPanel, StateBadge, formatDate } from "./AdminDataUi";
@@ -27,8 +27,10 @@ export default function AdminReputationPage() {
   const [counts, setCounts] = useState({ open: null, history: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const currentRequestRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++currentRequestRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -36,17 +38,22 @@ export default function AdminReputationPage() {
         listAdminReportedReviews(view, PAGE_SIZE, offset),
         getAdminReputationModerationCounts(),
       ]);
+      if (requestId !== currentRequestRef.current) return;
       setData(items);
       setCounts(nextCounts);
     } catch (loadError) {
+      if (requestId !== currentRequestRef.current) return;
       setError(loadError);
     } finally {
-      setLoading(false);
+      if (requestId === currentRequestRef.current) setLoading(false);
     }
   }, [offset, view]);
 
   useEffect(() => {
     load();
+    return () => {
+      currentRequestRef.current += 1;
+    };
   }, [load]);
 
   const selectView = (nextView) => setSearchParams({ view: nextView });
@@ -161,7 +168,7 @@ export default function AdminReputationPage() {
               ))}
             </div>
           )}
-          {total > PAGE_SIZE && (
+          {(total > PAGE_SIZE || page > 1) && (
             <nav
               aria-label="Pagination de la modération"
               className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-4"
@@ -175,7 +182,7 @@ export default function AdminReputationPage() {
                 <ChevronLeft size={16} /> Précédent
               </button>
               <span className="text-sm text-slate-600">
-                Page {page} sur {pageCount}
+                Page {page}{total > 0 ? ` sur ${pageCount}` : ""}
               </span>
               <button
                 type="button"

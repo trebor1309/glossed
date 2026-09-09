@@ -61,6 +61,102 @@ test("shows counts, open/history queues and backend pagination", async ({ page }
   expect(listCalls.some((call) => call.body.p_limit === 20 && call.body.p_offset === 20)).toBe(true);
 });
 
+test("ignores a superseded slow open response after history has loaded", async ({ page }) => {
+  let resolveOpen;
+  await installMockAdminSession(page, {
+    listResponse: async (body) => {
+      if (body.p_view === "open") {
+        return new Promise((resolve) => {
+          resolveOpen = () =>
+            resolve({
+              view: "open",
+              total: 1,
+              limit: 20,
+              offset: 0,
+              items: [
+                {
+                  review_id: "45000000-0000-4000-8000-000000000401",
+                  review_status: "published",
+                  rating: 1,
+                  comment: "Réponse obsolète de la file ouverte",
+                  reviewer_name: "ancien-auteur",
+                  provider_name: "Ancien prestataire",
+                  report_count: 1,
+                  open_report_count: 1,
+                  first_reported_at: "2026-09-01T10:00:00.000Z",
+                  last_reported_at: "2026-09-01T10:00:00.000Z",
+                },
+              ],
+            });
+        });
+      }
+      return {
+        view: "history",
+        total: 1,
+        limit: 20,
+        offset: 0,
+        items: [
+          {
+            review_id: "45000000-0000-4000-8000-000000000402",
+            review_status: "hidden",
+            rating: 4,
+            comment: "Dossier historique actuel",
+            reviewer_name: "auteur-historique",
+            provider_name: "Prestataire historique",
+            report_count: 1,
+            open_report_count: 0,
+            first_reported_at: "2026-09-02T10:00:00.000Z",
+            last_reported_at: "2026-09-02T10:00:00.000Z",
+          },
+        ],
+      };
+    },
+  });
+  await openAdmin(page);
+  await expect(page.getByRole("heading", { name: "Réputation" })).toBeVisible();
+  await expect.poll(() => typeof resolveOpen).toBe("function");
+
+  await page.getByRole("tab", { name: /Historique/ }).click();
+  await expect(page.getByText("Dossier historique actuel")).toBeVisible();
+  resolveOpen();
+
+  await expect(page.getByRole("tab", { name: /Historique/ })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
+  await expect(page.getByText("Dossier historique actuel")).toBeVisible();
+  await expect(page.getByText("Réponse obsolète de la file ouverte")).toHaveCount(0);
+});
+
+test("keeps a previous-page escape when a page becomes empty", async ({ page }) => {
+  const { calls } = await installMockAdminSession(page, {
+    initialPath: "/reputation?view=open&page=2",
+    listResponse: async (body) => ({
+      view: body.p_view,
+      total: 0,
+      limit: body.p_limit,
+      offset: body.p_offset,
+      items: [],
+    }),
+  });
+  await openAdmin(page);
+  await expect(page.getByText("Aucun avis signalé n’attend une décision.")).toBeVisible();
+  const previous = page.getByRole("button", { name: /Précédent/ });
+  await expect(previous).toBeVisible();
+  await expect(previous).toBeEnabled();
+  await previous.click();
+
+  await expect(page).toHaveURL(/view=open$/);
+  await expect
+    .poll(() =>
+      calls.some(
+        (call) =>
+          call.path.endsWith("admin_list_reported_reviews") && call.body.p_offset === 0
+      )
+    )
+    .toBe(true);
+});
+
 test("shows private reports, reply, business context and no finance data", async ({ page }) => {
   const { calls } = await installMockAdminSession(page, {
     permissions: ["admin.access", "reputation.read"],
