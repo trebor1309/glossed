@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, Loader2 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/lib/supabaseClient";
 import Toast from "@/components/ui/Toast";
@@ -11,12 +11,14 @@ const EMPTY_REVIEW_SUMMARY = { average_rating: null, review_count: 0 };
 
 export default function UserPublicProfile() {
   const { user_id: userId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const { user: currentUser } = useUser();
   const [profile, setProfile] = useState(null);
   const [reviewSummary, setReviewSummary] = useState(EMPTY_REVIEW_SUMMARY);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const handledReviewAnchorRef = useRef(null);
 
   const normalizedUserId = useMemo(() => {
     if (!userId || userId === "undefined" || userId === "null") return null;
@@ -92,6 +94,19 @@ export default function UserPublicProfile() {
     };
   }, [normalizedUserId]);
 
+  useEffect(() => {
+    if (loading || !profile || location.hash !== "#reviews") return;
+
+    const navigationIdentity = `${location.key}:${profile.id}:reviews`;
+    if (handledReviewAnchorRef.current === navigationIdentity) return;
+
+    const reviewsSection = document.getElementById("reviews");
+    if (!reviewsSection) return;
+
+    handledReviewAnchorRef.current = navigationIdentity;
+    reviewsSection.scrollIntoView({ block: "start" });
+  }, [loading, location.hash, location.key, profile]);
+
   const backButton = (
     <button
       type="button"
@@ -119,7 +134,9 @@ export default function UserPublicProfile() {
             </>
           )}
         </div>
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        {toast && (
+          <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+        )}
       </main>
     );
   }

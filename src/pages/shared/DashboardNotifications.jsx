@@ -1,10 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bell, CheckCheck, CircleAlert, LoaderCircle } from "lucide-react";
+import {
+  Bell,
+  CheckCheck,
+  CircleAlert,
+  LoaderCircle,
+  MessageSquareReply,
+  ShieldCheck,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useNotifications } from "@/context/NotificationContext";
 
 const PAGE_SIZE = 100;
+
+const SAFE_MODERATION_RESULTS = new Map([
+  ["A reported review was reviewed and remains published.", "Après examen, l’avis reste publié."],
+  ["A review was hidden following a moderation decision.", "Après examen, l’avis a été masqué."],
+  ["A review was removed following a moderation decision.", "Après examen, l’avis a été retiré."],
+]);
 
 function relativeTime(value) {
   const date = new Date(value);
@@ -23,10 +36,42 @@ function safeNotificationPath(value) {
   if (typeof value !== "string") return null;
   if (value === "/dashboard" || value.startsWith("/dashboard/")) return value;
   if (value === "/prodashboard" || value.startsWith("/prodashboard/")) return value;
-  if (/^\/profile\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+  if (
+    /^\/profile\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?:#reviews)?$/i.test(
+      value
+    )
+  ) {
     return value;
   }
   return null;
+}
+
+function notificationPresentation(notification) {
+  const rawPath = safeNotificationPath(notification.metadata?.path);
+  if (notification.event_type === "review_reply_received") {
+    return {
+      title: "Réponse à votre avis",
+      body: "Le professionnel a publié une réponse à votre avis Glossed.",
+      path: rawPath?.startsWith("/profile/") ? `${rawPath.split("#")[0]}#reviews` : rawPath,
+      Icon: MessageSquareReply,
+    };
+  }
+  if (notification.event_type === "review_moderation_decided") {
+    return {
+      title: "Mise à jour concernant un avis",
+      body:
+        SAFE_MODERATION_RESULTS.get(notification.body) ||
+        "Glossed a terminé l’examen d’un avis signalé.",
+      path: rawPath,
+      Icon: ShieldCheck,
+    };
+  }
+  return {
+    title: notification.title,
+    body: notification.body,
+    path: rawPath,
+    Icon: Bell,
+  };
 }
 
 export default function DashboardNotifications() {
@@ -81,7 +126,7 @@ export default function DashboardNotifications() {
       await refreshSummary();
     }
 
-    const path = safeNotificationPath(notification.metadata?.path);
+    const path = notificationPresentation(notification).path;
     if (path) navigate(path);
   };
 
@@ -116,7 +161,11 @@ export default function DashboardNotifications() {
           disabled={!hasUnread || markingAll}
           className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {markingAll ? <LoaderCircle className="animate-spin" size={17} /> : <CheckCheck size={17} />}
+          {markingAll ? (
+            <LoaderCircle className="animate-spin" size={17} />
+          ) : (
+            <CheckCheck size={17} />
+          )}
           Mark all as read
         </button>
       </div>
@@ -141,7 +190,8 @@ export default function DashboardNotifications() {
         ) : (
           <ul className="divide-y divide-gray-100">
             {items.map((notification) => {
-              const path = safeNotificationPath(notification.metadata?.path);
+              const presentation = notificationPresentation(notification);
+              const { path, Icon } = presentation;
               return (
                 <li key={notification.id}>
                   <button
@@ -151,21 +201,27 @@ export default function DashboardNotifications() {
                       notification.read_at ? "bg-white" : "bg-rose-50/50"
                     } ${path ? "cursor-pointer" : "cursor-default"}`}
                   >
-                    <span
-                      className={`mt-2 h-2.5 w-2.5 shrink-0 rounded-full ${
-                        notification.read_at ? "bg-gray-200" : "bg-rose-500"
-                      }`}
-                      aria-label={notification.read_at ? "Read" : "Unread"}
-                    />
+                    <span className="relative mt-0.5 shrink-0 text-rose-600">
+                      <Icon size={20} aria-hidden="true" />
+                      <span
+                        className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full ring-2 ring-white ${
+                          notification.read_at ? "bg-gray-200" : "bg-rose-500"
+                        }`}
+                        aria-label={notification.read_at ? "Read" : "Unread"}
+                      />
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                        <span className="font-semibold text-gray-900">{notification.title}</span>
-                        <time className="shrink-0 text-xs text-gray-400" dateTime={notification.created_at}>
+                        <span className="font-semibold text-gray-900">{presentation.title}</span>
+                        <time
+                          className="shrink-0 text-xs text-gray-400"
+                          dateTime={notification.created_at}
+                        >
                           {relativeTime(notification.created_at)}
                         </time>
                       </span>
                       <span className="mt-1 block text-sm leading-6 text-gray-600">
-                        {notification.body}
+                        {presentation.body}
                       </span>
                     </span>
                   </button>
