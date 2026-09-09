@@ -12,6 +12,11 @@ import {
   serviceLabel,
   targetedBookingErrorMessage,
 } from "@/lib/providerDiscovery";
+import {
+  createMyUserAddress,
+  listMyUserAddresses,
+  savedAddressErrorMessage,
+} from "@/lib/userAddresses";
 import { supabase } from "@/lib/supabaseClient";
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -163,7 +168,24 @@ function StepWhen({ bookingData, setBookingData, onNext, onPrev }) {
   );
 }
 
-function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
+function StepAddress({
+  bookingData,
+  setBookingData,
+  onNext,
+  onPrev,
+  savedAddresses,
+  addressesLoading,
+  selectedAddressId,
+  onSelectSaved,
+  usingCustomAddress,
+  onSelectCustom,
+  saveCustomAddress,
+  setSaveCustomAddress,
+  customAddressLabel,
+  setCustomAddressLabel,
+  savingAddress,
+  onManageAddresses,
+}) {
   const hasCoordinates = bookingData.latitude != null && bookingData.longitude != null;
 
   return (
@@ -179,35 +201,137 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
         <MapPin size={20} /> Where should we come?
       </h2>
 
-      <AddressAutocomplete
-        inputId="booking-address"
-        label="Service address"
-        placeholder="Enter your address"
-        defaultValue={bookingData.address}
-        required
-        types={["address"]}
-        onInputChange={(address) =>
-          setBookingData((previous) => ({
-            ...previous,
-            address,
-            latitude: null,
-            longitude: null,
-          }))
-        }
-        onSelect={(place) =>
-          setBookingData((previous) => ({
-            ...previous,
-            address: place.address,
-            latitude: place.latitude,
-            longitude: place.longitude,
-          }))
-        }
-      />
-      {!hasCoordinates && bookingData.address && (
-        <p className="text-sm text-amber-700">
-          Choose the address from the suggestions to continue.
-        </p>
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium text-gray-700">Service address</legend>
+        {addressesLoading ? (
+          <p role="status" className="rounded-xl bg-gray-50 p-3 text-sm text-gray-500">
+            Loading saved addresses…
+          </p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {savedAddresses.map((address) => (
+              <label
+                key={address.id}
+                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${
+                  selectedAddressId === address.id && !usingCustomAddress
+                    ? "border-rose-500 bg-rose-50"
+                    : "border-gray-200"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="service-address-choice"
+                  checked={selectedAddressId === address.id && !usingCustomAddress}
+                  onChange={() => onSelectSaved(address)}
+                  className="mt-1 accent-rose-600"
+                />
+                <span className="min-w-0">
+                  <span className="block font-semibold text-gray-800">
+                    {address.label}
+                    {address.is_default ? " — Default" : ""}
+                  </span>
+                  <span className="block break-words text-sm text-gray-600">
+                    {address.formatted_address}
+                  </span>
+                </span>
+              </label>
+            ))}
+            <label
+              className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${
+                usingCustomAddress ? "border-rose-500 bg-rose-50" : "border-gray-200"
+              }`}
+            >
+              <input
+                type="radio"
+                name="service-address-choice"
+                checked={usingCustomAddress}
+                onChange={onSelectCustom}
+                className="accent-rose-600"
+              />
+              <span className="font-semibold text-gray-800">Other address</span>
+            </label>
+          </div>
+        )}
+      </fieldset>
+
+      {usingCustomAddress && (
+        <div className="space-y-3 rounded-xl border border-gray-200 p-4">
+          <AddressAutocomplete
+            inputId="booking-address"
+            label="New address"
+            placeholder="Enter your address"
+            defaultValue={bookingData.address}
+            required
+            types={["address"]}
+            onInputChange={(address) =>
+              setBookingData((previous) => ({
+                ...previous,
+                address,
+                city: null,
+                postalCode: null,
+                countryCode: null,
+                latitude: null,
+                longitude: null,
+              }))
+            }
+            onSelect={(place) =>
+              setBookingData((previous) => ({
+                ...previous,
+                address: place.address,
+                city: place.city,
+                postalCode: place.postal_code,
+                countryCode: place.country_code,
+                latitude: place.latitude,
+                longitude: place.longitude,
+              }))
+            }
+          />
+          {!hasCoordinates && bookingData.address && (
+            <p className="text-sm text-amber-700">
+              Choose the address from the suggestions to continue.
+            </p>
+          )}
+          {hasCoordinates && (
+            <>
+              <label className="flex items-start gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={saveCustomAddress}
+                  onChange={(event) => setSaveCustomAddress(event.target.checked)}
+                  className="mt-1 accent-rose-600"
+                />
+                Save this address for later
+              </label>
+              {saveCustomAddress && (
+                <label className="block text-sm font-medium text-gray-700">
+                  Address label
+                  <input
+                    value={customAddressLabel}
+                    onChange={(event) => setCustomAddressLabel(event.target.value)}
+                    maxLength={50}
+                    list="booking-address-labels"
+                    placeholder="Home or Work"
+                    required
+                    className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-rose-300"
+                  />
+                  <datalist id="booking-address-labels">
+                    <option value="Home" />
+                    <option value="Work" />
+                  </datalist>
+                </label>
+              )}
+            </>
+          )}
+        </div>
       )}
+
+      <button
+        type="button"
+        onClick={onManageAddresses}
+        className="text-sm font-medium text-rose-700 underline-offset-2 hover:underline"
+      >
+        Manage my saved addresses
+      </button>
 
       <label className="block text-sm font-medium text-gray-700">
         Tell the professional what you need
@@ -223,13 +347,19 @@ function StepAddress({ bookingData, setBookingData, onNext, onPrev }) {
       <StepButtons
         onPrev={onPrev}
         onNext={onNext}
-        nextDisabled={!bookingData.address || !hasCoordinates}
+        nextDisabled={
+          savingAddress ||
+          !bookingData.address ||
+          !hasCoordinates ||
+          (usingCustomAddress && saveCustomAddress && !customAddressLabel.trim())
+        }
+        nextLoading={savingAddress}
       />
     </motion.div>
   );
 }
 
-function StepButtons({ onPrev, onNext, nextDisabled }) {
+function StepButtons({ onPrev, onNext, nextDisabled, nextLoading = false }) {
   return (
     <div className="flex justify-between gap-3 pt-6">
       <button
@@ -245,7 +375,7 @@ function StepButtons({ onPrev, onNext, nextDisabled }) {
         disabled={nextDisabled}
         className="rounded-full bg-gradient-to-r from-rose-600 to-red-600 px-6 py-2 font-semibold text-white transition hover:scale-[1.02] disabled:opacity-60"
       >
-        Next <ArrowRight size={18} className="ml-2 inline" />
+        {nextLoading ? "Saving…" : "Next"} <ArrowRight size={18} className="ml-2 inline" />
       </button>
     </div>
   );
@@ -329,7 +459,7 @@ function parseEditServices(service, categories) {
 }
 
 export default function DashboardNew({ isModal = false, editBooking = null, onClose, onSuccess }) {
-  const { session, user } = useUser();
+  const { session, user, isPro } = useUser();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const targetedProId = searchParams.get("pro");
@@ -339,12 +469,21 @@ export default function DashboardNew({ isModal = false, editBooking = null, onCl
     suppliedOperationId && uuidPattern.test(suppliedOperationId) ? suppliedOperationId : uuid()
   );
   const requestedServicePrefilledRef = useRef(false);
+  const addressOperationIdRef = useRef(uuid());
+  const attemptedAddressPayloadRef = useRef(null);
 
   const [targetedPro, setTargetedPro] = useState(null);
   const [targetedProLoading, setTargetedProLoading] = useState(Boolean(targetedProId));
   const [targetedProError, setTargetedProError] = useState("");
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [addressesLoading, setAddressesLoading] = useState(true);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [usingCustomAddress, setUsingCustomAddress] = useState(Boolean(editBooking));
+  const [saveCustomAddress, setSaveCustomAddress] = useState(false);
+  const [customAddressLabel, setCustomAddressLabel] = useState("Home");
+  const [savingAddress, setSavingAddress] = useState(false);
   const [step, setStep] = useState(1);
   const [bookingData, setBookingData] = useState(() => ({
     services: [],
@@ -356,6 +495,9 @@ export default function DashboardNew({ isModal = false, editBooking = null, onCl
           .filter(Boolean)
       : [],
     address: editBooking?.address || "",
+    city: null,
+    postalCode: null,
+    countryCode: null,
     notes: editBooking?.notes || "",
     latitude: editBooking?.client_lat ?? null,
     longitude: editBooking?.client_lng ?? null,
@@ -435,17 +577,124 @@ export default function DashboardNew({ isModal = false, editBooking = null, onCl
   }, [bookingData.services.length, requestedServiceCode, targetedServiceCodes]);
 
   useEffect(() => {
-    if (!user) return;
-    setBookingData((previous) => {
-      if (previous.address) return previous;
-      return {
+    if (!user?.id) return undefined;
+    let active = true;
+    setAddressesLoading(true);
+    listMyUserAddresses()
+      .then((rows) => {
+        if (!active) return;
+        setSavedAddresses(rows);
+
+        if (editBooking) {
+          const matching = rows.find(
+            (address) =>
+              address.formatted_address === editBooking.address &&
+              Number(address.latitude) === Number(editBooking.client_lat) &&
+              Number(address.longitude) === Number(editBooking.client_lng)
+          );
+          if (matching) {
+            setSelectedAddressId(matching.id);
+            setUsingCustomAddress(false);
+          } else {
+            setSelectedAddressId(null);
+            setUsingCustomAddress(true);
+          }
+          return;
+        }
+
+        const defaultAddress = rows.find((address) => address.is_default) || rows[0];
+        if (defaultAddress) {
+          setSelectedAddressId(defaultAddress.id);
+          setUsingCustomAddress(false);
+          setBookingData((previous) => ({
+            ...previous,
+            address: defaultAddress.formatted_address,
+            city: defaultAddress.city,
+            postalCode: defaultAddress.postal_code,
+            countryCode: defaultAddress.country_code,
+            latitude: defaultAddress.latitude,
+            longitude: defaultAddress.longitude,
+          }));
+        } else {
+          setUsingCustomAddress(true);
+        }
+      })
+      .catch((error) => {
+        if (!active) return;
+        setUsingCustomAddress(true);
+        setToast({ type: "error", message: savedAddressErrorMessage(error) });
+      })
+      .finally(() => {
+        if (active) setAddressesLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [editBooking, user?.id]);
+
+  const selectSavedAddress = (address) => {
+    setSelectedAddressId(address.id);
+    setUsingCustomAddress(false);
+    setSaveCustomAddress(false);
+    setBookingData((previous) => ({
+      ...previous,
+      address: address.formatted_address,
+      city: address.city,
+      postalCode: address.postal_code,
+      countryCode: address.country_code,
+      latitude: address.latitude,
+      longitude: address.longitude,
+    }));
+  };
+
+  const selectCustomAddress = () => {
+    if (!usingCustomAddress) {
+      setBookingData((previous) => ({
         ...previous,
-        address: user.address || "",
-        latitude: user.latitude ?? null,
-        longitude: user.longitude ?? null,
-      };
-    });
-  }, [user]);
+        address: "",
+        city: null,
+        postalCode: null,
+        countryCode: null,
+        latitude: null,
+        longitude: null,
+      }));
+    }
+    setSelectedAddressId(null);
+    setUsingCustomAddress(true);
+  };
+
+  const continueFromAddress = async () => {
+    if (!usingCustomAddress || !saveCustomAddress) {
+      setStep(4);
+      return;
+    }
+
+    const addressPayload = {
+      label: customAddressLabel.trim(),
+      formatted_address: bookingData.address,
+      city: bookingData.city,
+      postal_code: bookingData.postalCode,
+      country_code: bookingData.countryCode,
+      latitude: bookingData.latitude,
+      longitude: bookingData.longitude,
+    };
+    const fingerprint = JSON.stringify(addressPayload);
+    if (attemptedAddressPayloadRef.current && attemptedAddressPayloadRef.current !== fingerprint) {
+      addressOperationIdRef.current = uuid();
+    }
+    attemptedAddressPayloadRef.current = fingerprint;
+
+    setSavingAddress(true);
+    setToast(null);
+    try {
+      await createMyUserAddress(addressOperationIdRef.current, addressPayload);
+      setStep(4);
+    } catch (error) {
+      setToast({ type: "error", message: savedAddressErrorMessage(error) });
+    } finally {
+      setSavingAddress(false);
+    }
+  };
 
   const handleConfirm = async () => {
     if (isSubmitting) return;
@@ -634,8 +883,22 @@ export default function DashboardNew({ isModal = false, editBooking = null, onCl
         <StepAddress
           bookingData={bookingData}
           setBookingData={setBookingData}
-          onNext={() => setStep(4)}
+          onNext={continueFromAddress}
           onPrev={() => setStep(2)}
+          savedAddresses={savedAddresses}
+          addressesLoading={addressesLoading}
+          selectedAddressId={selectedAddressId}
+          onSelectSaved={selectSavedAddress}
+          usingCustomAddress={usingCustomAddress}
+          onSelectCustom={selectCustomAddress}
+          saveCustomAddress={saveCustomAddress}
+          setSaveCustomAddress={setSaveCustomAddress}
+          customAddressLabel={customAddressLabel}
+          setCustomAddressLabel={setCustomAddressLabel}
+          savingAddress={savingAddress}
+          onManageAddresses={() =>
+            navigate(`${isPro ? "/prodashboard" : "/dashboard"}/settings#saved-addresses`)
+          }
         />
       )}
       {step === 4 && (

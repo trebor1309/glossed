@@ -17,6 +17,7 @@ const allowedSupabasePosts = new Set([
   "/rest/v1/rpc/get_public_profile",
   "/rest/v1/rpc/get_user_summary",
   "/rest/v1/rpc/is_app_admin",
+  "/rest/v1/rpc/list_my_user_addresses_v1",
   "/rest/v1/rpc/list_service_categories",
   "/rest/v1/rpc/mark_notifications_read",
 ]);
@@ -154,8 +155,13 @@ test("client booking becomes a professional proposal and a payable client offer"
     await clientPage.getByRole("button", { name: "Morning (8–12)" }).click();
     await clientPage.getByRole("button", { name: /Next/ }).click();
 
-    const addressInput = clientPage.getByPlaceholder("Enter your address");
-    const address = await addressInput.inputValue();
+    const selectedSavedAddress = clientPage.locator('input[name="service-address-choice"]:checked');
+    await expect(selectedSavedAddress).toBeVisible();
+    const address = await selectedSavedAddress
+      .locator("xpath=..")
+      .locator("span span")
+      .nth(1)
+      .innerText();
     expect(address.trim()).not.toBe("");
     await clientPage
       .getByPlaceholder("Additional notes...")

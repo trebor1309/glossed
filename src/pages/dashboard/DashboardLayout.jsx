@@ -1,11 +1,8 @@
 import { useState, useEffect } from "react";
 import { useLocation, Outlet } from "react-router-dom";
-import { useJsApiLoader } from "@react-google-maps/api";
 import BottomNav from "../../components/navigation/BottomNavClient";
 import Sidebar from "../../components/navigation/SidebarClient";
 import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
-
-const libraries = ["places"];
 
 export default function DashboardLayout() {
   const location = useLocation();
@@ -14,11 +11,6 @@ export default function DashboardLayout() {
   const [showNewBookingModal, setShowNewBookingModal] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const isMessagesPage = location.pathname.includes("/messages");
-
-  const { loadError } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries,
-  });
 
   useEffect(() => {
     const checkViewport = () => setIsDesktop(window.innerWidth >= 768);
@@ -63,15 +55,6 @@ export default function DashboardLayout() {
       </div>
 
       <BottomNav />
-
-      {loadError && (
-        <div
-          role="status"
-          className="fixed bottom-20 left-1/2 z-[9998] -translate-x-1/2 rounded-full bg-amber-50 px-4 py-2 text-xs text-amber-800 shadow md:bottom-6"
-        >
-          Address suggestions are temporarily unavailable. Saved locations still work.
-        </div>
-      )}
 
       {/* Modal: NEW BOOKING */}
       {isDesktop && showNewBookingModal && (

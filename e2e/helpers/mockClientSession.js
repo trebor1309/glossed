@@ -64,6 +64,22 @@ const providerProfile = {
   verification_status: "verified",
 };
 
+const defaultSavedAddresses = [
+  {
+    id: "40000000-0000-4000-8000-000000000030",
+    label: "Home",
+    formatted_address: "Brussels test address",
+    city: "Brussels",
+    postal_code: "1000",
+    country_code: "BE",
+    latitude: 50.8503,
+    longitude: 4.3517,
+    is_default: true,
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+  },
+];
+
 function encode(value) {
   return Buffer.from(JSON.stringify(value)).toString("base64url");
 }
@@ -159,6 +175,36 @@ export async function installMockClientSession(page, options = {}) {
       ]);
     }
     if (url.pathname === "/rest/v1/rpc/list_service_categories") return json(categories);
+    if (url.pathname === "/rest/v1/rpc/list_my_user_addresses_v1") {
+      const response = options.addressesResponse
+        ? await options.addressesResponse(body, calls)
+        : defaultSavedAddresses;
+      return json(response);
+    }
+    if (url.pathname === "/rest/v1/rpc/create_my_user_address_v1") {
+      const response = options.createAddressResponse
+        ? await options.createAddressResponse(body, calls)
+        : [{ address_id: body.p_address_id, is_default: false, idempotent: false }];
+      return json(response.body || response, response.status || 200);
+    }
+    if (url.pathname === "/rest/v1/rpc/update_my_user_address_v1") {
+      const response = options.updateAddressResponse
+        ? await options.updateAddressResponse(body, calls)
+        : [{ address_id: body.p_address_id }];
+      return json(response.body || response, response.status || 200);
+    }
+    if (url.pathname === "/rest/v1/rpc/set_my_default_user_address_v1") {
+      const response = options.defaultAddressResponse
+        ? await options.defaultAddressResponse(body, calls)
+        : [{ address_id: body.p_address_id, is_default: true }];
+      return json(response.body || response, response.status || 200);
+    }
+    if (url.pathname === "/rest/v1/rpc/delete_my_user_address_v1") {
+      const response = options.deleteAddressResponse
+        ? await options.deleteAddressResponse(body, calls)
+        : [{ deleted_address_id: body.p_address_id, new_default_address_id: null }];
+      return json(response.body || response, response.status || 200);
+    }
     if (url.pathname === "/rest/v1/rpc/search_provider_profiles") {
       const response = options.searchResponse
         ? await options.searchResponse(body, calls)

@@ -5,18 +5,13 @@ import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MapPin, Upload, User, Building2, Phone, Mail } from "lucide-react";
-import { useLoadScript } from "@react-google-maps/api";
-
-const libraries = ["places"];
+import { useGoogleMaps } from "@/context/GoogleMapsContext";
 
 export default function OnboardingPage() {
   const { user, fetchUserProfile } = useUser();
   const navigate = useNavigate();
 
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries,
-  });
+  const { isLoaded, error: loadError } = useGoogleMaps({ request: true });
 
   // 🧠 Rôle réel en base
   const forcedRole = user?.role === "pro" ? "pro" : null;

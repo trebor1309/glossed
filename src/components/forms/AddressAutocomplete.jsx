@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { googlePlacesUnavailableMessage, useGoogleMaps } from "@/context/GoogleMapsContext";
 
 export default function AddressAutocomplete({
   label = "Address",
@@ -10,6 +11,7 @@ export default function AddressAutocomplete({
   inputId,
   types = ["geocode"],
 }) {
+  const { isLoaded, isLoading, error } = useGoogleMaps({ request: true });
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
   const onSelectRef = useRef(onSelect);
@@ -25,9 +27,6 @@ export default function AddressAutocomplete({
   }, [defaultValue]);
 
   useEffect(() => {
-    let retryTimer;
-    let attempts = 0;
-
     const initialize = () => {
       if (
         autocompleteRef.current ||
@@ -49,6 +48,8 @@ export default function AddressAutocomplete({
         const components = place.address_components || [];
         const find = (type) =>
           components.find((item) => item.types.includes(type))?.long_name || null;
+        const findShort = (type) =>
+          components.find((item) => item.types.includes(type))?.short_name || null;
         const city =
           find("locality") ||
           find("postal_town") ||
@@ -62,6 +63,7 @@ export default function AddressAutocomplete({
           city,
           postal_code: find("postal_code"),
           country: find("country"),
+          country_code: findShort("country")?.toUpperCase() || null,
           latitude: place.geometry.location.lat(),
           longitude: place.geometry.location.lng(),
         });
@@ -70,21 +72,15 @@ export default function AddressAutocomplete({
       return true;
     };
 
-    if (!initialize()) {
-      retryTimer = window.setInterval(() => {
-        attempts += 1;
-        if (initialize() || attempts >= 80) window.clearInterval(retryTimer);
-      }, 250);
-    }
+    initialize();
 
     return () => {
-      window.clearInterval(retryTimer);
       if (autocompleteRef.current) {
         window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
         autocompleteRef.current = null;
       }
     };
-  }, []);
+  }, [isLoaded]);
 
   return (
     <div>
@@ -103,7 +99,18 @@ export default function AddressAutocomplete({
           onInputChange?.(event.target.value);
         }}
         required={required}
+        disabled={!isLoaded}
+        aria-describedby={`${inputId}-places-status`}
       />
+      {!isLoaded && (
+        <p
+          id={`${inputId}-places-status`}
+          role={error ? "alert" : "status"}
+          className={`mt-2 text-sm ${error ? "text-amber-700" : "text-gray-500"}`}
+        >
+          {isLoading ? "Loading address suggestions…" : googlePlacesUnavailableMessage(error)}
+        </p>
+      )}
     </div>
   );
 }
