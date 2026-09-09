@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Calendar, Clock, MapPin, Search, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Clock, MapPin, Search } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AddressAutocomplete from "@/components/forms/AddressAutocomplete";
 import Toast from "@/components/ui/Toast";
@@ -381,7 +381,15 @@ function StepButtons({ onPrev, onNext, nextDisabled, nextLoading = false }) {
   );
 }
 
-function StepRecap({ bookingData, categories, onPrev, onConfirm, loading, targetedPro }) {
+function StepRecap({
+  bookingData,
+  categories,
+  onPrev,
+  onConfirm,
+  loading,
+  targetedPro,
+  isEditing,
+}) {
   return (
     <motion.div
       key="step4"
@@ -437,7 +445,13 @@ function StepRecap({ bookingData, categories, onPrev, onConfirm, loading, target
           disabled={loading}
           className="rounded-full bg-gradient-to-r from-rose-600 to-red-600 px-6 py-2 font-semibold text-white transition hover:scale-[1.02] disabled:opacity-60"
         >
-          {loading ? "Sending…" : "Send request"}
+          {loading
+            ? isEditing
+              ? "Saving…"
+              : "Sending…"
+            : isEditing
+              ? "Save changes"
+              : "Send request"}
         </button>
       </div>
     </motion.div>
@@ -458,7 +472,7 @@ function parseEditServices(service, categories) {
     .map((category) => category.code);
 }
 
-export default function DashboardNew({ isModal = false, editBooking = null, onClose, onSuccess }) {
+export default function DashboardNew({ editBooking = null, onSuccess, onBusyChange }) {
   const { session, user, isPro } = useUser();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -504,6 +518,10 @@ export default function DashboardNew({ isModal = false, editBooking = null, onCl
   }));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    onBusyChange?.(isSubmitting || savingAddress);
+  }, [isSubmitting, onBusyChange, savingAddress]);
 
   useEffect(() => {
     if (!targetedProId || searchParams.get("operation") === operationIdRef.current) return;
@@ -723,8 +741,7 @@ export default function DashboardNew({ isModal = false, editBooking = null, onCl
           .select("id")
           .single();
         if (error) throw error;
-        setToast({ message: "Booking updated!", type: "success" });
-        setTimeout(() => onSuccess?.(), 600);
+        onSuccess?.();
         return;
       }
 
@@ -786,11 +803,22 @@ export default function DashboardNew({ isModal = false, editBooking = null, onCl
       }
 
       setToast({ message: "Booking created and sent to nearby professionals!", type: "success" });
-      setTimeout(() => navigate("/dashboard/reservations"), 900);
+      if (onSuccess) onSuccess();
+      else setTimeout(() => navigate("/dashboard/reservations"), 900);
     } catch (error) {
       console.error("handleConfirm error:", error);
+      const editNoLongerPending =
+        editBooking &&
+        (error?.code === "PGRST116" ||
+          /0 rows|no rows|single json object/i.test(error?.message || ""));
       setToast({
-        message: targetedProId ? targetedBookingErrorMessage(error) : error.message,
+        message: editNoLongerPending
+          ? "This reservation can no longer be edited because it is no longer pending."
+          : editBooking
+            ? "Unable to update this reservation. Please try again."
+            : targetedProId
+              ? targetedBookingErrorMessage(error)
+              : error.message || "Unable to create this reservation. Please try again.",
         type: "error",
       });
       setIsSubmitting(false);
@@ -825,24 +853,10 @@ export default function DashboardNew({ isModal = false, editBooking = null, onCl
 
   return (
     <motion.div
-      className={`relative mx-auto w-full max-w-3xl space-y-8 rounded-2xl bg-white p-4 shadow-lg sm:p-8 ${
-        isModal ? "fixed inset-0 z-50 overflow-y-auto" : ""
-      }`}
+      className="relative mx-auto w-full max-w-3xl space-y-8 rounded-2xl bg-white p-4 shadow-lg sm:p-8"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-      {isModal && (
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={isSubmitting}
-          aria-label="Close"
-          className="absolute right-4 top-4 text-gray-500 hover:text-gray-800 disabled:opacity-50"
-        >
-          <X size={22} />
-        </button>
-      )}
-
       <div className="mb-6">
         <div className="mb-2 flex items-center justify-between text-sm text-gray-600">
           <span>Step {step} of 4</span>
@@ -909,6 +923,7 @@ export default function DashboardNew({ isModal = false, editBooking = null, onCl
           onPrev={() => setStep(3)}
           onConfirm={handleConfirm}
           loading={isSubmitting}
+          isEditing={Boolean(editBooking)}
         />
       )}
 
