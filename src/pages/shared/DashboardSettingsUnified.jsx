@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
 import Toast from "@/components/ui/Toast";
+import SavedAddressesSection from "@/components/addresses/SavedAddressesSection";
 
 const LANGS = [
   { value: "en", label: "English" },
@@ -259,6 +260,8 @@ export default function DashboardSettingsUnified() {
           </p>
         </div>
       </div>
+
+      <SavedAddressesSection onMessage={setToast} />
 
       {/* 🧩 Grille : préférences & notifications / visibilité */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

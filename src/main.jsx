@@ -9,15 +9,18 @@ import "./index.css";
 // ✅ Contexts
 import { UserProvider } from "./context/UserContext.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx"; // ← NEW
+import { GoogleMapsProvider } from "./context/GoogleMapsContext.jsx";
 
 function Root() {
   return (
-    <UserProvider>
-      {/* 🔔 Notifications globales accessibles partout (landing + dashboards) */}
-      <NotificationProvider>
-        <App />
-      </NotificationProvider>
-    </UserProvider>
+    <GoogleMapsProvider>
+      <UserProvider>
+        {/* 🔔 Notifications globales accessibles partout (landing + dashboards) */}
+        <NotificationProvider>
+          <App />
+        </NotificationProvider>
+      </UserProvider>
+    </GoogleMapsProvider>
   );
 }
 

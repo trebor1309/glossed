@@ -1,13 +1,10 @@
-import { GoogleMap, Marker, Circle, useLoadScript } from "@react-google-maps/api";
-
-const libraries = ["places"];
+import { GoogleMap, Marker, Circle } from "@react-google-maps/api";
+import { useGoogleMaps } from "@/context/GoogleMapsContext";
 
 export default function ProfileMap({ lat, lng, radius }) {
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries,
-  });
+  const { isLoaded, error } = useGoogleMaps({ request: true });
 
+  if (error) return <p className="text-sm text-gray-500">Map temporarily unavailable.</p>;
   if (!isLoaded) return <p>Loading map...</p>;
 
   return (

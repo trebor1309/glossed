@@ -4,10 +4,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import Toast from "@/components/ui/Toast";
 
-import { GoogleMap, Marker, Circle, useLoadScript, Autocomplete } from "@react-google-maps/api";
+import { GoogleMap, Marker, Circle, Autocomplete } from "@react-google-maps/api";
+import { useGoogleMaps } from "@/context/GoogleMapsContext";
 import { Edit2, Save, MapPin, Globe } from "lucide-react";
-
-const libraries = ["places"];
 
 export default function WorkingArea() {
   const { user } = useUser();
@@ -31,10 +30,7 @@ export default function WorkingArea() {
   /* ------------------------------------------------------------------
      LOAD MAPS SCRIPT
   ------------------------------------------------------------------ */
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries,
-  });
+  const { isLoaded, error: googleMapsError } = useGoogleMaps({ request: true });
 
   /* ------------------------------------------------------------------
      LOAD DATA
@@ -186,7 +182,7 @@ export default function WorkingArea() {
               <MapPin size={16} className="text-rose-600" /> Business Address
             </label>
 
-            {isLoaded && (
+            {isLoaded ? (
               <Autocomplete
                 onLoad={(ref) => (autocompleteRef.current = ref)}
                 onPlaceChanged={handlePlaceChanged}
@@ -197,6 +193,12 @@ export default function WorkingArea() {
                   defaultValue={form.business_address}
                 />
               </Autocomplete>
+            ) : (
+              <p role={googleMapsError ? "alert" : "status"} className="text-sm text-amber-700">
+                {googleMapsError
+                  ? "Address suggestions are temporarily unavailable."
+                  : "Loading address suggestions…"}
+              </p>
             )}
           </div>
           {/* Service Types */}
