@@ -32,6 +32,9 @@ const labels = {
   financial: "Finance", service_dispute_v2: "Litige de prestation", payment_dispute_v2: "Contestation bancaire",
   legal_withdrawal: "Rétractation légale", commercial_client: "Annulation commerciale client",
   provider_cancellation: "Annulation par le prestataire", mutual_cancellation: "Annulation mutuelle",
+  published: "Publié", hidden: "Masqué", removed: "Retiré",
+  resolved_kept: "Traité — avis conservé", resolved_hidden: "Traité — avis masqué",
+  resolved_removed: "Traité — avis retiré", client_to_provider: "Client vers prestataire",
 };
 
 const roleDescriptions = {

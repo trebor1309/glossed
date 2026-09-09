@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
   Activity,
@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquareWarning,
   Settings2,
   SlidersHorizontal,
   ShieldAlert,
@@ -23,6 +24,7 @@ import { useAdminAuth } from "./AdminAuthContext";
 import AdminGlobalSearch from "./AdminGlobalSearch";
 import { adminRoleLabel } from "./adminPresentation";
 import { useAdminI18n } from "./AdminI18nContext";
+import { getAdminReputationModerationCounts } from "./adminOperationsApi";
 
 const navigation = [
   {
@@ -51,6 +53,13 @@ const navigation = [
   },
   { to: "/audit", labelKey: "nav.audit", icon: BookOpenCheck, permission: "audit.read" },
   {
+    to: "/reputation",
+    labelKey: "nav.reputation",
+    icon: MessageSquareWarning,
+    permission: "reputation.read",
+    countKey: "reputation",
+  },
+  {
     to: "/configuration",
     labelKey: "nav.configuration",
     icon: Settings2,
@@ -74,7 +83,26 @@ export default function AdminLayout() {
   const { access, session, hasPermission, logout } = useAdminAuth();
   const { t } = useAdminI18n();
   const [open, setOpen] = useState(false);
+  const [reputationOpenCount, setReputationOpenCount] = useState(null);
   const visibleNavigation = navigation.filter((item) => hasPermission(item.permission));
+
+  const loadReputationCount = useCallback(async () => {
+    if (!hasPermission("reputation.read")) return;
+    try {
+      const counts = await getAdminReputationModerationCounts();
+      setReputationOpenCount(Number(counts?.open || 0));
+    } catch {
+      // The page owns actionable loading errors; a navigation badge is best-effort.
+      setReputationOpenCount(null);
+    }
+  }, [hasPermission]);
+
+  useEffect(() => {
+    loadReputationCount();
+    const refresh = () => loadReputationCount();
+    window.addEventListener("admin:reputation-updated", refresh);
+    return () => window.removeEventListener("admin:reputation-updated", refresh);
+  }, [loadReputationCount]);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -115,7 +143,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
-          {visibleNavigation.map(({ to, labelKey, icon: Icon, end }) => (
+          {visibleNavigation.map(({ to, labelKey, icon: Icon, end, countKey }) => (
             <NavLink
               key={to}
               to={to}
@@ -127,6 +155,14 @@ export default function AdminLayout() {
             >
               <Icon size={18} />
               <span className="flex-1">{t(labelKey)}</span>
+              {countKey === "reputation" && reputationOpenCount > 0 && (
+                <span
+                  aria-label={`${reputationOpenCount} avis signalé${reputationOpenCount === 1 ? "" : "s"} à traiter`}
+                  className="inline-flex min-w-6 items-center justify-center rounded-full bg-rose-100 px-1.5 py-0.5 text-xs font-bold text-rose-800"
+                >
+                  {reputationOpenCount > 99 ? "99+" : reputationOpenCount}
+                </span>
+              )}
               <ChevronRight size={14} />
             </NavLink>
           ))}
