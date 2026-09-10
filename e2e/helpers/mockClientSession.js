@@ -285,7 +285,14 @@ export async function installMockClientSession(page, options = {}) {
       ]);
     }
     if (url.pathname === "/rest/v1/bookings") {
-      return json(options.bookingsResponse || []);
+      const response =
+        typeof options.bookingsResponse === "function"
+          ? await options.bookingsResponse(body, calls, {
+              method: request.method(),
+              search: url.search,
+            })
+          : options.bookingsResponse || [];
+      return json(response?.body ?? response, response?.status || 200);
     }
     if (url.pathname === "/rest/v1/missions") {
       return json(options.missionsResponse || []);

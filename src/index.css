@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Google Places renders its suggestions as a direct child of body. Keep that
+   external overlay interactive while the reservation form is portalled. */
+body.glossed-reservation-modal-open .pac-container {
+  z-index: 10010 !important;
+}
+
 /* Animation déjà présente */
 @keyframes soft-pulse {
   0% {

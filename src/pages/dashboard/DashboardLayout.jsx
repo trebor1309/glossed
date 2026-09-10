@@ -3,12 +3,14 @@ import { useLocation, Outlet } from "react-router-dom";
 import BottomNav from "../../components/navigation/BottomNavClient";
 import Sidebar from "../../components/navigation/SidebarClient";
 import DashboardNew from "@/pages/dashboard/pages/DashboardNew";
+import ReservationFormModal from "@/components/modals/ReservationFormModal";
 
 export default function DashboardLayout() {
   const location = useLocation();
   const [toast, setToast] = useState(null);
 
   const [showNewBookingModal, setShowNewBookingModal] = useState(false);
+  const [newBookingBusy, setNewBookingBusy] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const isMessagesPage = location.pathname.includes("/messages");
 
@@ -20,7 +22,10 @@ export default function DashboardLayout() {
   }, []);
 
   useEffect(() => {
-    const handleOpenModal = () => setShowNewBookingModal(true);
+    const handleOpenModal = () => {
+      setNewBookingBusy(false);
+      setShowNewBookingModal(true);
+    };
     window.addEventListener("open-new-booking-modal", handleOpenModal);
     return () => window.removeEventListener("open-new-booking-modal", handleOpenModal);
   }, []);
@@ -58,11 +63,18 @@ export default function DashboardLayout() {
 
       {/* Modal: NEW BOOKING */}
       {isDesktop && showNewBookingModal && (
-        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
+        <ReservationFormModal
+          title="New reservation"
+          busy={newBookingBusy}
+          onClose={() => {
+            setNewBookingBusy(false);
+            setShowNewBookingModal(false);
+          }}
+        >
           <DashboardNew
-            isModal={true}
-            onClose={() => setShowNewBookingModal(false)}
+            onBusyChange={setNewBookingBusy}
             onSuccess={() => {
+              setNewBookingBusy(false);
               setShowNewBookingModal(false);
               setToast({
                 message: "✅ Booking created successfully!",
@@ -70,7 +82,7 @@ export default function DashboardLayout() {
               });
             }}
           />
-        </div>
+        </ReservationFormModal>
       )}
 
       {/* Toast */}

@@ -8,6 +8,7 @@ import { Clock, Bell, CheckCircle, Star, XCircle, Trash2, Edit3, Eye } from "luc
 import ClientOffersModal from "@/components/modals/ClientOffersModal";
 import ClientReservationDetailsModal from "@/components/modals/ClientReservationDetailsModal";
 import ProEvaluationModal from "@/components/modals/ProEvaluationModal";
+import ReservationFormModal from "@/components/modals/ReservationFormModal";
 import {
   fetchMyMissionLifecyclesV2,
   formatMissionLifecycleState,
@@ -53,6 +54,7 @@ export default function DashboardReservations() {
 
   const [showOffersModal, setShowOffersModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editBusy, setEditBusy] = useState(false);
 
   const [toast, setToast] = useState(null);
 
@@ -327,6 +329,7 @@ export default function DashboardReservations() {
         onDelete={handleDelete}
         onEdit={(b) => {
           setSelectedBooking(b);
+          setEditBusy(false);
           setShowEditModal(true);
         }}
       />
@@ -386,16 +389,25 @@ export default function DashboardReservations() {
       </AnimatePresence>
 
       {showEditModal && selectedBooking && (
-        <DashboardNew
-          isModal={true}
-          editBooking={selectedBooking}
-          onClose={() => setShowEditModal(false)}
-          onSuccess={() => {
+        <ReservationFormModal
+          title="Modifier la réservation"
+          busy={editBusy}
+          onClose={() => {
+            setEditBusy(false);
             setShowEditModal(false);
-            fetchBookings();
-            setToast({ message: "Booking updated!", type: "success" });
           }}
-        />
+        >
+          <DashboardNew
+            editBooking={selectedBooking}
+            onBusyChange={setEditBusy}
+            onSuccess={() => {
+              setEditBusy(false);
+              setShowEditModal(false);
+              fetchBookings();
+              setToast({ message: "Booking updated!", type: "success" });
+            }}
+          />
+        </ReservationFormModal>
       )}
 
       {selectedConfirmedBooking && (
@@ -520,6 +532,7 @@ function ReservationSection({
                     {actions.edit && (
                       <button
                         onClick={() => onEdit?.(b)}
+                        aria-label={`Edit ${b.service} reservation`}
                         className="p-2 rounded-full hover:bg-gray-100"
                       >
                         <Edit3 size={16} />
