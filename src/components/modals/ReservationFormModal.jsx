@@ -11,6 +11,12 @@ const FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
+const RESERVATION_MODAL_BODY_CLASS = "glossed-reservation-modal-open";
+
+function isGooglePlacesOverlay(target) {
+  return target instanceof Element && Boolean(target.closest(".pac-container"));
+}
+
 export default function ReservationFormModal({ children, title, busy = false, onClose }) {
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -25,10 +31,12 @@ export default function ReservationFormModal({ children, title, busy = false, on
     returnFocusRef.current = document.activeElement;
     const appRoot = document.getElementById("root");
     const previousOverflow = document.body.style.overflow;
+    const bodyHadModalClass = document.body.classList.contains(RESERVATION_MODAL_BODY_CLASS);
     const rootWasInert = appRoot?.hasAttribute("inert") || false;
     const previousAriaHidden = appRoot?.getAttribute("aria-hidden");
 
     document.body.style.overflow = "hidden";
+    document.body.classList.add(RESERVATION_MODAL_BODY_CLASS);
     appRoot?.setAttribute("inert", "");
     appRoot?.setAttribute("aria-hidden", "true");
 
@@ -71,7 +79,9 @@ export default function ReservationFormModal({ children, title, busy = false, on
     };
 
     const handleFocusIn = (event) => {
-      if (!dialogRef.current?.contains(event.target)) focusInsideDialog();
+      if (!dialogRef.current?.contains(event.target) && !isGooglePlacesOverlay(event.target)) {
+        focusInsideDialog();
+      }
     };
 
     document.addEventListener("keydown", handleKeyDown);
@@ -81,6 +91,7 @@ export default function ReservationFormModal({ children, title, busy = false, on
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("focusin", handleFocusIn);
       document.body.style.overflow = previousOverflow;
+      if (!bodyHadModalClass) document.body.classList.remove(RESERVATION_MODAL_BODY_CLASS);
       if (!rootWasInert) appRoot?.removeAttribute("inert");
       if (previousAriaHidden === null) appRoot?.removeAttribute("aria-hidden");
       else appRoot?.setAttribute("aria-hidden", previousAriaHidden);
