@@ -134,6 +134,8 @@ end
 $$;
 
 reset role;
+delete from public.users
+where id = '99000000-0000-0000-0000-000000000010';
 delete from auth.users
 where id = '99000000-0000-0000-0000-000000000010';
 
