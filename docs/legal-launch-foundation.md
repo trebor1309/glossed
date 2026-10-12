@@ -38,11 +38,19 @@ onboarding starts.
 
 ## Operator configuration required before launch
 
-The repository does not contain the operator's verified identity. Production
-must define all `VITE_LEGAL_*` variables documented in `.env.example`, including
-the legal entity, legal form, registered office, BCE/KBO number, VAT status,
-telephone and a working support address. The Legal Notice visibly fails closed
-with a launch-blocker warning while mandatory fields are absent.
+The initial operator is Robert Heinen, acting as an individual business under
+the EWCS trade name. Glossed is the service/trade name presented to marketplace
+users. The registered office, BCE/KBO and VAT numbers, telephone and contact
+address are configured as public defaults and documented in `.env.example`.
+Production may override them with the corresponding `VITE_LEGAL_*` variables.
+If any operator variable is overridden, all mandatory operator variables must be
+provided so that a partial migration cannot silently combine two identities.
+
+If a separate Glossed company later becomes the operator, update every operator
+variable together, complete a legal and payment-account migration review, and
+publish new contract/privacy versions where the change is material. Do not use
+the future company's identity before it has been incorporated and has actually
+assumed the platform contracts, data-controller role and payment operations.
 
 The following also require an operator/legal decision before commercial launch:
 
@@ -53,7 +61,7 @@ The following also require an operator/legal decision before commercial launch:
    publish the complaint statistics and two mediators required by that regime;
 4. execute and archive the processor/subprocessor contracts and international
    transfer assessment;
-5. verify that `support@glossed.app` is live as part of PR #49;
+5. configure and verify the dedicated support addresses as part of PR #49;
 6. obtain a final legal review of the English launch copy and add French/Dutch
    versions appropriate to the actual target market.
 

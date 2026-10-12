@@ -3,7 +3,14 @@ import { legalOperator, missingLegalOperatorFields } from "@/legal/legalConfig";
 
 function OperatorCard({ showConfigurationWarning = false }) {
   const rows = [
-    ["Operator", [legalOperator.legalName, legalOperator.legalForm].filter(Boolean).join(" ")],
+    ["Service", legalOperator.tradeName],
+    [
+      "Legal operator",
+      [legalOperator.legalName, legalOperator.legalForm].filter(Boolean).join(" — "),
+    ],
+    ...(legalOperator.operatorTradeName
+      ? [["Operator trade name", legalOperator.operatorTradeName]]
+      : []),
     ["Registered office", legalOperator.registeredOffice],
     ["BCE/KBO", legalOperator.enterpriseNumber],
     ["VAT", legalOperator.vatNumber],
