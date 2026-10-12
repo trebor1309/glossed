@@ -131,4 +131,18 @@ begin
 end
 $$;
 
+reset role;
+delete from auth.users
+where id = '99000000-0000-0000-0000-000000000010';
+
+do $$
+begin
+  if (select count(*) from public.user_legal_acceptances
+      where subject_id = '99000000-0000-0000-0000-000000000010'
+        and user_id is null) <> 2 then
+    raise exception 'Account deletion did not preserve de-linked legal evidence';
+  end if;
+end
+$$;
+
 rollback;

@@ -487,6 +487,15 @@ language plpgsql
 set search_path = public, pg_temp
 as $$
 begin
+  -- Account deletion removes only the live auth link. The immutable subject id
+  -- and every contractual evidence field remain intact for legal retention.
+  if tg_table_name = 'user_legal_acceptances' and tg_op = 'UPDATE' then
+    if old.user_id is not null
+       and new.user_id is null
+       and (to_jsonb(new) - 'user_id') = (to_jsonb(old) - 'user_id') then
+      return new;
+    end if;
+  end if;
   raise exception 'Legal acceptance evidence is append-only' using errcode = '55000';
 end
 $$;
