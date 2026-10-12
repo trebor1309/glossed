@@ -85,6 +85,8 @@ select public.record_my_legal_acceptances(
   'onboarding', null, 'en', '99000000-0000-0000-0000-000000000099'
 );
 
+reset role;
+
 do $$
 begin
   if (select count(*) from public.user_legal_acceptances
