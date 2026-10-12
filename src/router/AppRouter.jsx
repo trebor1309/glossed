@@ -17,6 +17,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import ProRoute from "./ProRoute";
 import PublicOnlyRoute from "./PublicOnlyRoute";
 import OnboardingGuard from "./OnboardingGuard";
+import LegalAcceptanceGuard from "./LegalAcceptanceGuard";
 
 const Home = lazy(() => import("@/pages/Home"));
 const About = lazy(() => import("@/pages/About"));
@@ -24,6 +25,7 @@ const Services = lazy(() => import("@/pages/Services"));
 const Legal = lazy(() => import("@/pages/Legal"));
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const Terms = lazy(() => import("@/pages/Terms"));
+const ProfessionalTerms = lazy(() => import("@/pages/ProfessionalTerms"));
 const FAQ = lazy(() => import("@/pages/FAQ"));
 const AboutUs = lazy(() => import("@/pages/AboutUs"));
 const Careers = lazy(() => import("@/pages/Careers"));
@@ -37,6 +39,7 @@ const UserPublicProfile = lazy(() => import("@/pages/public-profile/UserPublicPr
 const CheckEmail = lazy(() => import("@/pages/auth/CheckEmail"));
 const EmailVerified = lazy(() => import("@/pages/auth/EmailVerified"));
 const OnboardingPage = lazy(() => import("@/pages/auth/OnboardingPage"));
+const LegalAcceptance = lazy(() => import("@/pages/auth/LegalAcceptance"));
 
 const DashboardLayout = lazy(() => import("@/pages/dashboard/DashboardLayout"));
 const DashboardHome = lazy(() => import("@/pages/dashboard/pages/DashboardHome"));
@@ -98,6 +101,7 @@ export default function AppRouter({ onOpenLogin, onOpenSignup, onOpenDownload })
         <Route path="/legal" element={<Legal />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/terms/professionals" element={<ProfessionalTerms />} />
         <Route path="/faq" element={<FAQ />} />
         <Route path="/about-us" element={<AboutUs />} />
         <Route path="/careers" element={<Careers />} />
@@ -122,14 +126,25 @@ export default function AppRouter({ onOpenLogin, onOpenSignup, onOpenDownload })
 
         <Route path="/auth/email-verified" element={<EmailVerified />} />
 
+        <Route
+          path="/legal/accept"
+          element={
+            <ProtectedRoute>
+              <LegalAcceptance />
+            </ProtectedRoute>
+          }
+        />
+
         {/* 🧭 Onboarding */}
         <Route
           path="/onboarding"
           element={
             <ProtectedRoute>
-              <OnboardingGuard>
-                <OnboardingPage />
-              </OnboardingGuard>
+              <LegalAcceptanceGuard>
+                <OnboardingGuard>
+                  <OnboardingPage />
+                </OnboardingGuard>
+              </LegalAcceptanceGuard>
             </ProtectedRoute>
           }
         />
@@ -139,9 +154,11 @@ export default function AppRouter({ onOpenLogin, onOpenSignup, onOpenDownload })
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <OnboardingGuard>
-                <DashboardLayout />
-              </OnboardingGuard>
+              <LegalAcceptanceGuard>
+                <OnboardingGuard>
+                  <DashboardLayout />
+                </OnboardingGuard>
+              </LegalAcceptanceGuard>
             </ProtectedRoute>
           }
         >
@@ -168,11 +185,13 @@ export default function AppRouter({ onOpenLogin, onOpenSignup, onOpenDownload })
           path="/prodashboard"
           element={
             <ProtectedRoute>
-              <ProRoute>
-                <OnboardingGuard>
-                  <ProDashboardLayout />
-                </OnboardingGuard>
-              </ProRoute>
+              <LegalAcceptanceGuard>
+                <ProRoute>
+                  <OnboardingGuard>
+                    <ProDashboardLayout />
+                  </OnboardingGuard>
+                </ProRoute>
+              </LegalAcceptanceGuard>
             </ProtectedRoute>
           }
         >

@@ -8,6 +8,7 @@ const publicRoutes = [
   "/legal",
   "/privacy",
   "/terms",
+  "/terms/professionals",
   "/faq",
   "/about-us",
   "/careers",
@@ -67,6 +68,9 @@ test("opens the sign-up dialog from the account CTA", async ({ page }) => {
   await page.getByRole("button", { name: "Create your account" }).click();
 
   await expect(page.getByRole("heading", { level: 2, name: "Create your account" })).toBeVisible();
+  await expect(page.getByRole("checkbox")).toHaveCount(2);
+  await expect(page.getByRole("link", { name: "Terms of Use and Booking" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Privacy Notice" })).toBeVisible();
 });
 
 test("opens the download dialog from the app CTA", async ({ page }) => {

@@ -94,6 +94,12 @@ export default function Footer() {
             <a href="/terms" className="hover:text-rose-400 transition-colors duration-300">
               Terms of Service
             </a>
+            <a
+              href="/terms/professionals"
+              className="hover:text-rose-400 transition-colors duration-300"
+            >
+              Professional Terms
+            </a>
           </div>
         </div>
       </div>

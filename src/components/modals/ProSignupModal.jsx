@@ -2,6 +2,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
+import SignupLegalFields from "@/components/legal/SignupLegalFields";
 
 export default function ProSignupModal({ onClose, onClientSignup }) {
   const { signup } = useUser();
@@ -14,12 +15,17 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
     const businessName = e.target.businessName.value.trim();
     const email = e.target.email.value.trim();
     const password = e.target.password.value.trim();
+    const legalAccepted =
+      e.currentTarget.elements.acceptClientTerms.checked &&
+      e.currentTarget.elements.acceptProviderTerms.checked &&
+      e.currentTarget.elements.acknowledgePrivacy.checked;
 
     try {
       const { session } = await signup(email, password, {
         role: "pro",
         username,
         businessName,
+        legalAccepted,
       });
 
       onClose();
@@ -96,6 +102,8 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
                 placeholder="••••••••"
               />
             </div>
+
+            <SignupLegalFields professional />
 
             <button
               type="submit"

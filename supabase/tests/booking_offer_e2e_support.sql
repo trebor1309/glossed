@@ -16,7 +16,7 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('60000000-0000-0000-0000-000000000010', 'e2e-support-client@example.test',
    '{"requested_role":"client"}'::jsonb),
   ('60000000-0000-0000-0000-000000000020', 'e2e-support-pro@example.test',
-   '{"requested_role":"pro","business_name":"E2E Support Pro"}'::jsonb),
+   '{"requested_role":"pro","business_name":"E2E Support Pro","legal_acceptances":{"privacy_notice":"2026-10-12","client_terms":"2026-10-12","provider_terms":"2026-10-12"},"legal_acceptance_context":"signup","legal_acceptance_locale":"en","legal_acceptance_surface":"web_signup"}'::jsonb),
   ('60000000-0000-0000-0000-000000000030', 'e2e-support-admin@example.test',
    '{"requested_role":"client"}'::jsonb),
   ('60000000-0000-0000-0000-000000000040', 'e2e-support-outsider@example.test',

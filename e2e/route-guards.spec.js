@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { isolateFromRemoteServices } from "./helpers/safeNetwork.js";
 
 const protectedRoutes = [
+  "/legal/accept",
   "/onboarding",
   "/dashboard",
   "/dashboard/payments",

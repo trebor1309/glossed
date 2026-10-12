@@ -8,6 +8,12 @@ Deno.serve(async (req) => {
 
   try {
     const authUser = await requireUser(req);
+    const { error: legalError } = await admin.rpc("assert_user_current_legal_acceptances", {
+      p_user_id: authUser.id,
+      p_document_codes: ["privacy_notice", "client_terms", "provider_terms"],
+    });
+    if (legalError) throw legalError;
+
     const { data: account, error } = await admin
       .from("provider_connect_accounts")
       .select("stripe_account_id, closed")

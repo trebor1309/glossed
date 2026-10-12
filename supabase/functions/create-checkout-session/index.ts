@@ -5,13 +5,27 @@ import { admin, requireUser } from "../_shared/supabase.ts";
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2023-10-16" });
 const appUrl = (Deno.env.get("APP_URL") ?? "https://glossed.vercel.app").replace(/\/$/, "");
 
+function startsDuringWithdrawalPeriod(serviceDate: string) {
+  const start = new Date(`${serviceDate.slice(0, 10)}T00:00:00Z`);
+  const deadline = new Date();
+  deadline.setUTCDate(deadline.getUTCDate() + 14);
+  return !Number.isNaN(start.getTime()) && start < deadline;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return handleOptions(req);
   if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
 
   try {
     const authUser = await requireUser(req);
-    const { mission_id: missionId } = await req.json();
+    const { error: acceptanceError } = await admin.rpc("assert_user_current_legal_acceptances", {
+      p_user_id: authUser.id,
+      p_document_codes: ["privacy_notice", "client_terms"],
+    });
+    if (acceptanceError) throw acceptanceError;
+
+    const { mission_id: missionId, early_performance_requested: earlyPerformanceRequested } =
+      await req.json();
     if (!missionId) throw new HttpError(400, "Missing mission_id");
 
     const { data: attempts, error: reservationError } = await admin.rpc(
@@ -21,13 +35,9 @@ Deno.serve(async (req) => {
     if (reservationError) throw reservationError;
     const attempt = attempts?.[0];
     if (!attempt) throw new Error("Checkout reservation failed");
-    if (attempt.attempt_status === "open" && attempt.stripe_session_url) {
-      return json(req, { url: attempt.stripe_session_url });
-    }
-
     const { data: mission, error: missionError } = await admin
       .from("missions")
-      .select("id, service, description, price, client_id, pro_id, status")
+      .select("id, service, description, price, client_id, pro_id, status, date, time")
       .eq("id", missionId)
       .maybeSingle();
     if (missionError) throw missionError;
@@ -35,6 +45,29 @@ Deno.serve(async (req) => {
     if (mission.client_id !== authUser.id)
       throw new HttpError(403, "You cannot pay for this mission");
     if (mission.status !== "proposed") throw new HttpError(409, "Mission is not payable");
+    const needsEarlyPerformanceRequest = startsDuringWithdrawalPeriod(mission.date);
+    if (needsEarlyPerformanceRequest && earlyPerformanceRequested !== true) {
+      throw new HttpError(422, "Expressly request early performance before starting payment");
+    }
+
+    const { data: legalVersions, error: legalError } = await admin.rpc(
+      "snapshot_user_legal_acceptances",
+      {
+        p_user_id: authUser.id,
+        p_document_codes: ["privacy_notice", "client_terms"],
+        p_transaction_type: "legacy_checkout",
+        p_transaction_id: attempt.attempt_id,
+        p_evidence: {
+          mission_id: mission.id,
+          scheduled_date: mission.date,
+          early_performance_requested: needsEarlyPerformanceRequest,
+        },
+      }
+    );
+    if (legalError) throw legalError;
+    if (attempt.attempt_status === "open" && attempt.stripe_session_url) {
+      return json(req, { url: attempt.stripe_session_url });
+    }
 
     const { data: pro, error: proError } = await admin
       .from("users")
@@ -56,11 +89,13 @@ Deno.serve(async (req) => {
       client_id: authUser.id,
       pro_id: mission.pro_id,
       fee_cents: String(glossedFeeCents),
+      client_terms_version: String(legalVersions?.client_terms ?? "unknown"),
+      privacy_notice_version: String(legalVersions?.privacy_notice ?? "unknown"),
+      early_performance_requested: String(needsEarlyPerformanceRequest),
     };
 
     const session = await stripe.checkout.sessions.create(
       {
-        payment_method_types: ["card"],
         mode: "payment",
         client_reference_id: authUser.id,
         expires_at: Math.floor(new Date(attempt.expires_at).getTime() / 1000),

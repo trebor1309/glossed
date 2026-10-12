@@ -2,6 +2,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { recordMyLegalAcceptances } from "@/lib/legal";
+import { legalDocuments } from "@/legal/legalDocuments";
 
 export default function UpgradeToProModal({ onClose }) {
   const { user, fetchUserProfile } = useUser();
@@ -10,6 +12,7 @@ export default function UpgradeToProModal({ onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [providerTermsAccepted, setProviderTermsAccepted] = useState(false);
 
   const handleUpgrade = async (e) => {
     e.preventDefault();
@@ -22,7 +25,24 @@ export default function UpgradeToProModal({ onClose }) {
       return;
     }
 
+    if (!providerTermsAccepted) {
+      setError("Please accept the Professional Terms.");
+      setLoading(false);
+      return;
+    }
+
     try {
+      await recordMyLegalAcceptances({
+        documents: [
+          {
+            code: legalDocuments.provider_terms.code,
+            version: legalDocuments.provider_terms.version,
+          },
+        ],
+        context: "upgrade",
+        intendedRole: "pro",
+      });
+
       // ---------------------------------------------------
       // Mise à jour du rôle PRO + changement immédiat de dashboard
       // ---------------------------------------------------
@@ -97,6 +117,27 @@ export default function UpgradeToProModal({ onClose }) {
                     placeholder="Your Salon • Your Brand"
                   />
                 </div>
+
+                <label className="flex gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm leading-5 text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={providerTermsAccepted}
+                    onChange={(event) => setProviderTermsAccepted(event.target.checked)}
+                    className="mt-1 accent-rose-600"
+                  />
+                  <span>
+                    I accept the{" "}
+                    <a
+                      href="/terms/professionals"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-rose-700 underline"
+                    >
+                      Professional Terms
+                    </a>
+                    .
+                  </span>
+                </label>
 
                 {error && <p className="text-sm text-red-600 text-center">{error}</p>}
 
