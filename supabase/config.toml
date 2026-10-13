@@ -18,3 +18,9 @@ verify_jwt = true
 # Internal worker: the gateway verifies the JWT, then the handler requires the
 # service_role claim.
 verify_jwt = true
+
+[functions.submit-contact-request]
+# The public contact form is available before authentication. The handler
+# validates the origin and payload, rate-limits submissions and writes only
+# through service-role-only database functions.
+verify_jwt = false
