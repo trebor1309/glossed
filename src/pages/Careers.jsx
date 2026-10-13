@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Briefcase, HeartHandshake } from "lucide-react";
+import { legalOperator } from "@/legal/legalConfig";
 
 export default function Careers() {
   return (
@@ -42,10 +43,10 @@ export default function Careers() {
           <p className="text-gray-700 leading-relaxed mb-4">
             Send us a spontaneous application at{" "}
             <a
-              href="mailto:jobs@glossed.app"
+              href={`mailto:${legalOperator.contactEmail}?subject=Glossed%20spontaneous%20application`}
               className="text-rose-600 font-medium underline hover:text-rose-700"
             >
-              jobs@glossed.app
+              {legalOperator.contactEmail}
             </a>{" "}
             — we carefully review each message and keep profiles that fit our upcoming needs.
           </p>

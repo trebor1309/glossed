@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Newspaper, FileDown, Mail, Globe } from "lucide-react";
+import { legalOperator } from "@/legal/legalConfig";
 
 export default function Press() {
   return (
@@ -101,11 +102,11 @@ export default function Press() {
         </p>
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
           <a
-            href="mailto:press@glossed.app"
+            href={`mailto:${legalOperator.contactEmail}?subject=Glossed%20press%20inquiry`}
             className="inline-flex items-center gap-2 bg-gradient-to-r from-rose-600 to-red-600 text-white px-5 py-2.5 rounded-full font-medium hover:scale-105 transition"
           >
             <Mail size={18} />
-            press@glossed.app
+            {legalOperator.contactEmail}
           </a>
           <a
             href="/about"
