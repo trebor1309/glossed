@@ -10,6 +10,9 @@ function GoogleMapsLoader({ apiKey, onStatus }) {
     id: GOOGLE_MAPS_SCRIPT_ID,
     googleMapsApiKey: apiKey,
     libraries: GOOGLE_MAPS_LIBRARIES,
+    version: "weekly",
+    region: "BE",
+    authReferrerPolicy: "origin",
   });
 
   useEffect(() => {
@@ -23,7 +26,7 @@ export function GoogleMapsProvider({ children }) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || "";
   const [requested, setRequested] = useState(false);
   const [status, setStatus] = useState(() => ({
-    isLoaded: Boolean(window.google?.maps?.places?.Autocomplete),
+    isLoaded: Boolean(window.google?.maps?.places?.PlaceAutocompleteElement),
     error: null,
   }));
 
@@ -88,7 +91,10 @@ export function useGoogleMaps({ request = false } = {}) {
   return context;
 }
 
-export function googlePlacesUnavailableMessage(error) {
+export function googlePlacesUnavailableMessage(error, { allowManualEntry = false } = {}) {
   if (!error) return "Address suggestions are loading…";
+  if (allowManualEntry) {
+    return "Address suggestions are temporarily unavailable. Enter the address manually.";
+  }
   return "Address suggestions are temporarily unavailable. You can still use a saved address.";
 }

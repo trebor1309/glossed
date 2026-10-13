@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { installMockClientSession } from "./helpers/mockClientSession.js";
+import { installGooglePlacesMock } from "./helpers/googlePlacesMock.js";
 
 const clientId = "40000000-0000-4000-8000-000000000010";
 const home = {
@@ -59,67 +60,6 @@ async function installReservationMocks(page, options = {}) {
     },
   });
   return { ...result, booking, getPatchCount: () => patchCount };
-}
-
-async function installGooglePlacesOverlayMock(page) {
-  await page.addInitScript(() => {
-    class MockAutocomplete {
-      constructor(input) {
-        this.input = input;
-        this.listeners = {};
-        this.container = document.createElement("div");
-        this.container.className = "pac-container";
-        this.container.setAttribute("data-testid", "google-places-suggestions");
-        Object.assign(this.container.style, {
-          position: "fixed",
-          top: "1rem",
-          left: "1rem",
-          width: "24rem",
-          zIndex: "1000",
-        });
-
-        const suggestion = document.createElement("button");
-        suggestion.type = "button";
-        suggestion.textContent = "10 Rue du Test, 1000 Bruxelles, Belgium";
-        suggestion.addEventListener("click", () => {
-          window.__glossedPlace = {
-            formatted_address: "10 Rue du Test, 1000 Bruxelles, Belgium",
-            address_components: [
-              { long_name: "Bruxelles", short_name: "Bruxelles", types: ["locality"] },
-              { long_name: "1000", short_name: "1000", types: ["postal_code"] },
-              { long_name: "Belgium", short_name: "BE", types: ["country"] },
-            ],
-            geometry: {
-              location: { lat: () => 50.851, lng: () => 4.353 },
-            },
-          };
-          this.listeners.place_changed?.();
-        });
-        this.container.appendChild(suggestion);
-        document.body.appendChild(this.container);
-      }
-
-      addListener(name, callback) {
-        this.listeners[name] = callback;
-        return { remove() {} };
-      }
-
-      getPlace() {
-        return window.__glossedPlace;
-      }
-    }
-
-    window.google = {
-      maps: {
-        places: { Autocomplete: MockAutocomplete },
-        event: {
-          clearInstanceListeners(autocomplete) {
-            autocomplete.container?.remove();
-          },
-        },
-      },
-    };
-  });
 }
 
 async function openEditModal(page) {
@@ -199,10 +139,8 @@ test("preserves custom snapshots and can switch to another saved address", async
   await expect(dialog).toHaveCount(0);
 });
 
-test("keeps Google Places suggestions above and interactive only while the modal is open", async ({
-  page,
-}) => {
-  await installGooglePlacesOverlayMock(page);
+test("keeps the Google Places widget interactive inside the modal", async ({ page }) => {
+  await installGooglePlacesMock(page, { withSuggestion: true });
   await installReservationMocks(page);
   const { dialog } = await openEditModal(page);
   await reachAddressStep(dialog);
@@ -212,16 +150,6 @@ test("keeps Google Places suggestions above and interactive only while the modal
   await input.fill("Rue du Test");
   const suggestions = page.getByTestId("google-places-suggestions");
   await expect(suggestions).toBeVisible();
-  await expect(page.locator("body")).toHaveClass(/glossed-reservation-modal-open/);
-
-  const stacking = await page.evaluate(() => ({
-    backdrop: Number.parseInt(
-      getComputedStyle(document.querySelector("[data-testid='reservation-modal-backdrop']")).zIndex,
-      10
-    ),
-    places: Number.parseInt(getComputedStyle(document.querySelector(".pac-container")).zIndex, 10),
-  }));
-  expect(stacking.places).toBeGreaterThan(stacking.backdrop);
 
   const suggestion = suggestions.getByRole("button", {
     name: "10 Rue du Test, 1000 Bruxelles, Belgium",
@@ -233,18 +161,7 @@ test("keeps Google Places suggestions above and interactive only while the modal
   await expect(dialog.getByRole("button", { name: "Next" })).toBeEnabled();
 
   await dialog.getByRole("button", { name: "Fermer" }).click();
-  await expect(page.locator("body")).not.toHaveClass(/glossed-reservation-modal-open/);
-
-  await page.evaluate(() => {
-    const outsideContainer = document.createElement("div");
-    outsideContainer.className = "pac-container";
-    outsideContainer.dataset.testid = "outside-google-places-suggestions";
-    document.body.appendChild(outsideContainer);
-  });
-  const outsideZIndex = await page
-    .getByTestId("outside-google-places-suggestions")
-    .evaluate((element) => getComputedStyle(element).zIndex);
-  expect(outsideZIndex).not.toBe("10010");
+  await expect(suggestions).toHaveCount(0);
 });
 
 test("closes on authoritative update success and refreshes the dashboard", async ({ page }) => {

@@ -24,6 +24,10 @@ npm run dev
 
 Renseigner au minimum `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` et `VITE_GOOGLE_MAPS_API_KEY` dans `.env.local`.
 
+La configuration des domaines Vercel, de Maps JavaScript API et de Places API
+(New) pour le lancement est détaillée dans
+[`docs/production-web-configuration.md`](docs/production-web-configuration.md).
+
 Commandes utiles :
 
 ```powershell

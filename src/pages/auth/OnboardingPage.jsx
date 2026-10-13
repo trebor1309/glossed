@@ -5,15 +5,13 @@ import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MapPin, Upload, User, Building2, Phone, Mail } from "lucide-react";
-import { useGoogleMaps } from "@/context/GoogleMapsContext";
+import AddressAutocomplete from "@/components/forms/AddressAutocomplete";
 import { recordMyLegalAcceptances } from "@/lib/legal";
 import { legalDocuments } from "@/legal/legalDocuments";
 
 export default function OnboardingPage() {
   const { user, fetchUserProfile } = useUser();
   const navigate = useNavigate();
-
-  const { isLoaded, error: loadError } = useGoogleMaps({ request: true });
 
   // 🧠 Rôle réel en base
   const forcedRole = user?.role === "pro" ? "pro" : null;
@@ -45,60 +43,6 @@ export default function OnboardingPage() {
   const [providerTermsAccepted, setProviderTermsAccepted] = useState(false);
 
   const isProFlow = forcedRole === "pro" || roleChoice === "pro";
-
-  /* --------------------------------------------------------
-     Google Places Autocomplete (privé + business)
-  -------------------------------------------------------- */
-  useEffect(() => {
-    if (!isLoaded) return;
-    if (!window.google?.maps?.places) return;
-
-    const attachAutocomplete = (inputId, onPlaceSelected) => {
-      const input = document.getElementById(inputId);
-      if (!input) return;
-      if (input.dataset.autocompleteAttached) return;
-
-      input.dataset.autocompleteAttached = "true";
-
-      const autocomplete = new window.google.maps.places.Autocomplete(input, {
-        types: ["address"],
-        componentRestrictions: { country: "be" },
-        fields: ["formatted_address", "geometry"],
-      });
-
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (!place.geometry) return;
-
-        const formatted = place.formatted_address;
-        const location = place.geometry.location;
-
-        onPlaceSelected({
-          formatted,
-          lat: location.lat(),
-          lng: location.lng(),
-        });
-      });
-    };
-
-    // Adresse privée
-    attachAutocomplete("autocomplete-address", ({ formatted, lat, lng }) => {
-      setAddress(formatted);
-      setLat(lat);
-      setLng(lng);
-
-      if (businessSameAsPrivate) {
-        setBusinessAddress(formatted);
-      }
-    });
-
-    // Adresse business (uniquement si elle est différente)
-    if (!businessSameAsPrivate) {
-      attachAutocomplete("autocomplete-business-address", ({ formatted }) => {
-        setBusinessAddress(formatted);
-      });
-    }
-  }, [isLoaded, businessSameAsPrivate]);
 
   // 🔄 Sync businessAddress si "Same as private" est coché
   useEffect(() => {
@@ -226,25 +170,6 @@ export default function OnboardingPage() {
   };
 
   /* --------------------------------------------------------
-     UI: états de chargement Google
-  -------------------------------------------------------- */
-  if (loadError) {
-    return (
-      <div className="max-w-3xl mx-auto py-12 px-6 text-center text-red-600">
-        Error loading Google Maps. Please refresh the page.
-      </div>
-    );
-  }
-
-  if (!isLoaded) {
-    return (
-      <div className="max-w-3xl mx-auto py-12 px-6 text-center text-gray-500">
-        Loading location tools…
-      </div>
-    );
-  }
-
-  /* --------------------------------------------------------
      RENDER
   -------------------------------------------------------- */
   return (
@@ -328,16 +253,28 @@ export default function OnboardingPage() {
 
         {/* Adresse privée */}
         <div className="mb-6">
-          <label className="font-medium flex items-center gap-2">
-            <MapPin size={18} /> Private address
-          </label>
-          <input
-            id="autocomplete-address"
-            type="text"
-            value={address}
+          <AddressAutocomplete
+            inputId="autocomplete-address"
+            label={
+              <span className="flex items-center gap-2">
+                <MapPin size={18} /> Private address
+              </span>
+            }
             placeholder="Enter your private address"
-            onChange={(e) => setAddress(e.target.value)}
-            className="w-full mt-2 px-4 py-2 border rounded-lg"
+            defaultValue={address}
+            required
+            allowManualEntry
+            onInputChange={(nextAddress) => {
+              setAddress(nextAddress);
+              setLat(null);
+              setLng(null);
+            }}
+            onSelect={(place) => {
+              setAddress(place.address);
+              setLat(place.latitude);
+              setLng(place.longitude);
+              if (businessSameAsPrivate) setBusinessAddress(place.address);
+            }}
           />
         </div>
 
@@ -371,17 +308,16 @@ export default function OnboardingPage() {
             </div>
 
             <div>
-              <label className="font-medium">Business address</label>
-              <input
-                id="autocomplete-business-address"
-                type="text"
-                value={businessAddress}
+              <AddressAutocomplete
+                inputId="autocomplete-business-address"
+                label="Business address"
                 placeholder="Enter your business address"
-                onChange={(e) => setBusinessAddress(e.target.value)}
+                defaultValue={businessAddress}
+                required
+                allowManualEntry
                 disabled={businessSameAsPrivate}
-                className={`w-full mt-2 px-4 py-2 border rounded-lg ${
-                  businessSameAsPrivate ? "bg-gray-100 cursor-not-allowed" : ""
-                }`}
+                onInputChange={setBusinessAddress}
+                onSelect={(place) => setBusinessAddress(place.address)}
               />
             </div>
 

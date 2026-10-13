@@ -1,10 +1,11 @@
 // 📄 src/pages/prodashboard/pages/settings/WorkingArea.jsx
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import Toast from "@/components/ui/Toast";
+import AddressAutocomplete from "@/components/forms/AddressAutocomplete";
 
-import { GoogleMap, Marker, Circle, Autocomplete } from "@react-google-maps/api";
+import { GoogleMap, Marker, Circle } from "@react-google-maps/api";
 import { useGoogleMaps } from "@/context/GoogleMapsContext";
 import { Edit2, Save, MapPin, Globe } from "lucide-react";
 
@@ -25,12 +26,10 @@ export default function WorkingArea() {
     private_service: false,
   });
 
-  const autocompleteRef = useRef(null);
-
   /* ------------------------------------------------------------------
      LOAD MAPS SCRIPT
   ------------------------------------------------------------------ */
-  const { isLoaded, error: googleMapsError } = useGoogleMaps({ request: true });
+  const { isLoaded } = useGoogleMaps({ request: true });
 
   /* ------------------------------------------------------------------
      LOAD DATA
@@ -64,27 +63,18 @@ export default function WorkingArea() {
   }, [user?.id]);
 
   /* ------------------------------------------------------------------
-     AUTOCOMPLETE
-  ------------------------------------------------------------------ */
-  const handlePlaceChanged = () => {
-    const place = autocompleteRef.current.getPlace();
-    if (!place || !place.geometry) return;
-
-    const lat = place.geometry.location.lat();
-    const lng = place.geometry.location.lng();
-
-    setForm((prev) => ({
-      ...prev,
-      business_address: place.formatted_address,
-      latitude: lat,
-      longitude: lng,
-    }));
-  };
-
-  /* ------------------------------------------------------------------
      SAVE
   ------------------------------------------------------------------ */
   const handleSave = async () => {
+    if (
+      !form.business_address.trim() ||
+      !Number.isFinite(form.latitude) ||
+      !Number.isFinite(form.longitude)
+    ) {
+      setToast({ type: "error", message: "Choose the business address from the suggestions." });
+      return;
+    }
+
     setSaving(true);
 
     const payload = {
@@ -152,7 +142,7 @@ export default function WorkingArea() {
           />
 
           {/* Map */}
-          {isLoaded && (
+          {isLoaded && Number.isFinite(form.latitude) && Number.isFinite(form.longitude) && (
             <div className="rounded-xl overflow-hidden border">
               <GoogleMap
                 zoom={10}
@@ -178,28 +168,33 @@ export default function WorkingArea() {
         <div className="space-y-6">
           {/* Address */}
           <div>
-            <label className="font-medium text-sm mb-1 flex gap-2 items-center text-gray-700">
-              <MapPin size={16} className="text-rose-600" /> Business Address
-            </label>
-
-            {isLoaded ? (
-              <Autocomplete
-                onLoad={(ref) => (autocompleteRef.current = ref)}
-                onPlaceChanged={handlePlaceChanged}
-              >
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border rounded-lg"
-                  defaultValue={form.business_address}
-                />
-              </Autocomplete>
-            ) : (
-              <p role={googleMapsError ? "alert" : "status"} className="text-sm text-amber-700">
-                {googleMapsError
-                  ? "Address suggestions are temporarily unavailable."
-                  : "Loading address suggestions…"}
-              </p>
-            )}
+            <AddressAutocomplete
+              inputId="working-area-business-address"
+              label={
+                <span className="flex items-center gap-2">
+                  <MapPin size={16} className="text-rose-600" /> Business Address
+                </span>
+              }
+              placeholder="Enter your business address"
+              defaultValue={form.business_address}
+              required
+              onInputChange={(businessAddress) =>
+                setForm((previous) => ({
+                  ...previous,
+                  business_address: businessAddress,
+                  latitude: null,
+                  longitude: null,
+                }))
+              }
+              onSelect={(place) =>
+                setForm((previous) => ({
+                  ...previous,
+                  business_address: place.address,
+                  latitude: place.latitude,
+                  longitude: place.longitude,
+                }))
+              }
+            />
           </div>
           {/* Service Types */}
           <div className="space-y-3">
@@ -254,7 +249,7 @@ export default function WorkingArea() {
           </div>
 
           {/* Map preview (live) */}
-          {isLoaded && (
+          {isLoaded && Number.isFinite(form.latitude) && Number.isFinite(form.longitude) && (
             <div className="rounded-xl overflow-hidden border">
               <GoogleMap
                 zoom={10}
