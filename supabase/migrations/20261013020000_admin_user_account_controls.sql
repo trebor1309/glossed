@@ -22,7 +22,7 @@ insert into public.admin_role_permissions (role_code, permission_code) values
 on conflict do nothing;
 
 create table public.user_account_controls (
-  user_id uuid primary key references public.users(id) on delete restrict,
+  user_id uuid primary key references public.users(id) on delete cascade,
   status text not null default 'active' check (status in ('active', 'suspended')),
   reason text,
   suspended_at timestamptz,
