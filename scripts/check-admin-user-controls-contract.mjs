@@ -10,7 +10,7 @@ const configuration = read("src/admin/AdminConfigurationPage.jsx");
 const api = read("src/admin/adminOperationsApi.js");
 
 const requirements = [
-  [migration.includes("'users.manage'") && migration.includes("true\n)"), "recent-MFA user management permission"],
+  [migration.includes("'users.manage'") && /true\s*\)/.test(migration), "recent-MFA user management permission"],
   [migration.includes("admin_user_account_change_operations") && migration.includes("operation_status in ('requested', 'applied', 'failed')"), "two-phase account change operations"],
   [migration.includes("user_account_control_events_immutable") && migration.includes("admin_audit_log"), "immutable status history and admin audit"],
   [migration.includes("pgrst.db_pre_request") && migration.includes("as restrictive"), "Data API and private Storage suspension enforcement"],

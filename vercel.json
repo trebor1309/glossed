@@ -5,6 +5,12 @@
   "buildCommand": "npm run build",
   "redirects": [
     {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "glossed.app" }],
+      "destination": "https://www.glossed.app/:path*",
+      "permanent": true
+    },
+    {
       "source": "/",
       "has": [{ "type": "host", "value": "admin.glossed.app" }],
       "destination": "/admin.html",

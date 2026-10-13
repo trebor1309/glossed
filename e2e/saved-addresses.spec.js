@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { installMockClientSession } from "./helpers/mockClientSession.js";
+import { installGooglePlacesMock } from "./helpers/googlePlacesMock.js";
 
 const home = {
   id: "47000000-0000-4000-8000-000000000001",
@@ -38,36 +39,6 @@ async function reachAddressStep(page, targeted = true) {
   await page.getByLabel("Requested date").fill(futureDate);
   await page.getByRole("button", { name: "Morning (8–12)" }).click();
   await page.getByRole("button", { name: "Next" }).click();
-}
-
-async function installGooglePlacesMock(page) {
-  await page.addInitScript(() => {
-    class MockAutocomplete {
-      constructor(input) {
-        this.input = input;
-        this.listeners = {};
-        window.__glossedAutocomplete = this;
-      }
-      addListener(name, callback) {
-        this.listeners[name] = callback;
-        return { remove() {} };
-      }
-      getPlace() {
-        return window.__glossedPlace;
-      }
-    }
-
-    window.google = {
-      maps: {
-        places: { Autocomplete: MockAutocomplete },
-        event: { clearInstanceListeners() {} },
-      },
-    };
-    window.__selectGlossedPlace = (place) => {
-      window.__glossedPlace = place;
-      window.__glossedAutocomplete.listeners.place_changed();
-    };
-  });
 }
 
 test("uses the default saved address without loading Google and snapshots both booking paths", async ({
