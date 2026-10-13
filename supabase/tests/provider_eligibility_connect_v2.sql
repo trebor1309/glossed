@@ -34,12 +34,12 @@ insert into auth.users (id, email, raw_user_meta_data) values
   (
     '72000000-0000-0000-0000-000000000020',
     'eligibility-provider@example.test',
-    '{"requested_role":"pro"}'::jsonb
+    '{"requested_role":"pro","legal_acceptances":{"privacy_notice":"2026-10-12","client_terms":"2026-10-12","provider_terms":"2026-10-12"},"legal_acceptance_context":"signup","legal_acceptance_locale":"en","legal_acceptance_surface":"web_signup"}'::jsonb
   ),
   (
     '72000000-0000-0000-0000-000000000030',
     'eligibility-other-provider@example.test',
-    '{"requested_role":"pro"}'::jsonb
+    '{"requested_role":"pro","legal_acceptances":{"privacy_notice":"2026-10-12","client_terms":"2026-10-12","provider_terms":"2026-10-12"},"legal_acceptance_context":"signup","legal_acceptance_locale":"en","legal_acceptance_surface":"web_signup"}'::jsonb
   )
 on conflict (id) do nothing;
 

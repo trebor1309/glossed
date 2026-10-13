@@ -23,14 +23,28 @@ type Reservation = {
   terms_snapshot_id: string;
 };
 
+function startsDuringWithdrawalPeriod(scheduledStartAt: string) {
+  const start = new Date(scheduledStartAt);
+  const deadline = new Date();
+  deadline.setUTCDate(deadline.getUTCDate() + 14);
+  return !Number.isNaN(start.getTime()) && start < deadline;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return handleOptions(req);
   if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
 
   try {
     const user = await requireUser(req);
+    const { error: acceptanceError } = await admin.rpc("assert_user_current_legal_acceptances", {
+      p_user_id: user.id,
+      p_document_codes: ["privacy_notice", "client_terms"],
+    });
+    if (acceptanceError) throw acceptanceError;
+
     const body = await req.json();
     const selectionId = body?.selection_id;
+    const earlyPerformanceRequested = body?.early_performance_requested;
     if (typeof selectionId !== "string") {
       throw new HttpError(400, "Missing selection_id");
     }
@@ -42,6 +56,32 @@ Deno.serve(async (req) => {
     if (error) throw error;
     const reservation = data?.[0] as Reservation | undefined;
     if (!reservation) throw new Error("Checkout v2 reservation failed");
+    const { data: terms, error: termsError } = await admin
+      .from("financial_terms_snapshots")
+      .select("scheduled_start_at")
+      .eq("id", reservation.terms_snapshot_id)
+      .single();
+    if (termsError) throw termsError;
+    const needsEarlyPerformanceRequest = startsDuringWithdrawalPeriod(terms.scheduled_start_at);
+    if (needsEarlyPerformanceRequest && earlyPerformanceRequested !== true) {
+      throw new HttpError(422, "Expressly request early performance before starting payment");
+    }
+
+    const { data: legalVersions, error: legalError } = await admin.rpc(
+      "snapshot_user_legal_acceptances",
+      {
+        p_user_id: user.id,
+        p_document_codes: ["privacy_notice", "client_terms"],
+        p_transaction_type: "checkout_v2",
+        p_transaction_id: reservation.attempt_id,
+        p_evidence: {
+          selection_id: selectionId,
+          scheduled_start_at: terms.scheduled_start_at,
+          early_performance_requested: needsEarlyPerformanceRequest,
+        },
+      }
+    );
+    if (legalError) throw legalError;
     if (reservation.attempt_status === "open" && reservation.stripe_session_url) {
       return json(req, {
         url: reservation.stripe_session_url,
@@ -59,14 +99,16 @@ Deno.serve(async (req) => {
       client_id: user.id,
       provider_id: reservation.provider_id,
       terms_snapshot_id: reservation.terms_snapshot_id,
+      client_terms_version: String(legalVersions?.client_terms ?? "unknown"),
+      privacy_notice_version: String(legalVersions?.privacy_notice ?? "unknown"),
+      early_performance_requested: String(needsEarlyPerformanceRequest),
     };
 
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
         client_reference_id: user.id,
-        payment_method_configuration:
-          reservation.payment_method_configuration_reference,
+        payment_method_configuration: reservation.payment_method_configuration_reference,
         expires_at: Math.floor(new Date(reservation.expires_at).getTime() / 1000),
         line_items: [
           {

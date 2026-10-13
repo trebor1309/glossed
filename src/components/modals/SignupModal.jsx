@@ -2,6 +2,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
+import SignupLegalFields from "@/components/legal/SignupLegalFields";
 
 export default function SignupModal({ onClose, onLogin }) {
   const { signup } = useUser();
@@ -11,9 +12,12 @@ export default function SignupModal({ onClose, onLogin }) {
     e.preventDefault();
     const email = e.target.email.value.trim();
     const password = e.target.password.value.trim();
+    const legalAccepted =
+      e.currentTarget.elements.acceptClientTerms.checked &&
+      e.currentTarget.elements.acknowledgePrivacy.checked;
 
     try {
-      const { session } = await signup(email, password);
+      const { session } = await signup(email, password, { legalAccepted });
       onClose();
       navigate(session ? "/onboarding" : "/auth/check-email", { state: { email } });
     } catch (err) {
@@ -69,6 +73,8 @@ export default function SignupModal({ onClose, onLogin }) {
                 placeholder="••••••••"
               />
             </div>
+
+            <SignupLegalFields />
 
             <button
               type="submit"

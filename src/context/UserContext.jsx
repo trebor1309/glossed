@@ -1,6 +1,7 @@
 // src/context/UserContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { signupLegalEvidence } from "@/legal/legalDocuments";
 
 const UserContext = createContext();
 export const useUser = () => useContext(UserContext);
@@ -211,6 +212,9 @@ export function UserProvider({ children }) {
     SIGNUP
   ----------------------------------------------------------- */
   const signup = async (email, password, options = {}) => {
+    if (options.legalAccepted !== true) {
+      throw new Error("Accept the current legal documents before creating an account.");
+    }
     const normalizedEmail = email.trim();
     const requestedRole = options.role === "pro" ? "pro" : "client";
     const { data, error } = await supabase.auth.signUp({
@@ -222,6 +226,10 @@ export function UserProvider({ children }) {
           requested_role: requestedRole,
           username: options.username?.trim().toLowerCase() || null,
           business_name: options.businessName?.trim() || null,
+          legal_acceptances: signupLegalEvidence(requestedRole),
+          legal_acceptance_context: "signup",
+          legal_acceptance_locale: "en",
+          legal_acceptance_surface: "web_signup",
         },
       },
     });

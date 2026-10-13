@@ -4,16 +4,10 @@ import {
   stripe,
   syncConnectAccount,
 } from "../_shared/connect-v2.ts";
-import {
-  errorResponse,
-  handleOptions,
-  HttpError,
-  json,
-} from "../_shared/http.ts";
+import { errorResponse, handleOptions, HttpError, json } from "../_shared/http.ts";
 import { admin, requireUser } from "../_shared/supabase.ts";
 
-const appUrl = (Deno.env.get("APP_URL") ?? "https://glossed.vercel.app")
-  .replace(/\/$/, "");
+const appUrl = (Deno.env.get("APP_URL") ?? "https://glossed.vercel.app").replace(/\/$/, "");
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return handleOptions(req);
@@ -23,6 +17,12 @@ Deno.serve(async (req) => {
 
   try {
     const authUser = await requireUser(req);
+    const { error: acceptanceError } = await admin.rpc("assert_user_current_legal_acceptances", {
+      p_user_id: authUser.id,
+      p_document_codes: ["privacy_notice", "client_terms", "provider_terms"],
+    });
+    if (acceptanceError) throw acceptanceError;
+
     const { data: profile, error } = await admin
       .from("users")
       .select("role, first_name, last_name, business_name")
@@ -36,18 +36,27 @@ Deno.serve(async (req) => {
 
     const { data: reservations, error: reservationError } = await admin.rpc(
       "reserve_provider_connect_account_creation",
-      { p_provider_id: authUser.id },
+      { p_provider_id: authUser.id }
     );
     if (reservationError) throw reservationError;
     const reservation = reservations?.[0];
     if (!reservation) throw new Error("Connect account reservation failed");
 
+    const { error: legalError } = await admin.rpc("snapshot_user_legal_acceptances", {
+      p_user_id: authUser.id,
+      p_document_codes: ["privacy_notice", "client_terms", "provider_terms"],
+      p_transaction_type: "connect_onboarding",
+      p_transaction_id: `${authUser.id}:${reservation.creation_generation}`,
+      p_evidence: {
+        creation_generation: reservation.creation_generation,
+        should_create: reservation.should_create,
+      },
+    });
+    if (legalError) throw legalError;
+
     let accountId = reservation.stripe_account_id as string | null;
     if (reservation.should_create) {
-      const {
-        data: eligibilityDeclaration,
-        error: eligibilityDeclarationError,
-      } = await admin
+      const { data: eligibilityDeclaration, error: eligibilityDeclarationError } = await admin
         .from("provider_eligibility_declarations")
         .select("residence_country_code")
         .eq("provider_id", authUser.id)
@@ -58,7 +67,7 @@ Deno.serve(async (req) => {
       if (!eligibilityDeclaration?.residence_country_code) {
         throw new HttpError(
           409,
-          "Complete your provider eligibility declaration before starting Stripe onboarding",
+          "Complete your provider eligibility declaration before starting Stripe onboarding"
         );
       }
       const account = await stripe.v2.core.accounts.create(
@@ -67,7 +76,8 @@ Deno.serve(async (req) => {
           identity: {
             country: eligibilityDeclaration.residence_country_code,
           },
-          display_name: profile.business_name ||
+          display_name:
+            profile.business_name ||
             [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
             undefined,
           dashboard: "express",
@@ -89,18 +99,17 @@ Deno.serve(async (req) => {
           },
           include: [...accountInclude],
         },
-        { idempotencyKey: reservation.creation_idempotency_key },
+        { idempotencyKey: reservation.creation_idempotency_key }
       );
       accountId = account.id;
-      const { data: completedAccount, error: completionError } = await admin
-        .rpc(
-          "complete_provider_connect_account_creation",
-          {
-            p_provider_id: authUser.id,
-            p_stripe_account_id: accountId,
-            p_livemode: Boolean(account.livemode),
-          },
-        );
+      const { data: completedAccount, error: completionError } = await admin.rpc(
+        "complete_provider_connect_account_creation",
+        {
+          p_provider_id: authUser.id,
+          p_stripe_account_id: accountId,
+          p_livemode: Boolean(account.livemode),
+        }
+      );
       if (completionError) throw completionError;
       if (!completedAccount) {
         throw new Error("Connect account completion failed");
@@ -121,9 +130,7 @@ Deno.serve(async (req) => {
         .single();
       if (accountStateError) throw accountStateError;
       if (accountState.stripe_account_id !== accountId) {
-        throw new Error(
-          "Connect account changed while preparing the account check",
-        );
+        throw new Error("Connect account changed while preparing the account check");
       }
       const account = await retrieveConnectAccount(accountId);
       await syncConnectAccount(account, {

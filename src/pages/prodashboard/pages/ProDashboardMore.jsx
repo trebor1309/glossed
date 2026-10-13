@@ -49,6 +49,7 @@ export default function ProDashboardMore() {
         { label: "Legal Notice", icon: FileText, to: "/legal" },
         { label: "Privacy Policy", icon: FileText, to: "/privacy" },
         { label: "Terms of Service", icon: FileText, to: "/terms" },
+        { label: "Professional Terms", icon: FileText, to: "/terms/professionals" },
       ],
     },
   ];

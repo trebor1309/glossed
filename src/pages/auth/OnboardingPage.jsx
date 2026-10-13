@@ -6,6 +6,8 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MapPin, Upload, User, Building2, Phone, Mail } from "lucide-react";
 import { useGoogleMaps } from "@/context/GoogleMapsContext";
+import { recordMyLegalAcceptances } from "@/lib/legal";
+import { legalDocuments } from "@/legal/legalDocuments";
 
 export default function OnboardingPage() {
   const { user, fetchUserProfile } = useUser();
@@ -40,6 +42,7 @@ export default function OnboardingPage() {
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [providerTermsAccepted, setProviderTermsAccepted] = useState(false);
 
   const isProFlow = forcedRole === "pro" || roleChoice === "pro";
 
@@ -157,6 +160,10 @@ export default function OnboardingPage() {
       if (!finalBusinessAddress || !finalBusinessAddress.trim()) {
         return alert("Please provide your business address.");
       }
+
+      if (user?.role !== "pro" && !providerTermsAccepted) {
+        return alert("Please accept the Professional Terms.");
+      }
     }
 
     setSaving(true);
@@ -165,6 +172,19 @@ export default function OnboardingPage() {
       const imageUrl = await handleUpload();
 
       const finalRole = forcedRole || roleChoice || user?.role || "client";
+
+      if (finalRole === "pro" && user?.role !== "pro") {
+        await recordMyLegalAcceptances({
+          documents: [
+            {
+              code: legalDocuments.provider_terms.code,
+              version: legalDocuments.provider_terms.version,
+            },
+          ],
+          context: "upgrade",
+          intendedRole: "pro",
+        });
+      }
 
       const finalBusinessAddress = isProFlow
         ? businessSameAsPrivate
@@ -397,6 +417,29 @@ export default function OnboardingPage() {
                 className="w-full mt-2 px-4 py-2 border rounded-lg"
               />
             </div>
+
+            {user?.role !== "pro" && (
+              <label className="flex gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm leading-5 text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={providerTermsAccepted}
+                  onChange={(event) => setProviderTermsAccepted(event.target.checked)}
+                  className="mt-1 accent-rose-600"
+                />
+                <span>
+                  I accept the{" "}
+                  <a
+                    href="/terms/professionals"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-rose-700 underline"
+                  >
+                    Professional Terms
+                  </a>
+                  .
+                </span>
+              </label>
+            )}
           </div>
         )}
 

@@ -8,6 +8,12 @@ export default function ClientOffersModal({ booking, onClose }) {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
+  const [earlyPerformanceAccepted, setEarlyPerformanceAccepted] = useState({});
+
+  const scheduledStart = (offer) => {
+    const date = String(offer.date || "").slice(0, 10);
+    return new Date(`${date}T${offer.time || "00:00"}`);
+  };
 
   // ------------------------------------------------------------
   // 🔹 Charger les offres liées à une réservation
@@ -58,9 +64,26 @@ export default function ClientOffersModal({ booking, onClose }) {
   // 💳 Paiement et confirmation
   // ------------------------------------------------------------
   const handlePayAndConfirm = async (offer) => {
+    const scheduledAt = scheduledStart(offer);
+    const withdrawalEndsAt = new Date();
+    withdrawalEndsAt.setDate(withdrawalEndsAt.getDate() + 14);
+    const needsEarlyPerformanceRequest =
+      !Number.isNaN(scheduledAt.getTime()) && scheduledAt < withdrawalEndsAt;
+
+    if (needsEarlyPerformanceRequest && !earlyPerformanceAccepted[offer.id]) {
+      setToast({
+        type: "error",
+        message: "Please confirm your request for performance during the withdrawal period.",
+      });
+      return;
+    }
+
     try {
       const { data: result, error } = await supabase.functions.invoke("create-checkout-session", {
-        body: { mission_id: offer.id },
+        body: {
+          mission_id: offer.id,
+          early_performance_requested: needsEarlyPerformanceRequest,
+        },
       });
 
       if (error || !result?.url) {
@@ -129,6 +152,11 @@ export default function ClientOffersModal({ booking, onClose }) {
           >
             {offers.map((o, i) => {
               const totalPrice = (Number(o.price) * 1.1).toFixed(2);
+              const scheduledAt = scheduledStart(o);
+              const withdrawalEndsAt = new Date();
+              withdrawalEndsAt.setDate(withdrawalEndsAt.getDate() + 14);
+              const needsEarlyPerformanceRequest =
+                !Number.isNaN(scheduledAt.getTime()) && scheduledAt < withdrawalEndsAt;
               const proName =
                 [o.pro?.first_name, o.pro?.last_name].filter(Boolean).join(" ") ||
                 o.pro?.business_name ||
@@ -165,11 +193,32 @@ export default function ClientOffersModal({ booking, onClose }) {
                     </p>
                   )}
 
+                  {needsEarlyPerformanceRequest && (
+                    <label className="mt-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(earlyPerformanceAccepted[o.id])}
+                        onChange={(event) =>
+                          setEarlyPerformanceAccepted((current) => ({
+                            ...current,
+                            [o.id]: event.target.checked,
+                          }))
+                        }
+                        className="mt-1 accent-rose-600"
+                      />
+                      <span>
+                        I expressly request performance before the 14-day withdrawal period ends and
+                        acknowledge that the withdrawal right is lost once the service is fully
+                        performed.
+                      </span>
+                    </label>
+                  )}
+
                   <div className="mt-5 flex justify-between items-center">
                     <p className="text-[11px] text-gray-400 leading-tight max-w-[70%]">
                       By confirming this payment, you agree to the{" "}
                       <a
-                        href="https://glossed.be/terms"
+                        href="/terms"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="underline text-rose-500 hover:text-rose-600"
@@ -183,7 +232,7 @@ export default function ClientOffersModal({ booking, onClose }) {
                       onClick={() => handlePayAndConfirm(o)}
                       className="bg-gradient-to-r from-rose-600 to-red-600 hover:scale-[1.03] text-white text-sm font-semibold px-5 py-2 rounded-full shadow-sm transition"
                     >
-                      Pay & Confirm
+                      Pay {totalPrice} € & confirm
                     </button>
                   </div>
                 </motion.div>

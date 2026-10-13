@@ -30,6 +30,7 @@ const localTests = [
   "admin_ux_consolidation_3.sql",
   "provider_discovery_backend.sql",
   "saved_addresses_google_places.sql",
+  "legal_launch_foundation.sql",
 ];
 
 function run(command, args, options = {}) {

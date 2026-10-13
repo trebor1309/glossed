@@ -33,11 +33,11 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('20000000-0000-0000-0000-000000000010', 'functional-client@example.test',
    '{"requested_role":"client"}'::jsonb),
   ('20000000-0000-0000-0000-000000000020', 'functional-pro@example.test',
-   '{"requested_role":"pro","username":"functional-pro","business_name":"Functional Pro"}'::jsonb),
+   '{"requested_role":"pro","username":"functional-pro","business_name":"Functional Pro","legal_acceptances":{"privacy_notice":"2026-10-12","client_terms":"2026-10-12","provider_terms":"2026-10-12"},"legal_acceptance_context":"signup","legal_acceptance_locale":"en","legal_acceptance_surface":"web_signup"}'::jsonb),
   ('20000000-0000-0000-0000-000000000030', 'functional-outsider@example.test',
    '{"requested_role":"client"}'::jsonb),
   ('20000000-0000-0000-0000-000000000040', 'functional-pro-two@example.test',
-   '{"requested_role":"pro","username":"functional-pro-two","business_name":"Functional Pro Two"}'::jsonb);
+   '{"requested_role":"pro","username":"functional-pro-two","business_name":"Functional Pro Two","legal_acceptances":{"privacy_notice":"2026-10-12","client_terms":"2026-10-12","provider_terms":"2026-10-12"},"legal_acceptance_context":"signup","legal_acceptance_locale":"en","legal_acceptance_surface":"web_signup"}'::jsonb);
 
 update public.users
 set onboarding_completed = true, show_city = true, show_country = true
