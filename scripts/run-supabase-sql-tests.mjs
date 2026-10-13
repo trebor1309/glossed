@@ -32,6 +32,7 @@ const localTests = [
   "saved_addresses_google_places.sql",
   "legal_launch_foundation.sql",
   "support_contact.sql",
+  "admin_user_account_controls.sql",
 ];
 
 function run(command, args, options = {}) {

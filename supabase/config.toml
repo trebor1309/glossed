@@ -24,3 +24,8 @@ verify_jwt = true
 # validates the origin and payload, rate-limits submissions and writes only
 # through service-role-only database functions.
 verify_jwt = false
+
+[functions.admin-user-account-control]
+# The gateway validates the administrator JWT. The function then repeats the
+# user lookup and database permission/recent-MFA checks before using Auth Admin.
+verify_jwt = true

@@ -13,7 +13,52 @@ export const globalAdminSearch = (query, limit = 12) =>
   rpc("admin_global_search", { p_query: query, p_limit: limit });
 export const listAdminUsers = (query = "", limit = 50, offset = 0) =>
   rpc("admin_list_users", { p_query: query || null, p_limit: limit, p_offset: offset });
-export const getAdminUser = (userId) => rpc("admin_get_user_detail", { p_user_id: userId });
+export async function getAdminUser(userId) {
+  const [detail, controls] = await Promise.all([
+    rpc("admin_get_user_detail", { p_user_id: userId }),
+    rpc("admin_get_user_control_context", { p_user_id: userId }),
+  ]);
+  return { ...detail, ...controls };
+}
+export async function controlAdminUserAccount(userId, status, reason, operationId) {
+  const { data, error } = await adminSupabase.functions.invoke("admin-user-account-control", {
+    body: {
+      target_user_id: userId,
+      target_status: status,
+      reason,
+      operation_id: operationId,
+    },
+  });
+  if (error) {
+    let message = error.message;
+    try {
+      const payload = await error.context?.json?.();
+      if (payload?.error) message = payload.error;
+    } catch {
+      // Keep the SDK error when the response body is unavailable.
+    }
+    throw new Error(message);
+  }
+  return data;
+}
+export const recordAdminProviderEligibility = ({
+  providerId,
+  policyVersion,
+  serviceCategoryCode,
+  status,
+  validUntil,
+  reason,
+  operationId,
+}) =>
+  rpc("admin_record_provider_eligibility_assessment", {
+    p_provider_id: providerId,
+    p_policy_version: policyVersion,
+    p_service_category_code: serviceCategoryCode,
+    p_status: status,
+    p_valid_until: validUntil,
+    p_reason: reason,
+    p_operation_id: operationId,
+  });
 export async function refreshAdminConnectAccount(providerId) {
   const { data, error } = await adminSupabase.functions.invoke("check-stripe-account", {
     body: { provider_id: providerId, requested_from: "admin" },
@@ -127,12 +172,18 @@ export const searchAdminAudit = ({
   });
 export const getAdminConfiguration = () => rpc("admin_get_configuration_catalog_ux_v3");
 export const createAdminConfigurationVersion = (configurationType, version, payload, reason) =>
-  rpc("admin_create_configuration_version", {
-    p_configuration_type: configurationType,
-    p_version: version,
-    p_payload: payload,
-    p_reason: reason,
-  });
+  configurationType === "eligibility_policy"
+    ? rpc("admin_create_provider_eligibility_policy_version", {
+        p_version: version,
+        p_payload: payload,
+        p_reason: reason,
+      })
+    : rpc("admin_create_configuration_version", {
+        p_configuration_type: configurationType,
+        p_version: version,
+        p_payload: payload,
+        p_reason: reason,
+      });
 export const getMyAdminPreferences = () => rpc("admin_get_my_preferences");
 export const updateMyAdminPreferences = (interfaceLocale, theme, operationId) => {
   if (!operationId) throw new Error("A stable preference operation ID is required.");
