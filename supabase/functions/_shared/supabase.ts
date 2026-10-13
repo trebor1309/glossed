@@ -20,5 +20,12 @@ export async function requireUser(req: Request) {
   const { data, error } = await authClient.auth.getUser(token);
   if (error || !data.user) throw new HttpError(401, "Invalid or expired session");
 
+  const { data: accountActive, error: accountError } = await admin.rpc(
+    "is_user_account_active",
+    { p_user_id: data.user.id },
+  );
+  if (accountError) throw accountError;
+  if (accountActive !== true) throw new HttpError(403, "Account suspended");
+
   return data.user;
 }

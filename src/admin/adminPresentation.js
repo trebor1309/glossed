@@ -33,6 +33,7 @@ const labels = {
   legal_withdrawal: "Rétractation légale", commercial_client: "Annulation commerciale client",
   provider_cancellation: "Annulation par le prestataire", mutual_cancellation: "Annulation mutuelle",
   published: "Publié", hidden: "Masqué", removed: "Retiré",
+  eligible: "Éligible", ineligible: "Non éligible", review_required: "Revue complémentaire requise",
   resolved_kept: "Traité — avis conservé", resolved_hidden: "Traité — avis masqué",
   resolved_removed: "Traité — avis retiré", client_to_provider: "Client vers prestataire",
 };
@@ -68,6 +69,9 @@ export function humanizeAdminError(error) {
   if (/last active super administrator/i.test(message)) return "Le dernier super administrateur actif ne peut pas être suspendu, désactivé ou privé de ce rôle.";
   if (/Trusted administrator identity not found/i.test(message)) return "Aucune identité administrateur préprovisionnée ne correspond à cet email.";
   if (/Identity is not eligible for administrator activation/i.test(message)) return "Cette identité ne respecte pas tous les prérequis d’activation administrateur.";
+  if (/Account suspended/i.test(message)) return "Ce compte est suspendu et ne peut plus accéder à Glossed.";
+  if (/Supabase Auth could not apply/i.test(message)) return "Le statut n’a pas pu être synchronisé avec l’authentification. Aucun changement local définitif n’a été appliqué.";
+  if (/policy is not applicable/i.test(message)) return "La politique sélectionnée ne correspond plus à la déclaration actuelle du prestataire.";
   return message;
 }
 

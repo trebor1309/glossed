@@ -4,6 +4,8 @@ import { Link, useParams } from "react-router-dom";
 import { AdminPanel, DefinitionList, ErrorPanel, LoadingPanel, StateBadge, formatDate, shortId } from "./AdminDataUi";
 import { getAdminUser, refreshAdminConnectAccount } from "./adminOperationsApi";
 import { adminLabel, connectAccountPresentation, humanizeAdminError } from "./adminPresentation";
+import AdminUserAccountControl from "./AdminUserAccountControl";
+import AdminProviderEligibilityControl from "./AdminProviderEligibilityControl";
 
 export default function AdminUserDetailPage() {
   const { userId } = useParams();
@@ -36,7 +38,17 @@ export default function AdminUserDetailPage() {
 
   if (loading) return <LoadingPanel />;
   if (error) return <ErrorPanel error={error} retry={load} />;
-  const { profile, eligibility_declaration: declaration, eligibility_assessment: eligibility, connect_account: connect, activity } = data;
+  const {
+    profile,
+    eligibility_declaration: declaration,
+    eligibility_assessment: eligibility,
+    eligibility_assessment_history: eligibilityHistory,
+    applicable_eligibility_policies: eligibilityPolicies,
+    account_control: accountControl,
+    account_control_history: accountControlHistory,
+    connect_account: connect,
+    activity,
+  } = data;
   const name = [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.business_name || profile.email;
   const connectState = connectAccountPresentation(connect);
 
@@ -45,7 +57,7 @@ export default function AdminUserDetailPage() {
       <Link to="/utilisateurs" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-rose-700"><ArrowLeft size={16} /> Retour aux utilisateurs</Link>
       <header className="rounded-2xl bg-slate-950 p-6 text-white shadow-lg">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-400">Fiche utilisateur</p><h1 className="mt-2 text-2xl font-bold">{name}</h1><p className="mt-1 text-sm text-slate-300">{profile.email} · {profile.id}</p>
-        <div className="mt-4 flex flex-wrap gap-2"><StateBadge value={profile.active_role || profile.role} label={`Rôle : ${adminLabel(profile.active_role || profile.role)}`} /><StateBadge value={profile.verification_status} label={`Vérification Glossed : ${adminLabel(profile.verification_status)}`} /><StateBadge value={eligibility?.status} label={`Éligibilité : ${adminLabel(eligibility?.status)}`} /></div>
+        <div className="mt-4 flex flex-wrap gap-2"><StateBadge value={profile.active_role || profile.role} label={`Rôle : ${adminLabel(profile.active_role || profile.role)}`} /><StateBadge value={accountControl?.status || "active"} label={`Compte : ${adminLabel(accountControl?.status || "active")}`} /><StateBadge value={profile.verification_status} label={`Vérification Glossed : ${adminLabel(profile.verification_status)}`} /><StateBadge value={eligibility?.status} label={`Éligibilité : ${adminLabel(eligibility?.status)}`} /></div>
       </header>
       <div className="grid gap-6 xl:grid-cols-2">
         <AdminPanel title="Identité et compte"><DefinitionList items={[
@@ -54,14 +66,8 @@ export default function AdminUserDetailPage() {
           { label: "Entreprise", value: profile.business_name }, { label: "Numéro d’entreprise", value: profile.company_number },
           { label: "TVA", value: profile.no_vat ? "Non assujetti déclaré" : profile.vat_number }, { label: "Création", value: formatDate(profile.created_at) },
         ]} /></AdminPanel>
-        <AdminPanel title="Éligibilité prestataire" description="Dernière déclaration et dernière évaluation versionnée.">
-          {eligibility || declaration ? <DefinitionList items={[
-            { label: "État", value: eligibility?.status }, { label: "Politique", value: eligibility?.policy_version, mono: true },
-            { label: "Pays de résidence", value: declaration?.residence_country_code }, { label: "Pays de prestation", value: eligibility?.service_country_code || declaration?.service_country_code },
-            { label: "Statut déclaré", value: declaration?.provider_status_code }, { label: "Trader", value: declaration?.trader_classification },
-            { label: "Validité", value: formatDate(eligibility?.valid_until) }, { label: "Motif", value: eligibility?.reason },
-          ]} /> : <p className="text-sm text-slate-500">Aucune déclaration d’éligibilité.</p>}
-        </AdminPanel>
+        <AdminUserAccountControl profile={profile} control={accountControl} history={accountControlHistory} onChanged={load} />
+        <AdminProviderEligibilityControl profile={profile} declaration={declaration} eligibility={eligibility} history={eligibilityHistory} policies={eligibilityPolicies} onChanged={load} />
         <AdminPanel title="Vérification Glossed" description="Historique des décisions administratives.">
           <div className="mb-4 flex items-center gap-2"><BadgeCheck size={18} className="text-rose-600" /><StateBadge value={profile.verification_status} /></div>
           {data.verification_history.length === 0 ? <p className="text-sm text-slate-500">Aucune décision enregistrée.</p> : <ol className="space-y-3">{data.verification_history.map((review) => <li key={review.id} className="rounded-xl bg-slate-50 p-3 text-sm"><div className="flex justify-between gap-3"><StateBadge value={review.decision} /><span className="text-xs text-slate-500">{formatDate(review.reviewed_at)}</span></div>{review.reason && <p className="mt-2 text-slate-700">{review.reason}</p>}</li>)}</ol>}

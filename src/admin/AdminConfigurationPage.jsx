@@ -45,6 +45,17 @@ const initialForms = {
     effective_from: "",
     notes: "",
   },
+  eligibility_policy: {
+    jurisdiction_code: "BE",
+    residence_country_code: "BE",
+    service_country_code: "BE",
+    provider_status_code: "",
+    service_category_code: "",
+    requirement_lines: "",
+    effective_from: "",
+    effective_until: "",
+    notes: "",
+  },
   jurisdiction_policy_structure: { jurisdiction_code: "", policy_type: "eligibility", notes: "" },
 };
 const humanFlag = (code) =>
@@ -323,6 +334,38 @@ function ConfigurationFields({ type, form, setForm, liquidityVersions }) {
         </div>
       </div>
     );
+  if (type === "eligibility_policy")
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Juridiction">
+            <input value={form.jurisdiction_code} onChange={(e) => update("jurisdiction_code", e.target.value.toUpperCase())} pattern="[A-Z]{2}(-[A-Z0-9]{1,3})?" className={inputClass} required />
+          </Field>
+          <Field label="Pays de résidence">
+            <input value={form.residence_country_code} onChange={(e) => update("residence_country_code", e.target.value.toUpperCase())} pattern="[A-Z]{2}" className={inputClass} placeholder="Vide = tous" />
+          </Field>
+          <Field label="Pays de prestation">
+            <input value={form.service_country_code} onChange={(e) => update("service_country_code", e.target.value.toUpperCase())} pattern="[A-Z]{2}" className={inputClass} placeholder="Vide = tous" />
+          </Field>
+          <Field label="Statut professionnel déclaré">
+            <input value={form.provider_status_code} onChange={(e) => update("provider_status_code", e.target.value.toLowerCase())} pattern="[a-z][a-z0-9_.-]{1,99}" className={inputClass} placeholder="Vide = tous" />
+          </Field>
+          <Field label="Catégorie de service">
+            <input value={form.service_category_code} onChange={(e) => update("service_category_code", e.target.value.toLowerCase())} pattern="[a-z][a-z0-9_.-]{1,99}" className={inputClass} placeholder="Vide = toutes" />
+          </Field>
+          <Field label="Activation">
+            <input type="datetime-local" value={form.effective_from} onChange={(e) => update("effective_from", e.target.value)} className={inputClass} required />
+          </Field>
+          <Field label="Fin de validité optionnelle">
+            <input type="datetime-local" value={form.effective_until} onChange={(e) => update("effective_until", e.target.value)} min={form.effective_from || undefined} className={inputClass} />
+          </Field>
+        </div>
+        <Field label="Exigences documentées (une par ligne)">
+          <textarea value={form.requirement_lines} onChange={(e) => update("requirement_lines", e.target.value)} rows={4} maxLength={8000} className={inputClass} placeholder="Ex. Numéro d’entreprise valide" />
+        </Field>
+        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Cette version ne doit être créée qu’après validation juridique. Sa création ne rend aucun prestataire automatiquement éligible.</p>
+      </div>
+    );
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Field label="Juridiction (code ISO)">
@@ -386,6 +429,22 @@ function buildPayload(type, form) {
       instant_quote_ttl_seconds: toSeconds(form.instant_quote_minutes, 60),
       stripe_instant_cost_rate_bps: Math.round(Number(form.stripe_instant_cost_percent) * 100),
       effective_from: new Date(form.effective_from).toISOString(),
+      notes: form.notes,
+    };
+  if (type === "eligibility_policy")
+    return {
+      jurisdiction_code: form.jurisdiction_code,
+      residence_country_code: form.residence_country_code || null,
+      service_country_code: form.service_country_code || null,
+      provider_status_code: form.provider_status_code || null,
+      service_category_code: form.service_category_code || null,
+      requirement_definitions: form.requirement_lines
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((description) => ({ description })),
+      effective_from: new Date(form.effective_from).toISOString(),
+      effective_until: form.effective_until ? new Date(form.effective_until).toISOString() : null,
       notes: form.notes,
     };
   return {
@@ -602,6 +661,7 @@ export default function AdminConfigurationPage() {
                   <option value="liquidity_limit">Seuil de liquidité</option>
                   <option value="checkout_policy">Fenêtre Checkout</option>
                   <option value="payout_policy">Calendrier payout</option>
+                  <option value="eligibility_policy">Politique d’éligibilité prestataire</option>
                   <option value="jurisdiction_policy_structure">Structure juridictionnelle</option>
                 </select>
               </Field>

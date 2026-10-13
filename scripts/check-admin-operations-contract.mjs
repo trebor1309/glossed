@@ -5,7 +5,10 @@ const migration = read("supabase/migrations/20260814190000_admin_operations_read
 const app = read("src/admin/AdminApp.jsx");
 const layout = read("src/admin/AdminLayout.jsx");
 const overview = read("src/admin/AdminOverview.jsx");
-const users = read("src/admin/AdminUsersPage.jsx") + read("src/admin/AdminUserDetailPage.jsx");
+const users = read("src/admin/AdminUsersPage.jsx")
+  + read("src/admin/AdminUserDetailPage.jsx")
+  + read("src/admin/AdminProviderEligibilityControl.jsx")
+  + read("src/admin/AdminUserAccountControl.jsx");
 const missions = read("src/admin/AdminMissionsPage.jsx") + read("src/admin/AdminMissionDetailPage.jsx");
 const api = read("src/admin/adminOperationsApi.js");
 
