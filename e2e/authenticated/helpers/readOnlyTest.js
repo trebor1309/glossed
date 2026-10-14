@@ -13,6 +13,10 @@ const allowedSupabasePostPaths = [
   "/rest/v1/rpc/get_my_chat_summaries",
   "/rest/v1/rpc/get_my_legal_requirements",
   "/rest/v1/rpc/get_public_platform_capabilities",
+  "/rest/v1/rpc/get_public_profile",
+  "/rest/v1/rpc/get_public_review_summary",
+  "/rest/v1/rpc/get_public_reviews",
+  "/rest/v1/rpc/list_service_categories",
 ];
 
 function isAllowedReadOnlySupabasePost(pathname) {
