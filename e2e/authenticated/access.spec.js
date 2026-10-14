@@ -4,6 +4,16 @@ import { loginThroughUi } from "./helpers/login.js";
 import { expect, test } from "./helpers/readOnlyTest.js";
 import { generateTotpCode } from "./helpers/totp.js";
 
+const mapsConsoleError =
+  /Google Maps JavaScript API error|RefererNotAllowedMapError|ApiNotActivatedMapError|BillingNotEnabledMapError/i;
+
+async function currentProfile(page) {
+  return page.evaluate(() => {
+    const storedProfile = window.localStorage.getItem("glossed_user");
+    return storedProfile ? JSON.parse(storedProfile) : null;
+  });
+}
+
 test("a client session survives reload and cannot enter pro routes", async ({ page }) => {
   await loginThroughUi(page, credentialsFor("client"), /\/dashboard$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Welcome back");
@@ -39,6 +49,36 @@ test("an authenticated client sees the booking pause and can explore professiona
   ).toBeVisible();
 });
 
+test("a client can open its account and the live professional discovery tools", async ({
+  page,
+}) => {
+  const googleMapsErrors = [];
+  page.on("console", (message) => {
+    if (mapsConsoleError.test(message.text())) googleMapsErrors.push(message.text());
+  });
+
+  const credentials = credentialsFor("client");
+  await loginThroughUi(page, credentials, /\/dashboard$/);
+
+  await page.goto("/dashboard/account", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { level: 2, name: "My Account" })).toBeVisible();
+  await expect(page.locator('input[name="email"]')).toHaveValue(credentials.email);
+
+  await page.goto("/dashboard/discover", { waitUntil: "domcontentloaded" });
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Who can help with your beauty request?" })
+  ).toBeVisible();
+
+  const serviceSelect = page.getByLabel("What service do you need?");
+  await expect(serviceSelect).toBeEnabled();
+  await expect.poll(() => serviceSelect.locator("option").count()).toBeGreaterThan(1);
+  await expect(page.locator("gmp-place-autocomplete#discovery-location")).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(page.locator("#discovery-location-places-status")).toHaveCount(0);
+  expect(googleMapsErrors).toEqual([]);
+});
+
 test("a professional session can open its notifications", async ({ page }) => {
   await loginThroughUi(page, credentialsFor("pro"), /\/prodashboard$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Welcome back");
@@ -46,6 +86,38 @@ test("a professional session can open its notifications", async ({ page }) => {
   await page.goto("/prodashboard/notifications", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/prodashboard\/notifications$/);
   await expect(page.getByRole("heading", { level: 1, name: "Notifications" })).toBeVisible();
+});
+
+test("a professional account exposes a public profile without opening bookings", async ({
+  page,
+}) => {
+  await loginThroughUi(page, credentialsFor("pro"), /\/prodashboard$/);
+
+  await page.goto("/prodashboard/account", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { level: 3, name: "Business Information" })).toBeVisible();
+
+  const profile = await currentProfile(page);
+  expect(profile?.id).toMatch(/^[0-9a-f-]{36}$/i);
+
+  await page.goto(`/profile/${profile.id}`, { waitUntil: "domcontentloaded" });
+  await expect(page.getByText("This is your public profile")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Contact" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bookings opening soon" })).toBeDisabled();
+  await expect(page.getByText(/Bookings are not open yet/i)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Reviews" })).toBeVisible();
+  await expect(page.getByText("Reviews could not be loaded. Please try again.")).toHaveCount(0);
+});
+
+test("the public contact channel is ready without sending a scheduled test message", async ({
+  page,
+}) => {
+  await page.goto("/contact", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { level: 1, name: "Contact Glossed" })).toBeVisible();
+  await expect(page.locator('a[href^="mailto:"]')).toBeVisible();
+  await expect(page.getByLabel("Email *")).toBeVisible();
+  await expect(page.getByLabel("Message *")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send message" })).toBeEnabled();
 });
 
 for (const role of ["client", "pro"]) {
