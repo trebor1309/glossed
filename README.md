@@ -89,7 +89,7 @@ La connexion peut mettre à jour les métadonnées techniques de Supabase Auth, 
 que `last_sign_in_at`, mais aucune table métier n’est modifiée.
 
 Copier `.env.e2e.auth.example` vers `.env.e2e.auth`, puis renseigner trois comptes
-de test distincts et déjà onboardés :
+de test distincts, déjà onboardés et à jour sur les versions juridiques obligatoires :
 
 ```powershell
 Copy-Item .env.e2e.auth.example .env.e2e.auth
@@ -99,6 +99,11 @@ npm run test:e2e:auth
 Le compte client doit avoir le rôle actif `client`, le prestataire le rôle permanent
 et actif `pro`, et seul le troisième compte doit être administrateur. Le fichier
 `.env.e2e.auth` et les états de session Playwright sont ignorés par Git.
+
+Après la publication d'une nouvelle version juridique, connecter une fois les comptes
+client et prestataire et accepter les documents dans l'interface. La suite quotidienne
+reste volontairement en lecture seule et signale explicitement cette préparation au lieu
+d'enregistrer une acceptation contractuelle automatiquement.
 
 Le workflow manuel `Authenticated E2E` lit la même configuration depuis les variables
 `E2E_BASE_URL` et `E2E_SUPABASE_URL` de l’environnement GitHub `e2e`, ainsi que les

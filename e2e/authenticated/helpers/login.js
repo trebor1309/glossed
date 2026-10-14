@@ -15,7 +15,18 @@ export async function loginThroughUi(page, credentials, expectedPath) {
   await page.getByRole("button", { name: "Continue" }).click();
 
   try {
-    await expect(page).toHaveURL(expectedPath, { timeout: 20_000 });
+    await page.waitForURL(
+      (url) => expectedPath.test(url.pathname) || url.pathname === "/legal/accept",
+      { timeout: 20_000 }
+    );
+
+    if (new URL(page.url()).pathname === "/legal/accept") {
+      throw new Error(
+        "The configured test account must accept the current legal documents before running the read-only authenticated suite."
+      );
+    }
+
+    await expect(page).toHaveURL((url) => expectedPath.test(url.pathname));
   } catch (error) {
     if (loginFailure) {
       throw new Error(`The configured test account could not sign in: ${loginFailure}`);

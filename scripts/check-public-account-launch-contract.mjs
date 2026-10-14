@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-const read = (path) => readFileSync(path, "utf8");
+const read = (path) => readFileSync(path, "utf8").replace(/\r\n?/g, "\n");
 const migration = read("supabase/migrations/20261013030000_public_account_launch.sql");
 const legacyCheckout = read("supabase/functions/create-checkout-session/index.ts");
 const checkoutV2 = read("supabase/functions/create-checkout-session-v2/index.ts");

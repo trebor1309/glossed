@@ -20,15 +20,22 @@ test("a client session survives reload and cannot enter pro routes", async ({ pa
   await expect(page).toHaveURL(/\/dashboard$/);
 });
 
-test("an authenticated client can start a booking from the home CTA", async ({ page }) => {
+test("an authenticated client sees the booking pause and can explore professionals", async ({
+  page,
+}) => {
   await loginThroughUi(page, credentialsFor("client"), /\/dashboard$/);
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: "Book Now" }).click();
+  await expect(page.getByText(/Bookings are not open yet/i)).toBeVisible();
+  await page.getByRole("button", { name: "Explore professionals" }).click();
+
+  await expect(page).toHaveURL(/\/dashboard\/discover$/);
+
+  await page.goto("/dashboard/new", { waitUntil: "domcontentloaded" });
 
   await expect(page).toHaveURL(/\/dashboard\/new$/);
   await expect(
-    page.getByRole("heading", { level: 2, name: /Which service\(s\) would you like to book/ })
+    page.getByRole("heading", { level: 1, name: "Bookings are opening soon" })
   ).toBeVisible();
 });
 
