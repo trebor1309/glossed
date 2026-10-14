@@ -54,18 +54,26 @@ test("opens the sign-in dialog without submitting credentials", async ({ page })
   await expect(page.locator('input[type="password"]')).toBeVisible();
 });
 
-test("opens the sign-in dialog from the primary booking CTA", async ({ page }) => {
+test("opens sign-up from the primary launch CTA while bookings are paused", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  await page.getByRole("button", { name: "Book Now" }).click();
+  await page
+    .locator("main section")
+    .first()
+    .getByRole("button", { name: "Create your account" })
+    .click();
 
-  await expect(page.getByRole("heading", { level: 2, name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Create your account" })).toBeVisible();
 });
 
 test("opens the sign-up dialog from the account CTA", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  await page.getByRole("button", { name: "Create your account" }).click();
+  await page
+    .locator("main section")
+    .last()
+    .getByRole("button", { name: "Create your account" })
+    .click();
 
   await expect(page.getByRole("heading", { level: 2, name: "Create your account" })).toBeVisible();
   await expect(page.getByRole("checkbox")).toHaveCount(2);

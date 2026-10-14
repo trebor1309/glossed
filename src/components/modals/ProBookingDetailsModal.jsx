@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { X, Calendar, Clock, MapPin, FileText, User, Trash2, Send } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { usePlatformCapabilities } from "@/context/PlatformCapabilitiesContext";
 
 export default function ProBookingDetailsModal({ booking, onClose, onMakeProposal, onDelete }) {
   const [client, setClient] = useState(null);
+  const { bookingsEnabled, bookingsMessage } = usePlatformCapabilities();
 
   useEffect(() => {
     if (!booking?.id) return;
@@ -129,10 +131,12 @@ export default function ProBookingDetailsModal({ booking, onClose, onMakeProposa
           transition={{ delay: 0.1 }}
         >
           <button
-            onClick={() => onMakeProposal?.(booking)}
-            className="px-5 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.03] transition flex items-center gap-2 shadow-sm"
+            onClick={() => bookingsEnabled && onMakeProposal?.(booking)}
+            disabled={!bookingsEnabled}
+            title={bookingsEnabled ? "Make proposal" : bookingsMessage}
+            className="px-5 py-2 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full font-semibold hover:scale-[1.03] transition flex items-center gap-2 shadow-sm disabled:cursor-not-allowed disabled:grayscale disabled:opacity-60"
           >
-            <Send size={16} /> Make proposal
+            <Send size={16} /> {bookingsEnabled ? "Make proposal" : "Proposals paused"}
           </button>
 
           <button

@@ -4,7 +4,9 @@ import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Calendar, Clock, MapPin, Search } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AddressAutocomplete from "@/components/forms/AddressAutocomplete";
+import BookingsPausedNotice from "@/components/booking/BookingsPausedNotice";
 import Toast from "@/components/ui/Toast";
+import { usePlatformCapabilities } from "@/context/PlatformCapabilitiesContext";
 import { useUser } from "@/context/UserContext";
 import {
   loadServiceCategories,
@@ -472,7 +474,17 @@ function parseEditServices(service, categories) {
     .map((category) => category.code);
 }
 
-export default function DashboardNew({ editBooking = null, onSuccess, onBusyChange }) {
+export default function DashboardNew(props) {
+  const { bookingsEnabled } = usePlatformCapabilities();
+
+  if (!bookingsEnabled) {
+    return <BookingsPausedNotice />;
+  }
+
+  return <DashboardNewForm {...props} />;
+}
+
+function DashboardNewForm({ editBooking = null, onSuccess, onBusyChange }) {
   const { session, user, isPro } = useUser();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();

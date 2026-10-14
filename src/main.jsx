@@ -10,17 +10,20 @@ import "./index.css";
 import { UserProvider } from "./context/UserContext.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx"; // ← NEW
 import { GoogleMapsProvider } from "./context/GoogleMapsContext.jsx";
+import { PlatformCapabilitiesProvider } from "./context/PlatformCapabilitiesContext.jsx";
 
 function Root() {
   return (
-    <GoogleMapsProvider>
-      <UserProvider>
-        {/* 🔔 Notifications globales accessibles partout (landing + dashboards) */}
-        <NotificationProvider>
-          <App />
-        </NotificationProvider>
-      </UserProvider>
-    </GoogleMapsProvider>
+    <PlatformCapabilitiesProvider>
+      <GoogleMapsProvider>
+        <UserProvider>
+          {/* 🔔 Notifications globales accessibles partout (landing + dashboards) */}
+          <NotificationProvider>
+            <App />
+          </NotificationProvider>
+        </UserProvider>
+      </GoogleMapsProvider>
+    </PlatformCapabilitiesProvider>
   );
 }
 

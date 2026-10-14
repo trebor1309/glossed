@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
 const localTests = [
+  "public_account_launch.sql",
   "stripe_concurrency.sql",
   "functional_flows.sql",
   "storage_security.sql",

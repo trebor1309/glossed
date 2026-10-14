@@ -36,6 +36,12 @@ Deno.serve(async (req) => {
 
   try {
     const user = await requireUser(req);
+    const { error: launchGateError } = await admin.rpc("assert_platform_feature_enabled", {
+      p_flag_code: "bookings",
+    });
+    if (launchGateError) {
+      throw new HttpError(503, "Bookings and payments are not open yet");
+    }
     const { error: acceptanceError } = await admin.rpc("assert_user_current_legal_acceptances", {
       p_user_id: user.id,
       p_document_codes: ["privacy_notice", "client_terms"],
