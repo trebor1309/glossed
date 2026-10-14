@@ -174,6 +174,14 @@ export async function installMockClientSession(page, options = {}) {
         },
       ]);
     }
+    if (url.pathname === "/rest/v1/rpc/get_public_platform_capabilities") {
+      return json({
+        bookings_enabled: options.bookingsEnabled ?? true,
+        bookings_message:
+          options.bookingsMessage ||
+          "Bookings are not open yet. You can create your account and explore professional profiles in the meantime.",
+      });
+    }
     if (url.pathname === "/rest/v1/rpc/list_service_categories") return json(categories);
     if (url.pathname === "/rest/v1/rpc/list_my_user_addresses_v1") {
       const response = options.addressesResponse

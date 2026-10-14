@@ -16,11 +16,13 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
 import NotificationBadge from "@/components/navigation/NotificationBadge";
+import { usePlatformCapabilities } from "@/context/PlatformCapabilitiesContext";
 
 export default function SidebarClient() {
   const navigate = useNavigate();
   const { logout, switchRole, isPro } = useUser();
   const { notifications, newMessages } = useNotifications();
+  const { bookingsEnabled } = usePlatformCapabilities();
 
   const links = [
     { to: "/dashboard", label: "Dashboard", icon: Home },
@@ -79,11 +81,12 @@ export default function SidebarClient() {
 
       {/* New Booking CTA */}
       <button
-        onClick={() => navigate("/dashboard/new")}
-        className="flex items-center gap-3 px-4 py-2.5 mb-3 rounded-lg text-gray-700 hover:bg-gray-100 transition"
+        onClick={() => bookingsEnabled && navigate("/dashboard/new")}
+        disabled={!bookingsEnabled}
+        className="flex items-center gap-3 px-4 py-2.5 mb-3 rounded-lg text-gray-700 hover:bg-gray-100 transition disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Plus size={18} className="text-rose-600" />
-        <span>New Booking</span>
+        <span>{bookingsEnabled ? "New Booking" : "Bookings opening soon"}</span>
       </button>
 
       {/* Links */}

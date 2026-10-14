@@ -2,6 +2,7 @@ import { MessageCircle, Calendar, CheckCircle2 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { v4 as uuid } from "uuid";
 import { useUser } from "@/context/UserContext";
+import { usePlatformCapabilities } from "@/context/PlatformCapabilitiesContext";
 import useStartChat from "@/components/chat/hooks/useStartChat";
 
 import ProfilePortfolio from "./ProfilePortfolio";
@@ -14,6 +15,7 @@ export default function ProProfileView({ profile, reviewSummary }) {
   const [searchParams] = useSearchParams();
   const startChat = useStartChat();
   const { user, isPro } = useUser();
+  const { bookingsEnabled, bookingsMessage } = usePlatformCapabilities();
 
   /* -------------------------------------------------------------
      CONTACT BUTTON
@@ -41,6 +43,7 @@ export default function ProProfileView({ profile, reviewSummary }) {
      - DashboardNew devra filtrer les services proposés par ce pro
   ------------------------------------------------------------- */
   const handleBooking = () => {
+    if (!bookingsEnabled) return;
     if (!user) return navigate("/login");
 
     const params = new URLSearchParams({ pro: profile.id, operation: uuid() });
@@ -105,11 +108,13 @@ export default function ProProfileView({ profile, reviewSummary }) {
           {/* BOOK SERVICE */}
           <button
             onClick={handleBooking}
-            className="px-5 py-2 bg-gray-100 rounded-full flex items-center gap-2"
+            disabled={!bookingsEnabled}
+            className="px-5 py-2 bg-gray-100 rounded-full flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Calendar size={18} /> Book a Service
+            <Calendar size={18} /> {bookingsEnabled ? "Book a Service" : "Bookings opening soon"}
           </button>
         </div>
+        {!bookingsEnabled && <p className="text-sm text-amber-800">{bookingsMessage}</p>}
       </div>
 
       {/* Portfolio */}

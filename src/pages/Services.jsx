@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import { Scissors, Sparkles, Smile, Heart, Wand2, CalendarHeart } from "lucide-react";
+import { usePlatformCapabilities } from "@/context/PlatformCapabilitiesContext";
 export default function Services() {
+  const { bookingsEnabled, bookingsMessage } = usePlatformCapabilities();
   const services = [
     {
       icon: <Sparkles className="text-rose-600" size={28} />,
@@ -171,15 +173,26 @@ export default function Services() {
       <section className="text-center">
         {" "}
         <h2 className="text-2xl font-semibold mb-6 text-gray-800"> Ready to get started? </h2>{" "}
+        {!bookingsEnabled && (
+          <p className="mx-auto mb-6 max-w-xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {bookingsMessage}
+          </p>
+        )}
         <div className="flex flex-col sm:flex-row justify-center gap-4">
           {" "}
-          <a
-            href="/dashboard/new"
-            className="bg-gradient-to-r from-rose-600 to-red-600 text-white font-semibold px-8 py-3 rounded-full hover:scale-105 transition"
-          >
-            {" "}
-            Book a Service{" "}
-          </a>{" "}
+          {bookingsEnabled ? (
+            <a
+              href="/dashboard/new"
+              className="bg-gradient-to-r from-rose-600 to-red-600 text-white font-semibold px-8 py-3 rounded-full hover:scale-105 transition"
+            >
+              {" "}
+              Book a Service{" "}
+            </a>
+          ) : (
+            <span className="cursor-not-allowed rounded-full bg-gray-200 px-8 py-3 font-semibold text-gray-600">
+              Bookings opening soon
+            </span>
+          )}{" "}
           <a
             href="/prodashboard"
             className="border border-rose-300 text-rose-600 font-semibold px-8 py-3 rounded-full hover:bg-rose-50 transition"

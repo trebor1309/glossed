@@ -1,12 +1,19 @@
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
+import { usePlatformCapabilities } from "@/context/PlatformCapabilitiesContext";
 import { useUser } from "../context/UserContext";
 
 export default function Home({ onOpenLogin, onOpenSignup, onOpenDownload }) {
   const { isAuthenticated } = useUser();
+  const { bookingsEnabled, bookingsMessage } = usePlatformCapabilities();
   const navigate = useNavigate();
 
   const handleBookNow = () => {
+    if (!bookingsEnabled) {
+      if (!isAuthenticated) onOpenSignup?.();
+      else navigate("/dashboard/discover");
+      return;
+    }
     if (!isAuthenticated) {
       onOpenLogin?.();
     } else {
@@ -61,7 +68,11 @@ export default function Home({ onOpenLogin, onOpenSignup, onOpenDownload }) {
                 onClick={handleBookNow}
                 className="bg-gradient-to-r from-rose-600 to-red-600 text-white font-semibold px-8 py-3 rounded-full hover:scale-105 transition-transform duration-300"
               >
-                Book Now
+                {bookingsEnabled
+                  ? "Book Now"
+                  : isAuthenticated
+                    ? "Explore professionals"
+                    : "Create your account"}
               </button>
 
               <Link
@@ -71,6 +82,12 @@ export default function Home({ onOpenLogin, onOpenSignup, onOpenDownload }) {
                 Learn more →
               </Link>
             </motion.div>
+
+            {!bookingsEnabled && (
+              <p className="mt-4 max-w-md rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-900">
+                {bookingsMessage}
+              </p>
+            )}
 
             {/* petits indicateurs */}
             <motion.div

@@ -3,10 +3,12 @@ import { Home, Calendar, MoreHorizontal, MessageSquare } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useNotifications } from "@/context/NotificationContext";
 import NotificationBadge from "@/components/navigation/NotificationBadge";
+import { usePlatformCapabilities } from "@/context/PlatformCapabilitiesContext";
 
 export default function BottomNavClient() {
   const navigate = useNavigate();
   const { notifications, newMessages } = useNotifications();
+  const { bookingsEnabled } = usePlatformCapabilities();
 
   const links = [
     { to: "/dashboard", icon: Home, label: "Home" },
@@ -36,10 +38,11 @@ export default function BottomNavClient() {
       {/* 🔘 Bouton [+] flottant */}
       <div className="absolute -top-5 left-1/2 -translate-x-1/2">
         <button
-          onClick={() => navigate("/dashboard/new")}
-          className="rounded-full p-4 shadow-lg bg-gradient-to-r from-rose-600 to-red-600 focus:outline-none focus:ring-2 focus:ring-rose-200 active:scale-95 transition-transform"
-          aria-label="New"
-          title="New"
+          onClick={() => bookingsEnabled && navigate("/dashboard/new")}
+          disabled={!bookingsEnabled}
+          className="rounded-full p-4 shadow-lg bg-gradient-to-r from-rose-600 to-red-600 focus:outline-none focus:ring-2 focus:ring-rose-200 active:scale-95 transition-transform disabled:cursor-not-allowed disabled:grayscale disabled:opacity-60"
+          aria-label={bookingsEnabled ? "New booking" : "Bookings opening soon"}
+          title={bookingsEnabled ? "New booking" : "Bookings opening soon"}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

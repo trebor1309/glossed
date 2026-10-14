@@ -3,8 +3,10 @@ import { supabase } from "@/lib/supabaseClient";
 import Toast from "@/components/ui/Toast";
 import { motion } from "framer-motion";
 import { X, CreditCard, User } from "lucide-react";
+import { usePlatformCapabilities } from "@/context/PlatformCapabilitiesContext";
 
 export default function ClientOffersModal({ booking, onClose }) {
+  const { bookingsEnabled, bookingsMessage } = usePlatformCapabilities();
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
@@ -64,6 +66,10 @@ export default function ClientOffersModal({ booking, onClose }) {
   // 💳 Paiement et confirmation
   // ------------------------------------------------------------
   const handlePayAndConfirm = async (offer) => {
+    if (!bookingsEnabled) {
+      setToast({ type: "error", message: bookingsMessage });
+      return;
+    }
     const scheduledAt = scheduledStart(offer);
     const withdrawalEndsAt = new Date();
     withdrawalEndsAt.setDate(withdrawalEndsAt.getDate() + 14);
@@ -230,9 +236,11 @@ export default function ClientOffersModal({ booking, onClose }) {
 
                     <button
                       onClick={() => handlePayAndConfirm(o)}
-                      className="bg-gradient-to-r from-rose-600 to-red-600 hover:scale-[1.03] text-white text-sm font-semibold px-5 py-2 rounded-full shadow-sm transition"
+                      disabled={!bookingsEnabled}
+                      title={bookingsEnabled ? "Pay and confirm" : bookingsMessage}
+                      className="bg-gradient-to-r from-rose-600 to-red-600 hover:scale-[1.03] text-white text-sm font-semibold px-5 py-2 rounded-full shadow-sm transition disabled:cursor-not-allowed disabled:grayscale disabled:opacity-60"
                     >
-                      Pay {totalPrice} € & confirm
+                      {bookingsEnabled ? `Pay ${totalPrice} € & confirm` : "Payments paused"}
                     </button>
                   </div>
                 </motion.div>
