@@ -98,9 +98,6 @@ declare
   v_privacy_results jsonb;
   v_support_results jsonb;
 begin
-  select id into v_request_id from public.data_subject_requests
-  where subject_id = '9b000000-0000-4000-8000-000000000010';
-
   v_client_results := public.admin_list_users(null, 'client', 50, 0);
   v_pro_results := public.admin_list_users(null, 'pro', 50, 0);
   if not (v_client_results -> 'items' @> '[{"id":"9b000000-0000-4000-8000-000000000010"}]'::jsonb)
@@ -112,6 +109,10 @@ begin
   v_privacy_results := public.admin_list_data_subject_requests('open', 'erasure', 'privacy-client', 50, 0);
   if (v_privacy_results ->> 'total')::integer <> 1 then
     raise exception 'The privacy administrator queue did not return the submitted request';
+  end if;
+  v_request_id := (v_privacy_results -> 'items' -> 0 ->> 'id')::uuid;
+  if v_request_id is null then
+    raise exception 'The privacy administrator queue did not expose the request identifier';
   end if;
 
   v_support_results := public.admin_list_contact_requests('open', 'account', 'privacy-contact', 50, 0);

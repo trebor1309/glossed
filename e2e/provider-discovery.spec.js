@@ -126,7 +126,7 @@ test("opens the existing profile and sends one targeted logical request across a
   await page.getByRole("button", { name: "Next" }).click();
 
   await page.getByRole("button", { name: "Send request" }).dblclick();
-  await expect(page.getByText("Temporary network interruption")).toBeVisible();
+  await expect(page.getByText("Unable to send this request. Please try again.")).toBeVisible();
   expect(operationIds).toHaveLength(1);
 
   await page.getByRole("button", { name: "Send request" }).click();

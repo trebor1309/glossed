@@ -148,7 +148,9 @@ test("retries one logical review, updates the mission, profile and discovery", a
     .fill(publicReview.comment);
 
   await page.getByRole("button", { name: "Publish review" }).click();
-  await expect(page.getByRole("alert")).toContainText("Temporary review service interruption");
+  await expect(page.getByRole("alert")).toContainText(
+    "Your review could not be published. Please try again."
+  );
   await page.getByRole("button", { name: "Publish review" }).dblclick();
 
   await expect(page.getByText("Review submitted", { exact: true })).toBeVisible();
