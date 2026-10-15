@@ -13,6 +13,13 @@ Les trois domaines doivent être rattachés au même projet Vercel que ce dépô
 chaque déploiement, vérifier que `www.glossed.app` sert le même hash d'asset que le
 dernier déploiement Production et que le domaine nu redirige sans boucle.
 
+Pendant la bêta fermée, définir `VITE_PUBLIC_APP_URL=https://glossed.vercel.app`
+dans Vercel pour que les liens de confirmation Supabase reviennent toujours sur
+le déploiement canonique, même lorsqu'une inscription est initiée depuis une URL
+technique de déploiement. Au basculement de l'application sur le domaine public,
+remplacer cette valeur par `https://www.glossed.app` et mettre à jour en même temps
+les URL de redirection autorisées dans Supabase Auth.
+
 ## Google Maps et Places
 
 Le projet Google Cloud de production doit avoir une facturation active et ces API

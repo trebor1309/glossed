@@ -4,9 +4,11 @@ import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CheckCircle } from "lucide-react";
+import InlineAlert from "@/components/ui/InlineAlert";
 
 export default function EmailVerified() {
   const [status, setStatus] = useState("loading");
+  const [destination, setDestination] = useState("/onboarding");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,21 +47,18 @@ export default function EmailVerified() {
         setStatus("success");
         localStorage.removeItem("pending_signup_email");
 
+        const nextDestination =
+          profile.onboarding_completed !== true
+            ? "/onboarding"
+            : profile.active_role === "pro" || profile.role === "pro"
+              ? "/prodashboard"
+              : "/dashboard";
+        setDestination(nextDestination);
+
         // ➤ Redirection selon complétude du profil
         setTimeout(() => {
-          if (profile.onboarding_completed !== true) {
-            navigate("/onboarding", { replace: true });
-          } else {
-            navigate(
-              profile.active_role === "pro" || profile.role === "pro"
-                ? "/prodashboard"
-                : "/dashboard",
-              {
-                replace: true,
-              }
-            );
-          }
-        }, 2000);
+          navigate(nextDestination, { replace: true });
+        }, 3500);
       } catch (err) {
         console.error(err);
         setStatus("invalid");
@@ -84,14 +83,30 @@ export default function EmailVerified() {
           <>
             <CheckCircle size={64} className="text-green-500 mx-auto mb-4" />
             <h1 className="text-3xl font-bold mb-2">Email verified!</h1>
-            <p className="text-gray-600">Redirecting...</p>
+            <p className="text-gray-600">
+              Your address is confirmed. You can now continue to Glossed.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate(destination, { replace: true })}
+              className="mt-6 rounded-full bg-rose-600 px-5 py-2.5 font-semibold text-white"
+            >
+              Continue
+            </button>
           </>
         )}
 
         {status === "invalid" && (
           <>
             <h1 className="text-2xl font-bold text-red-600 mb-3">Invalid link</h1>
-            <p className="text-gray-600">Your verification link is invalid or expired.</p>
+            <InlineAlert message="This verification link is invalid or has expired. Request a new email or sign in if your address is already confirmed." />
+            <button
+              type="button"
+              onClick={() => navigate("/", { replace: true })}
+              className="mt-6 rounded-full border border-gray-300 px-5 py-2.5 font-semibold text-gray-800"
+            >
+              Back to Glossed
+            </button>
           </>
         )}
       </motion.div>

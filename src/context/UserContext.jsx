@@ -2,6 +2,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { signupLegalEvidence } from "@/legal/legalDocuments";
+import { publicAppUrl } from "@/lib/publicAppUrl";
+import { userFacingError } from "@/lib/userFacingError";
 
 const UserContext = createContext();
 export const useUser = () => useContext(UserContext);
@@ -102,7 +104,7 @@ export function UserProvider({ children }) {
     } catch (err) {
       console.error("❌ fetchUserProfile failed:", err.message);
       setUser(null);
-      setProfileError(err.message || "Unable to load your account profile.");
+      setProfileError(userFacingError(err, "Unable to load your account profile."));
       return null;
     }
   };
@@ -221,7 +223,7 @@ export function UserProvider({ children }) {
       email: normalizedEmail,
       password: password.trim(),
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/email-verified`,
+        emailRedirectTo: publicAppUrl("/auth/email-verified"),
         data: {
           requested_role: requestedRole,
           username: options.username?.trim().toLowerCase() || null,

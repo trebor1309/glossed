@@ -4,6 +4,7 @@ import { useUser } from "@/context/UserContext";
 import { Eye, Inbox, Loader2 } from "lucide-react";
 import Toast from "@/components/ui/Toast";
 import ClientOffersModal from "@/components/modals/ClientOffersModal";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 export default function DashboardOffers() {
   const { session } = useUser();
@@ -67,8 +68,11 @@ export default function DashboardOffers() {
           setOffersByBooking({});
         }
       } catch (err) {
-        console.error("❌ fetchOffers error:", err);
-        setToast({ type: "error", message: `❌ ${err.message}` });
+        logUnexpectedError("Loading client offers failed", err);
+        setToast({
+          type: "error",
+          message: userFacingError(err, "Unable to load your offers right now."),
+        });
       } finally {
         if (mounted) setLoading(false);
       }

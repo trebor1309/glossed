@@ -2,12 +2,16 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import InlineAlert from "@/components/ui/InlineAlert";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 export default function LoginModal({ onClose, onSignup }) {
   const { login, user, loading } = useUser();
   const navigate = useNavigate();
   const onCloseRef = useRef(onClose);
+  const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   onCloseRef.current = onClose;
 
@@ -26,6 +30,8 @@ export default function LoginModal({ onClose, onSignup }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError("");
+    setSubmitting(true);
 
     const identifier = e.target.identifier.value.trim();
     const password = e.target.password.value.trim();
@@ -34,7 +40,10 @@ export default function LoginModal({ onClose, onSignup }) {
       await login(identifier, password);
       // 🟡 Ne rien faire ici : on attend que le UserContext mette user à jour
     } catch (error) {
-      alert("Login failed: " + error.message);
+      logUnexpectedError("Sign-in failed", error);
+      setFormError(userFacingError(error, "Unable to sign in right now. Please try again."));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -65,6 +74,7 @@ export default function LoginModal({ onClose, onSignup }) {
           <h2 className="text-3xl font-bold text-center mb-6">Sign in</h2>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
+            <InlineAlert message={formError} />
             <div>
               <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
@@ -89,9 +99,10 @@ export default function LoginModal({ onClose, onSignup }) {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all"
+              disabled={submitting}
+              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Continue
+              {submitting ? "Signing in…" : "Continue"}
             </button>
           </form>
 

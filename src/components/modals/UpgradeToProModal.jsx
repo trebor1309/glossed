@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { recordMyLegalAcceptances } from "@/lib/legal";
 import { legalDocuments } from "@/legal/legalDocuments";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 export default function UpgradeToProModal({ onClose }) {
   const { user, fetchUserProfile } = useUser();
@@ -68,7 +69,8 @@ export default function UpgradeToProModal({ onClose }) {
         window.location.assign("/onboarding");
       }, 1200);
     } catch (err) {
-      setError(err.message || "Upgrade failed. Please try again.");
+      logUnexpectedError("Professional account upgrade failed", err);
+      setError(userFacingError(err, "Upgrade failed. Please try again."));
     } finally {
       setLoading(false);
     }

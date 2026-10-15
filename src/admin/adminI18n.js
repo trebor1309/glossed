@@ -6,6 +6,8 @@ export const ADMIN_LOCALE_STORAGE_KEY = "glossed-admin-locale";
 const fr = {
   "nav.overview": "Vue d’ensemble",
   "nav.users": "Utilisateurs",
+  "nav.support": "Support",
+  "nav.privacy": "Demandes RGPD",
   "nav.verifications": "Vérifications",
   "nav.missions": "Missions",
   "nav.disputes": "Litiges",
@@ -103,6 +105,8 @@ const fr = {
 const nl = {
   "nav.overview": "Overzicht",
   "nav.users": "Gebruikers",
+  "nav.support": "Ondersteuning",
+  "nav.privacy": "Privacyverzoeken",
   "nav.verifications": "Verificaties",
   "nav.missions": "Opdrachten",
   "nav.disputes": "Geschillen",
@@ -128,6 +132,8 @@ const nl = {
 const de = {
   "nav.overview": "Übersicht",
   "nav.users": "Benutzer",
+  "nav.support": "Support",
+  "nav.privacy": "Datenschutzanfragen",
   "nav.verifications": "Prüfungen",
   "nav.missions": "Aufträge",
   "nav.disputes": "Streitfälle",
@@ -153,6 +159,8 @@ const de = {
 const en = {
   "nav.overview": "Overview",
   "nav.users": "Users",
+  "nav.support": "Support",
+  "nav.privacy": "Privacy requests",
   "nav.verifications": "Verifications",
   "nav.missions": "Missions",
   "nav.disputes": "Disputes",

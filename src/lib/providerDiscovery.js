@@ -43,5 +43,5 @@ export function targetedBookingErrorMessage(error) {
   if (message.includes("Operation identifier was already used")) {
     return "This request changed after an earlier submission. Return to the profile to start a new request.";
   }
-  return message;
+  return "Unable to send this request. Please try again.";
 }

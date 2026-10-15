@@ -1,22 +1,12 @@
 // 📄 src/pages/shared/DashboardSettingsUnified.jsx
 import { useEffect, useState } from "react";
-import {
-  Bell,
-  Moon,
-  Globe,
-  Eye,
-  Trash2,
-  User,
-  Mail,
-  Smartphone,
-  Briefcase,
-  Calendar,
-} from "lucide-react";
+import { Bell, Moon, Globe, Eye, User, Mail, Smartphone, Briefcase, Calendar } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { useNotifications } from "@/context/NotificationContext";
 import Toast from "@/components/ui/Toast";
 import SavedAddressesSection from "@/components/addresses/SavedAddressesSection";
+import PrivacyRequestsSection from "@/components/privacy/PrivacyRequestsSection";
 
 const LANGS = [
   { value: "en", label: "English" },
@@ -212,15 +202,6 @@ export default function DashboardSettingsUnified() {
       window.dispatchEvent(new CustomEvent("notification-preferences-updated"));
       setToast({ type: "success", message: "✅ Settings updated successfully!" });
     }
-  };
-
-  const handleDeleteAccount = () => {
-    // On ne supprime rien ici pour l’instant -> juste un message
-    setToast({
-      type: "info",
-      message:
-        "Account deletion will be handled via support for now. Please contact us if you need to close your account.",
-    });
   };
 
   const firstLetter = user?.first_name?.[0]?.toUpperCase() || "?";
@@ -486,25 +467,7 @@ export default function DashboardSettingsUnified() {
         </div>
       </div>
 
-      {/* 🚨 Danger Zone */}
-      <div className="bg-white rounded-2xl shadow-md p-6 border border-rose-100 space-y-3">
-        <h3 className="text-lg font-semibold text-red-600 flex items-center gap-2">
-          <Trash2 className="w-5 h-5" />
-          Account & data
-        </h3>
-        <p className="text-xs text-gray-500">
-          For legal reasons (payments, invoices, disputes), some data must be kept even after an
-          account is closed. We never show closed profiles publicly.
-        </p>
-        <button
-          type="button"
-          onClick={handleDeleteAccount}
-          className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-red-300 text-red-600 hover:bg-red-50 transition"
-        >
-          <Trash2 className="w-4 h-4" />
-          Request account deletion
-        </button>
-      </div>
+      <PrivacyRequestsSection onMessage={setToast} />
 
       {/* Bouton global Save */}
       <div className="flex justify-end">

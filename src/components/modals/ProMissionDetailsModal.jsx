@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getOrCreateChat } from "@/lib/chat";
 import { openConfirmModal } from "@/components/ui/openConfirmModal";
 import MissionLifecycleV2Panel from "@/components/mission-lifecycle/MissionLifecycleV2Panel";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 const fmtTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : t);
 
@@ -110,8 +111,8 @@ export default function ProMissionDetailsModal({
       onProposalCancelled?.(booking);
       onClose?.();
     } catch (err) {
-      console.error("Error cancelling proposal:", err);
-      pushNotification(err.message || "Unable to cancel proposal.", "error");
+      logUnexpectedError("Proposal cancellation failed", err);
+      pushNotification(userFacingError(err, "Unable to cancel proposal."), "error");
     } finally {
       setLoading(false);
     }

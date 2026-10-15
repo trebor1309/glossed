@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import Toast from "@/components/ui/Toast";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 // Petites listes “safe” côté UI
 const LANGS = [
@@ -157,7 +158,11 @@ export default function PreferencesSettings() {
 
     if (authErr) {
       setSavingEmail(false);
-      return setToast({ type: "error", message: `Auth email update failed: ${authErr.message}` });
+      logUnexpectedError("Auth email update failed", authErr);
+      return setToast({
+        type: "error",
+        message: userFacingError(authErr, "Unable to update your email address right now."),
+      });
     }
 
     setSavingEmail(false);
@@ -207,7 +212,11 @@ export default function PreferencesSettings() {
     setSavingPwd(false);
 
     if (updErr) {
-      return setToast({ type: "error", message: `Password update failed: ${updErr.message}` });
+      logUnexpectedError("Password update failed", updErr);
+      return setToast({
+        type: "error",
+        message: userFacingError(updErr, "Unable to update your password right now."),
+      });
     }
 
     setPwdForm({ old_password: "", new_password: "", confirm_password: "" });

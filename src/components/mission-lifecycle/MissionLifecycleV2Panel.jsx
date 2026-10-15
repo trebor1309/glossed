@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { openConfirmModal } from "@/components/ui/openConfirmModal";
 import { runMissionLifecycleAction } from "@/lib/missionLifecycleV2";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 const dateTime = (value) =>
   value
@@ -133,12 +134,12 @@ export default function MissionLifecycleV2Panel({ lifecycle, onChanged, onEvalua
       try {
         await onChanged?.();
       } catch (refreshError) {
-        console.error("Mission lifecycle refresh failed:", refreshError);
+        logUnexpectedError("Mission lifecycle refresh failed", refreshError);
         setError("The action was recorded, but the status could not refresh. Reload this page.");
       }
     } catch (actionError) {
-      console.error("Mission lifecycle action failed:", actionError);
-      setError(actionError.message || "The action could not be completed.");
+      logUnexpectedError("Mission lifecycle action failed", actionError);
+      setError(userFacingError(actionError, "The action could not be completed."));
     } finally {
       setBusyAction(null);
     }

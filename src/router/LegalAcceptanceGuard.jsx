@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { getMyLegalRequirements } from "@/lib/legal";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 export default function LegalAcceptanceGuard({ children }) {
   const { user } = useUser();
@@ -20,10 +21,11 @@ export default function LegalAcceptanceGuard({ children }) {
         error: null,
       });
     } catch (error) {
+      logUnexpectedError("Legal acceptance guard failed", error);
       setState({
         loading: false,
         missing: [],
-        error: error.message || "Unable to check legal terms.",
+        error: userFacingError(error, "Unable to check legal terms."),
       });
     }
   }, [userKey]);

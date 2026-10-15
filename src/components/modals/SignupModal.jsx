@@ -3,10 +3,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 import SignupLegalFields from "@/components/legal/SignupLegalFields";
+import InlineAlert from "@/components/ui/InlineAlert";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
+import { useState } from "react";
 
 export default function SignupModal({ onClose, onLogin }) {
   const { signup } = useUser();
   const navigate = useNavigate();
+  const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -16,12 +21,17 @@ export default function SignupModal({ onClose, onLogin }) {
       e.currentTarget.elements.acceptClientTerms.checked &&
       e.currentTarget.elements.acknowledgePrivacy.checked;
 
+    setFormError("");
+    setSubmitting(true);
     try {
       const { session } = await signup(email, password, { legalAccepted });
       onClose();
       navigate(session ? "/onboarding" : "/auth/check-email", { state: { email } });
     } catch (err) {
-      alert("Signup failed: " + err.message);
+      logUnexpectedError("Client sign-up failed", err);
+      setFormError(userFacingError(err, "Unable to create your account right now."));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -52,6 +62,7 @@ export default function SignupModal({ onClose, onLogin }) {
           <h2 className="text-3xl font-bold text-center mb-6">Create your account</h2>
 
           <form className="space-y-4" onSubmit={handleSignup}>
+            <InlineAlert message={formError} />
             <div>
               <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
@@ -78,9 +89,10 @@ export default function SignupModal({ onClose, onLogin }) {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all"
+              disabled={submitting}
+              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Sign up
+              {submitting ? "Creating account…" : "Sign up"}
             </button>
           </form>
 

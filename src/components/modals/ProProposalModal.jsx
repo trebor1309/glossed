@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import Toast from "@/components/ui/Toast";
 import BookingsPausedNotice from "@/components/booking/BookingsPausedNotice";
 import { usePlatformCapabilities } from "@/context/PlatformCapabilitiesContext";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 export default function ProProposalModal({ booking, onClose, onSuccess }) {
   const { bookingsEnabled } = usePlatformCapabilities();
@@ -58,8 +59,11 @@ export default function ProProposalModal({ booking, onClose, onSuccess }) {
         onClose?.();
       }, 600);
     } catch (err) {
-      console.error("❌ handleSubmit error:", err);
-      setToast({ message: `❌ ${err.message}`, type: "error" });
+      logUnexpectedError("Professional proposal submission failed", err);
+      setToast({
+        message: userFacingError(err, "Unable to send this proposal. Please try again."),
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }

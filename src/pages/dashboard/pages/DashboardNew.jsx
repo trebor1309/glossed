@@ -20,6 +20,7 @@ import {
   savedAddressErrorMessage,
 } from "@/lib/userAddresses";
 import { supabase } from "@/lib/supabaseClient";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -556,7 +557,13 @@ function DashboardNewForm({ editBooking = null, onSuccess, onBusyChange }) {
         }
       })
       .catch((error) => {
-        if (active) setToast({ type: "error", message: error.message });
+        logUnexpectedError("Loading service categories failed", error);
+        if (active) {
+          setToast({
+            type: "error",
+            message: userFacingError(error, "Unable to load services right now."),
+          });
+        }
       })
       .finally(() => {
         if (active) setCategoriesLoading(false);
@@ -818,7 +825,7 @@ function DashboardNewForm({ editBooking = null, onSuccess, onBusyChange }) {
       if (onSuccess) onSuccess();
       else setTimeout(() => navigate("/dashboard/reservations"), 900);
     } catch (error) {
-      console.error("handleConfirm error:", error);
+      logUnexpectedError("Reservation submission failed", error);
       const editNoLongerPending =
         editBooking &&
         (error?.code === "PGRST116" ||
@@ -830,7 +837,7 @@ function DashboardNewForm({ editBooking = null, onSuccess, onBusyChange }) {
             ? "Unable to update this reservation. Please try again."
             : targetedProId
               ? targetedBookingErrorMessage(error)
-              : error.message || "Unable to create this reservation. Please try again.",
+              : userFacingError(error, "Unable to create this reservation. Please try again."),
         type: "error",
       });
       setIsSubmitting(false);

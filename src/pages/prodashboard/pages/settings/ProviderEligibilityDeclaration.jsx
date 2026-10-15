@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Save } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 const EMPTY_DECLARATION = {
   residence_country_code: "",
@@ -137,7 +138,8 @@ export default function ProviderEligibilityDeclaration({
     setSaving(false);
 
     if (saveError || !data) {
-      setError(saveError?.message || "Unable to save your provider declaration.");
+      logUnexpectedError("Provider declaration save failed", saveError);
+      setError(userFacingError(saveError, "Unable to save your provider declaration."));
       return;
     }
 

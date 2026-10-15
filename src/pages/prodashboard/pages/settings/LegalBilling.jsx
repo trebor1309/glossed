@@ -5,6 +5,7 @@ import { useUser } from "@/context/UserContext";
 import { Save, Edit2, ShieldCheck, AlertCircle, Link as LinkIcon } from "lucide-react";
 import Toast from "@/components/ui/Toast";
 import ProviderEligibilityDeclaration from "./ProviderEligibilityDeclaration";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 export default function LegalBilling() {
   const { user, session, fetchUserProfile } = useUser();
@@ -114,9 +115,10 @@ export default function LegalBilling() {
     setSaving(false);
 
     if (error || !data?.url) {
+      logUnexpectedError("Stripe Connect onboarding failed", error || data?.error);
       setToast({
         type: "error",
-        message: data?.error || error?.message || "Stripe connection failed.",
+        message: userFacingError(error || data?.error, "Stripe connection failed."),
       });
       return;
     }
@@ -134,9 +136,10 @@ export default function LegalBilling() {
     setSaving(false);
 
     if (error || !data?.success) {
+      logUnexpectedError("Stripe Connect disconnection failed", error || data?.error);
       setToast({
         type: "error",
-        message: data?.error || error?.message || "Stripe disconnection failed.",
+        message: userFacingError(error || data?.error, "Stripe disconnection failed."),
       });
     } else {
       setToast({ type: "success", message: "Stripe account disconnected." });

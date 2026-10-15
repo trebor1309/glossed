@@ -22,6 +22,8 @@ import AdminAdministratorsPage from "./AdminAdministratorsPage";
 import AdminPersonalSettingsPage from "./AdminPersonalSettingsPage";
 import AdminReputationPage from "./AdminReputationPage";
 import AdminReputationDetailPage from "./AdminReputationDetailPage";
+import AdminPrivacyRequestsPage from "./AdminPrivacyRequestsPage";
+import AdminSupportRequestsPage from "./AdminSupportRequestsPage";
 import { AdminI18nProvider } from "./AdminI18nContext";
 
 const allowedHosts = new Set([
@@ -74,6 +76,22 @@ function AdminWorkspace() {
           element={
             <PermissionRoute permission="users.read">
               <AdminUserDetailPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="confidentialite"
+          element={
+            <PermissionRoute permission="privacy.read">
+              <AdminPrivacyRequestsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="support"
+          element={
+            <PermissionRoute permission="support_requests.read">
+              <AdminSupportRequestsPage />
             </PermissionRoute>
           }
         />
