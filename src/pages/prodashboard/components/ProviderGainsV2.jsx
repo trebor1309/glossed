@@ -8,6 +8,7 @@ import {
 } from "@stripe/react-connect-js";
 import { AlertCircle, Banknote, ExternalLink, RefreshCw, Zap } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 const money = (cents, currency = "eur") =>
   new Intl.NumberFormat("fr-BE", {
@@ -16,7 +17,11 @@ const money = (cents, currency = "eur") =>
   }).format(Number(cents ?? 0) / 100);
 
 const dateTime = (value) =>
-  value ? new Intl.DateTimeFormat("fr-BE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+  value
+    ? new Intl.DateTimeFormat("fr-BE", { dateStyle: "medium", timeStyle: "short" }).format(
+        new Date(value)
+      )
+    : "—";
 
 function SummaryCard({ label, value, hint }) {
   return (
@@ -55,7 +60,8 @@ function ConnectPanels() {
   if (!connectInstance) {
     return (
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        Les composants bancaires Stripe seront disponibles après configuration de la clé publique Connect.
+        Les composants bancaires Stripe seront disponibles après configuration de la clé publique
+        Connect.
       </div>
     );
   }
@@ -89,10 +95,9 @@ export default function ProviderGainsV2() {
   const load = useCallback(async ({ refresh = false } = {}) => {
     setError("");
     if (refresh) {
-      const { data, error: refreshError } = await supabase.functions.invoke(
-        "provider-payouts-v2",
-        { body: { action: "refresh" } }
-      );
+      const { data, error: refreshError } = await supabase.functions.invoke("provider-payouts-v2", {
+        body: { action: "refresh" },
+      });
       if (refreshError) throw refreshError;
       if (data?.enabled === false) {
         setSummary({ enabled: false });
@@ -109,7 +114,10 @@ export default function ProviderGainsV2() {
 
   useEffect(() => {
     load()
-      .catch((cause) => setError(cause.message || "Impossible de charger les gains."))
+      .catch((cause) => {
+        logUnexpectedError("Loading provider gains failed", cause);
+        setError(userFacingError(cause, "Impossible de charger les gains."));
+      })
       .finally(() => setLoading(false));
   }, [load]);
 
@@ -123,7 +131,8 @@ export default function ProviderGainsV2() {
       if (quoteError || !data?.quote) throw quoteError || new Error("Devis indisponible");
       setQuote(data.quote);
     } catch (cause) {
-      setError(cause.message || "Instant Payout indisponible.");
+      logUnexpectedError("Loading instant payout quote failed", cause);
+      setError(userFacingError(cause, "Instant Payout indisponible."));
     } finally {
       setBusy(false);
     }
@@ -141,7 +150,8 @@ export default function ProviderGainsV2() {
       setQuote(null);
       await load({ refresh: true });
     } catch (cause) {
-      setError(cause.message || "Le versement instantané n’a pas pu être envoyé.");
+      logUnexpectedError("Confirming instant payout failed", cause);
+      setError(userFacingError(cause, "Le versement instantané n’a pas pu être envoyé."));
     } finally {
       setBusy(false);
     }
@@ -157,7 +167,8 @@ export default function ProviderGainsV2() {
       if (linkError || !data?.url) throw linkError || new Error("Lien Express indisponible");
       window.location.assign(data.url);
     } catch (cause) {
-      setError(cause.message || "Dashboard Express indisponible.");
+      logUnexpectedError("Opening Stripe Express failed", cause);
+      setError(userFacingError(cause, "Dashboard Express indisponible."));
       setBusy(false);
     }
   };
@@ -169,8 +180,8 @@ export default function ProviderGainsV2() {
         <Banknote className="mx-auto text-rose-600" size={42} />
         <h2 className="mt-3 text-xl font-bold text-gray-900">Gains</h2>
         <p className="mt-2 text-gray-600">
-          Le nouveau suivi des soldes et versements est prêt pour une activation contrôlée.
-          Le flux actuel reste inchangé pour le moment.
+          Le nouveau suivi des soldes et versements est prêt pour une activation contrôlée. Le flux
+          actuel reste inchangé pour le moment.
         </p>
       </div>
     );
@@ -189,7 +200,12 @@ export default function ProviderGainsV2() {
         </div>
         <button
           type="button"
-          onClick={() => load({ refresh: true }).catch((cause) => setError(cause.message))}
+          onClick={() =>
+            load({ refresh: true }).catch((cause) => {
+              logUnexpectedError("Refreshing provider gains failed", cause);
+              setError(userFacingError(cause, "Impossible d’actualiser les gains."));
+            })
+          }
           disabled={busy}
           className="inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         >
@@ -224,7 +240,8 @@ export default function ProviderGainsV2() {
           <div>
             <h3 className="font-semibold text-gray-900">Versement instantané</h3>
             <p className="mt-1 text-sm text-gray-500">
-              Uniquement sur les fonds déjà libérés. Le coût Stripe exact est affiché avant confirmation.
+              Uniquement sur les fonds déjà libérés. Le coût Stripe exact est affiché avant
+              confirmation.
             </p>
           </div>
           <button
@@ -247,14 +264,37 @@ export default function ProviderGainsV2() {
         <div className="rounded-2xl border-2 border-rose-200 bg-rose-50 p-5">
           <h3 className="font-semibold text-gray-900">Confirmer le versement instantané</h3>
           <dl className="mt-4 grid gap-2 text-sm">
-            <div className="flex justify-between gap-4"><dt>Fonds utilisés</dt><dd>{money(quote.provider_balance_debit_amount_cents, quote.currency)}</dd></div>
-            <div className="flex justify-between gap-4"><dt>Coût Stripe exact</dt><dd>{money(quote.quoted_stripe_fee_amount_cents, quote.currency)}</dd></div>
-            <div className="flex justify-between gap-4 font-bold"><dt>Reçu sur le compte</dt><dd>{money(quote.bank_payout_amount_cents, quote.currency)}</dd></div>
+            <div className="flex justify-between gap-4">
+              <dt>Fonds utilisés</dt>
+              <dd>{money(quote.provider_balance_debit_amount_cents, quote.currency)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt>Coût Stripe exact</dt>
+              <dd>{money(quote.quoted_stripe_fee_amount_cents, quote.currency)}</dd>
+            </div>
+            <div className="flex justify-between gap-4 font-bold">
+              <dt>Reçu sur le compte</dt>
+              <dd>{money(quote.bank_payout_amount_cents, quote.currency)}</dd>
+            </div>
           </dl>
           <p className="mt-3 text-xs text-gray-600">Glossed ne prélève aucune marge sur ce coût.</p>
           <div className="mt-4 flex flex-wrap justify-end gap-3">
-            <button type="button" onClick={() => setQuote(null)} disabled={busy} className="rounded-full border px-4 py-2 text-sm">Annuler</button>
-            <button type="button" onClick={confirmQuote} disabled={busy} className="rounded-full bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Confirmer</button>
+            <button
+              type="button"
+              onClick={() => setQuote(null)}
+              disabled={busy}
+              className="rounded-full border px-4 py-2 text-sm"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              onClick={confirmQuote}
+              disabled={busy}
+              className="rounded-full bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              Confirmer
+            </button>
           </div>
         </div>
       )}

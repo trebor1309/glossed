@@ -34,6 +34,7 @@ const localTests = [
   "legal_launch_foundation.sql",
   "support_contact.sql",
   "admin_user_account_controls.sql",
+  "operations_gdpr_ux_hardening.sql",
 ];
 
 function run(command, args, options = {}) {

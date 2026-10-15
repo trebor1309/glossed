@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Logo from "@/components/Logo";
 import { useNotifications } from "@/context/NotificationContext"; // ← NEW
+import { userDisplayName } from "@/lib/userDisplayName";
 
 export default function Navbar({
   isAuthenticated,
@@ -16,6 +17,7 @@ export default function Navbar({
   const [isOpen, setIsOpen] = useState(false);
 
   const { newMessages } = useNotifications(); // ← NEW
+  const displayName = userDisplayName(user);
 
   // Cache la navbar sur mobile quand on est sur un dashboard
   if (isDashboard && isMobile) return null;
@@ -89,9 +91,7 @@ export default function Navbar({
             </>
           ) : (
             <>
-              <span className="text-gray-700 font-medium">
-                Welcome, {user?.email?.split("@")[0] || "Guest"} 👋
-              </span>
+              <span className="text-gray-700 font-medium">Welcome, {displayName} 👋</span>
               <button
                 onClick={logout}
                 className="text-rose-600 border border-rose-300 px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-rose-50 hover:border-rose-400 hover:text-rose-700 hover:shadow-md hover:scale-105 transition-all duration-300"

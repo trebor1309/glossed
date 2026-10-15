@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/lib/supabaseClient";
+import { userDisplayName } from "@/lib/userDisplayName";
 import { Search, Clock, CheckCircle, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Toast from "@/components/ui/Toast";
@@ -102,7 +103,7 @@ export default function DashboardHome() {
       });
   }, [clientId]);
 
-  const firstName = user?.first_name || "there";
+  const displayName = userDisplayName(user);
 
   /* --------------------------------------------------------------
      🎨 Rendu UI
@@ -119,12 +120,12 @@ export default function DashboardHome() {
           />
         ) : (
           <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-3xl font-semibold shadow-lg">
-            {firstName?.[0]?.toUpperCase()}
+            {displayName?.[0]?.toUpperCase()}
           </div>
         )}
 
         <h1 className="text-3xl font-bold text-gray-800">
-          Welcome back, <span className="text-rose-600">{firstName}</span> 👋
+          Welcome back, <span className="text-rose-600">{displayName}</span> 👋
         </h1>
         <p className="text-gray-500 max-w-md">
           Manage your bookings and discover new services in a few clicks.

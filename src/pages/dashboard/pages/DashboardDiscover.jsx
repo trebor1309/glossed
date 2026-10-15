@@ -15,6 +15,7 @@ import RatingStars from "@/components/reputation/RatingStars";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/lib/supabaseClient";
 import { DISCOVERY_PAGE_SIZE, loadServiceCategories, serviceLabel } from "@/lib/providerDiscovery";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 const radiusOptions = [5, 10, 20, 50, 100];
 
@@ -168,10 +169,11 @@ export default function DashboardDiscover() {
         setHasSearched(true);
       } catch (searchError) {
         if (sequence !== requestSequence.current) return;
+        logUnexpectedError("Professional discovery search failed", searchError);
         setResults([]);
         setTotalCount(0);
         setHasSearched(true);
-        setError(searchError?.message || "Unable to search right now. Please retry.");
+        setError(userFacingError(searchError, "Unable to search right now. Please retry."));
       } finally {
         if (sequence === requestSequence.current) setLoading(false);
       }

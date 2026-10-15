@@ -16,6 +16,7 @@ import {
   indexMissionLifecycles,
   missionLifecycleNotificationTypes,
 } from "@/lib/missionLifecycleV2";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 const formatTime = (t) => (typeof t === "string" && t.includes(":") ? t.slice(0, 5) : "");
 
@@ -179,8 +180,11 @@ export default function ProDashboardMissions() {
 
       setMissions(finalList);
     } catch (err) {
-      console.error("❌ fetchMissions error:", err);
-      setToast({ message: `❌ ${err.message}`, type: "error" });
+      logUnexpectedError("Loading professional missions failed", err);
+      setToast({
+        message: userFacingError(err, "Unable to load your missions right now."),
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -246,7 +250,11 @@ export default function ProDashboardMissions() {
       setToast({ message: "❌ Request deleted", type: "info" });
       fetchMissions();
     } catch (err) {
-      setToast({ message: `❌ ${err.message}`, type: "error" });
+      logUnexpectedError("Deleting a professional request failed", err);
+      setToast({
+        message: userFacingError(err, "Unable to remove this request right now."),
+        type: "error",
+      });
     }
   };
 

@@ -93,19 +93,17 @@ export default function ClientOffersModal({ booking, onClose }) {
       });
 
       if (error || !result?.url) {
-        alert(
-          result?.error ||
-            error?.message ||
-            result?.message ||
-            "Impossible de démarrer le paiement, réessayez plus tard."
-        );
+        setToast({
+          type: "error",
+          message: "Unable to start the payment right now. Please try again later.",
+        });
         return;
       }
 
       window.location.href = result.url;
     } catch (err) {
       console.error("❌ Payment error:", err);
-      alert("Erreur lors du paiement, veuillez réessayer.");
+      setToast({ type: "error", message: "Payment could not be started. Please try again." });
     }
   };
 

@@ -11,8 +11,55 @@ export const getConnectActionQueue = (limit = 10) =>
   rpc("admin_get_connect_action_queue", { p_limit: limit });
 export const globalAdminSearch = (query, limit = 12) =>
   rpc("admin_global_search", { p_query: query, p_limit: limit });
-export const listAdminUsers = (query = "", limit = 50, offset = 0) =>
-  rpc("admin_list_users", { p_query: query || null, p_limit: limit, p_offset: offset });
+export const listAdminUsers = (query = "", role = "all", limit = 50, offset = 0) =>
+  rpc("admin_list_users", {
+    p_query: query || null,
+    p_role: role,
+    p_limit: limit,
+    p_offset: offset,
+  });
+export const listAdminDataSubjectRequests = ({
+  status = "open",
+  requestType = "all",
+  query = "",
+  limit = 50,
+  offset = 0,
+} = {}) =>
+  rpc("admin_list_data_subject_requests", {
+    p_status: status,
+    p_request_type: requestType,
+    p_query: query || null,
+    p_limit: limit,
+    p_offset: offset,
+  });
+export const updateAdminDataSubjectRequest = (requestId, status, note, operationId) =>
+  rpc("admin_update_data_subject_request", {
+    p_request_id: requestId,
+    p_status: status,
+    p_note: note || null,
+    p_operation_id: operationId,
+  });
+export const listAdminContactRequests = ({
+  caseStatus = "open",
+  category = "all",
+  query = "",
+  limit = 50,
+  offset = 0,
+} = {}) =>
+  rpc("admin_list_contact_requests", {
+    p_case_status: caseStatus,
+    p_category: category,
+    p_query: query || null,
+    p_limit: limit,
+    p_offset: offset,
+  });
+export const updateAdminContactRequest = (requestId, caseStatus, note, operationId) =>
+  rpc("admin_update_contact_request", {
+    p_request_id: requestId,
+    p_case_status: caseStatus,
+    p_note: note || null,
+    p_operation_id: operationId,
+  });
 export async function getAdminUser(userId) {
   const [detail, controls] = await Promise.all([
     rpc("admin_get_user_detail", { p_user_id: userId }),

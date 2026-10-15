@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { getMyLegalRequirements, recordMyLegalAcceptances } from "@/lib/legal";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 function safeReturnPath(value, role) {
   if (value?.startsWith("/") && !value.startsWith("//") && value !== "/legal/accept") return value;
@@ -33,7 +34,8 @@ export default function LegalAcceptance() {
       setChecked({});
       setStatus("ready");
     } catch (loadError) {
-      setError(loadError.message || "Unable to load the current legal documents.");
+      logUnexpectedError("Loading legal requirements failed", loadError);
+      setError(userFacingError(loadError, "Unable to load the current legal documents."));
       setStatus("error");
     }
   };
@@ -57,7 +59,8 @@ export default function LegalAcceptance() {
       });
       continueToApp();
     } catch (acceptanceError) {
-      setError(acceptanceError.message || "Unable to record your acceptance.");
+      logUnexpectedError("Recording legal acceptance failed", acceptanceError);
+      setError(userFacingError(acceptanceError, "Unable to record your acceptance."));
       setStatus("ready");
     }
   };

@@ -9,6 +9,9 @@ import ProfilePortfolio from "./ProfilePortfolio";
 import ProfileReviews from "./ProfileReviews";
 import ProfileMap from "./ProfileMap";
 import RatingStars from "@/components/reputation/RatingStars";
+import InlineAlert from "@/components/ui/InlineAlert";
+import { useState } from "react";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 export default function ProProfileView({ profile, reviewSummary }) {
   const navigate = useNavigate();
@@ -16,6 +19,7 @@ export default function ProProfileView({ profile, reviewSummary }) {
   const startChat = useStartChat();
   const { user, isPro } = useUser();
   const { bookingsEnabled, bookingsMessage } = usePlatformCapabilities();
+  const [contactError, setContactError] = useState("");
 
   /* -------------------------------------------------------------
      CONTACT BUTTON
@@ -26,15 +30,23 @@ export default function ProProfileView({ profile, reviewSummary }) {
     if (!user) return navigate("/login");
 
     if (isPro) {
-      alert("Pros cannot contact other pros.");
+      setContactError(
+        "Professional accounts cannot start a conversation with another professional."
+      );
       return;
     }
 
-    await startChat({
-      proId: profile.id,
-      clientId: user.id,
-      missionId: null,
-    });
+    try {
+      setContactError("");
+      await startChat({
+        proId: profile.id,
+        clientId: user.id,
+        missionId: null,
+      });
+    } catch (error) {
+      logUnexpectedError("Starting a profile conversation failed", error);
+      setContactError(userFacingError(error, "Unable to start this conversation right now."));
+    }
   };
 
   /* -------------------------------------------------------------
@@ -115,6 +127,7 @@ export default function ProProfileView({ profile, reviewSummary }) {
           </button>
         </div>
         {!bookingsEnabled && <p className="text-sm text-amber-800">{bookingsMessage}</p>}
+        <InlineAlert message={contactError} className="mx-auto mt-3 max-w-xl text-left" />
       </div>
 
       {/* Portfolio */}

@@ -4,33 +4,41 @@ import { useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { motion } from "framer-motion";
 import { Mail, RefreshCcw } from "lucide-react";
+import InlineAlert from "@/components/ui/InlineAlert";
+import { publicAppUrl } from "@/lib/publicAppUrl";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 export default function CheckEmail() {
   const location = useLocation();
   const [resending, setResending] = useState(false);
   const [done, setDone] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const resendEmail = async () => {
     const storedEmail = location.state?.email || localStorage.getItem("pending_signup_email");
     if (!storedEmail) {
-      alert("No email detected.");
+      setErrorMessage(
+        "We could not find the email address used for sign-up. Start again or contact support."
+      );
       return;
     }
 
     try {
+      setErrorMessage("");
       setResending(true);
 
       const { error } = await supabase.auth.resend({
         type: "signup",
         email: storedEmail,
-        options: { emailRedirectTo: `${window.location.origin}/auth/email-verified` },
+        options: { emailRedirectTo: publicAppUrl("/auth/email-verified") },
       });
 
       if (error) throw error;
 
       setDone(true);
     } catch (err) {
-      alert("Error sending email: " + err.message);
+      logUnexpectedError("Confirmation email resend failed", err);
+      setErrorMessage(userFacingError(err, "Unable to resend the confirmation email right now."));
     } finally {
       setResending(false);
     }
@@ -57,6 +65,8 @@ export default function CheckEmail() {
           <br />
           Please click the link inside to activate your account.
         </p>
+
+        <InlineAlert message={errorMessage} className="mb-4 text-left" />
 
         {!done ? (
           <button

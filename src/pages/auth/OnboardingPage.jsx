@@ -8,6 +8,8 @@ import { MapPin, Upload, User, Building2, Phone, Mail } from "lucide-react";
 import AddressAutocomplete from "@/components/forms/AddressAutocomplete";
 import { recordMyLegalAcceptances } from "@/lib/legal";
 import { legalDocuments } from "@/legal/legalDocuments";
+import InlineAlert from "@/components/ui/InlineAlert";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 export default function OnboardingPage() {
   const { user, fetchUserProfile } = useUser();
@@ -41,6 +43,7 @@ export default function OnboardingPage() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [providerTermsAccepted, setProviderTermsAccepted] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const isProFlow = forcedRole === "pro" || roleChoice === "pro";
 
@@ -72,9 +75,6 @@ export default function OnboardingPage() {
 
       const { data } = supabase.storage.from("glossed-media").getPublicUrl(filePath);
       return data.publicUrl;
-    } catch (err) {
-      alert("Error uploading image: " + err.message);
-      return null;
     } finally {
       setUploading(false);
     }
@@ -84,29 +84,30 @@ export default function OnboardingPage() {
      Save Profile
   -------------------------------------------------------- */
   const handleSave = async () => {
-    if (!username.trim()) return alert("Please choose a username.");
-    if (!phone.trim()) return alert("Please provide a phone number.");
-    if (!address.trim()) return alert("Please select a valid address.");
+    setFormError("");
+    if (!username.trim()) return setFormError("Please choose a username.");
+    if (!phone.trim()) return setFormError("Please provide a phone number.");
+    if (!address.trim()) return setFormError("Please provide a valid address.");
 
     // Si aucune contrainte, roleChoice peut rester "client" sans souci
     if (!forcedRole && !roleChoice) {
-      return alert("Please select Client or Pro.");
+      return setFormError("Please select Client or Professional.");
     }
 
     // 🔐 Si on est en flux pro (upgrade ou signup pro)
     if (isProFlow) {
       if (!businessName.trim()) {
-        return alert("Please provide your business name.");
+        return setFormError("Please provide your business name.");
       }
 
       const finalBusinessAddress = businessSameAsPrivate ? address : businessAddress;
 
       if (!finalBusinessAddress || !finalBusinessAddress.trim()) {
-        return alert("Please provide your business address.");
+        return setFormError("Please provide your business address.");
       }
 
       if (user?.role !== "pro" && !providerTermsAccepted) {
-        return alert("Please accept the Professional Terms.");
+        return setFormError("Please accept the Professional Terms.");
       }
     }
 
@@ -163,7 +164,8 @@ export default function OnboardingPage() {
 
       navigate(finalRole === "pro" ? "/prodashboard" : "/dashboard");
     } catch (err) {
-      alert("Error saving: " + err.message);
+      logUnexpectedError("Onboarding profile save failed", err);
+      setFormError(userFacingError(err, "We could not save your profile. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -180,6 +182,8 @@ export default function OnboardingPage() {
         className="bg-white shadow-xl rounded-3xl p-8"
       >
         <h1 className="text-3xl font-bold mb-6 text-center">Complete Your Profile</h1>
+
+        <InlineAlert message={formError} className="mb-6" />
 
         {/* Choix Client / Pro — masqué si rôle déjà PRO en base */}
         {!forcedRole && (

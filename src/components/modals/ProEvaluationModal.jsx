@@ -3,6 +3,7 @@ import { Loader2, Star, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
 import { supabase } from "@/lib/supabaseClient";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 const MAX_COMMENT_LENGTH = 2000;
 
@@ -38,8 +39,10 @@ export default function ProEvaluationModal({ booking, onClose, onSuccess }) {
       await onSuccess?.(data?.[0] || null);
       onClose();
     } catch (submitError) {
-      console.error("Error submitting review:", submitError);
-      setError(submitError?.message || "Your review could not be published. Please try again.");
+      logUnexpectedError("Review submission failed", submitError);
+      setError(
+        userFacingError(submitError, "Your review could not be published. Please try again.")
+      );
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -81,14 +84,17 @@ export default function ProEvaluationModal({ booking, onClose, onSuccess }) {
           <Star size={20} className="text-amber-500" aria-hidden="true" /> Leave a review
         </h2>
         <p className="mb-5 text-sm leading-6 text-gray-600">
-          Your review will be published on the professional&apos;s Glossed profile. Published reviews
-          cannot be edited in this version.
+          Your review will be published on the professional&apos;s Glossed profile. Published
+          reviews cannot be edited in this version.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <fieldset disabled={submitting}>
             <legend className="text-sm font-semibold text-gray-800">Your rating (required)</legend>
-            <div className="mt-2 flex justify-center gap-1" aria-label="Choose a rating from 1 to 5">
+            <div
+              className="mt-2 flex justify-center gap-1"
+              aria-label="Choose a rating from 1 to 5"
+            >
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
                   key={star}
@@ -106,9 +112,7 @@ export default function ProEvaluationModal({ booking, onClose, onSuccess }) {
                     size={34}
                     aria-hidden="true"
                     className={`transition-colors ${
-                      (hover || rating) >= star
-                        ? "fill-amber-400 text-amber-400"
-                        : "text-gray-300"
+                      (hover || rating) >= star ? "fill-amber-400 text-amber-400" : "text-gray-300"
                     }`}
                   />
                 </button>

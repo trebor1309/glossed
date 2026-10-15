@@ -7,6 +7,7 @@ import { useAdminAuth } from "./AdminAuthContext";
 import { useAdminI18n } from "./AdminI18nContext";
 import { listAdminProfessionalVerifications } from "./adminOperationsApi";
 import { StateBadge, formatDate } from "./AdminDataUi";
+import { userFacingError } from "@/lib/userFacingError";
 
 const VERIFICATION_BUCKET = "verification-documents";
 
@@ -47,7 +48,7 @@ export default function VerificationReviewPage() {
       })) : result.items || [];
       setData({ ...result, items });
     } catch (error) {
-      setToast({ type: "error", message: error.message });
+      setToast({ type: "error", message: userFacingError(error, "Impossible de charger les vérifications pour le moment.") });
     } finally {
       setLoading(false);
     }
@@ -65,7 +66,7 @@ export default function VerificationReviewPage() {
       p_professional_id: request.professional_id, p_decision: decision, p_reason: reason,
     });
     if (error) {
-      setToast({ type: "error", message: error.message }); setReviewingId(null); return;
+      setToast({ type: "error", message: userFacingError(error, "Impossible d’enregistrer cette décision pour le moment.") }); setReviewingId(null); return;
     }
     setData((current) => ({ ...current, total: Math.max(0, current.total - 1), items: current.items.filter((item) => item.professional_id !== request.professional_id) }));
     setRejectionReasons((current) => { const next = { ...current }; delete next[request.professional_id]; return next; });

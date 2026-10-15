@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { legalOperator } from "@/legal/legalConfig";
 import { submitContactRequest } from "@/lib/contactSupport";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
 
 const categories = [
   ["general", "General question"],
@@ -71,9 +72,10 @@ export default function Contact() {
         reference: result.reference,
       });
     } catch (error) {
+      logUnexpectedError("Public contact request failed", error);
       setStatus({
         state: "error",
-        message: error instanceof Error ? error.message : "Unable to send your message right now.",
+        message: userFacingError(error, "Unable to send your message right now."),
         reference: null,
       });
     }

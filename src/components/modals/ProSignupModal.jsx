@@ -3,10 +3,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 import SignupLegalFields from "@/components/legal/SignupLegalFields";
+import InlineAlert from "@/components/ui/InlineAlert";
+import { logUnexpectedError, userFacingError } from "@/lib/userFacingError";
+import { useState } from "react";
 
 export default function ProSignupModal({ onClose, onClientSignup }) {
   const { signup } = useUser();
   const navigate = useNavigate();
+  const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleProSignup = async (e) => {
     e.preventDefault();
@@ -20,6 +25,8 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
       e.currentTarget.elements.acceptProviderTerms.checked &&
       e.currentTarget.elements.acknowledgePrivacy.checked;
 
+    setFormError("");
+    setSubmitting(true);
     try {
       const { session } = await signup(email, password, {
         role: "pro",
@@ -31,7 +38,10 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
       onClose();
       navigate(session ? "/onboarding" : "/auth/check-email", { state: { email } });
     } catch (err) {
-      alert("Pro signup failed: " + err.message);
+      logUnexpectedError("Professional sign-up failed", err);
+      setFormError(userFacingError(err, "Unable to create your professional account right now."));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -59,6 +69,7 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
           <h2 className="text-3xl font-bold text-center mb-6">Join Glossed as a Pro</h2>
 
           <form className="space-y-4" onSubmit={handleProSignup}>
+            <InlineAlert message={formError} />
             <div>
               <label className="block text-sm font-medium text-gray-700">Username</label>
               <input
@@ -107,9 +118,10 @@ export default function ProSignupModal({ onClose, onClientSignup }) {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg"
+              disabled={submitting}
+              className="w-full bg-gradient-to-r from-rose-600 to-red-600 text-white py-2.5 rounded-lg disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Join as a Pro
+              {submitting ? "Creating account…" : "Join as a Pro"}
             </button>
           </form>
 
