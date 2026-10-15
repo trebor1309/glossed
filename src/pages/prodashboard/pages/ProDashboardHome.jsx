@@ -5,13 +5,14 @@ import { supabase } from "@/lib/supabaseClient";
 import { useUser } from "@/context/UserContext";
 import { Clock, CheckCircle, DollarSign, Star } from "lucide-react";
 import Toast from "@/components/ui/Toast";
+import { userDisplayName } from "@/lib/userDisplayName";
 
 export default function ProDashboardHome() {
   const navigate = useNavigate();
   const { user } = useUser();
 
   const proId = user?.id;
-  const firstName = user?.first_name || user?.business_name || "there";
+  const displayName = userDisplayName(user);
 
   const [profilePhoto, setProfilePhoto] = useState(user?.profile_photo || null);
   const [toast, setToast] = useState(null);
@@ -175,12 +176,12 @@ export default function ProDashboardHome() {
             {profilePhoto ? (
               <img
                 src={profilePhoto}
-                alt={firstName}
+                alt={displayName}
                 className="w-full h-full rounded-full object-cover bg-white"
               />
             ) : (
               <div className="w-full h-full rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold text-xl">
-                {firstName.charAt(0).toUpperCase()}
+                {displayName.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
@@ -188,7 +189,7 @@ export default function ProDashboardHome() {
         </div>
 
         <h1 className="text-2xl font-bold text-gray-800">
-          Welcome back, <span className="text-rose-600">{firstName}</span> 👋
+          Welcome back, <span className="text-rose-600">{displayName}</span> 👋
         </h1>
         <p className="text-gray-500 text-sm mt-1">Here’s your current activity overview.</p>
       </div>

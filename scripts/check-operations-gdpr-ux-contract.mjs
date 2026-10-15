@@ -10,6 +10,8 @@ const adminSupport = read("src/admin/AdminSupportRequestsPage.jsx");
 const adminUsers = read("src/admin/AdminUsersPage.jsx");
 const errors = read("src/lib/userFacingError.js");
 const userContext = read("src/context/UserContext.jsx");
+const navbar = read("src/components/navigation/NavbarMain.jsx");
+const displayName = read("src/lib/userDisplayName.js");
 const runbook = read("docs/operations-gdpr-runbook.md");
 const exampleEnv = read(".env.example");
 
@@ -69,6 +71,12 @@ requireText(
   "Auth email does not use the configured public origin"
 );
 requireText(exampleEnv, "VITE_PUBLIC_APP_URL=", "The public Auth origin is undocumented");
+requireText(navbar, "userDisplayName(user)", "The navbar does not use the profile display name");
+requireText(displayName, "first_name", "The profile display name does not prefer the first name");
+requireText(displayName, "username", "The profile display name does not fall back to the username");
+if (/email.*split|split\(["']@["']\)/.test(navbar)) {
+  failures.push("The navbar still derives the welcome name from the email address");
+}
 
 for (const contract of [
   "Matrice de conservation à faire valider",

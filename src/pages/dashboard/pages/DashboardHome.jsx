@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { supabase } from "@/lib/supabaseClient";
+import { userDisplayName } from "@/lib/userDisplayName";
 import { Search, Clock, CheckCircle, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Toast from "@/components/ui/Toast";
@@ -102,7 +103,7 @@ export default function DashboardHome() {
       });
   }, [clientId]);
 
-  const displayName = user?.first_name?.trim() || user?.username?.trim() || "there";
+  const displayName = userDisplayName(user);
 
   /* --------------------------------------------------------------
      🎨 Rendu UI
