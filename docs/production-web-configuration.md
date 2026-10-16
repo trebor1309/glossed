@@ -31,8 +31,13 @@ activées :
 Créer une clé navigateur dédiée à la production, limitée à ces deux API et aux
 référents HTTP suivants :
 
+    https://glossed.vercel.app
     https://www.glossed.app
     https://glossed.app
+
+Pendant la bêta accounts-only, `glossed.vercel.app` est le référent canonique.
+Supprimer ce référent devenu inutile après le basculement définitif sur le
+domaine public.
 
 Ajouter la clé dans Vercel sous `VITE_GOOGLE_MAPS_API_KEY`, uniquement pour
 l'environnement Production. Une autre clé restreinte doit être utilisée pour les
@@ -59,6 +64,8 @@ profil.
    `ApiNotActivatedMapError` et `BillingNotEnabledMapError`.
 5. Confirmer que `admin.glossed.app` ouvre toujours `admin.html`.
 6. Lancer `npm run check:production-web` avant fusion.
+7. Compléter le registre de preuves #56 dans
+   `docs/beta-readiness-runbook.md` avant l'ouverture de la bêta fermée.
 
 La configuration exacte des domaines Vercel et des restrictions Google Cloud est
 une opération d'infrastructure externe : elle doit être revue à chaque changement

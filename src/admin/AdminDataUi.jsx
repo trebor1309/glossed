@@ -47,6 +47,7 @@ export function StateBadge({ value, label }) {
   ];
   const danger = [
     "failed",
+    "error",
     "critical",
     "blocking",
     "rejected",

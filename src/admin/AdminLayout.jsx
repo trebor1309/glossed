@@ -15,6 +15,7 @@ import {
   Menu,
   MessageSquareWarning,
   Inbox,
+  HeartPulse,
   Settings2,
   SlidersHorizontal,
   ShieldAlert,
@@ -42,6 +43,12 @@ const navigation = [
     labelKey: "nav.support",
     icon: Inbox,
     permission: "support_requests.read",
+  },
+  {
+    to: "/sante-technique",
+    labelKey: "nav.operational_health",
+    icon: HeartPulse,
+    permission: "operations_health.read",
   },
   {
     to: "/confidentialite",

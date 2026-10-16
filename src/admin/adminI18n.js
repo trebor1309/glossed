@@ -7,6 +7,7 @@ const fr = {
   "nav.overview": "Vue d’ensemble",
   "nav.users": "Utilisateurs",
   "nav.support": "Support",
+  "nav.operational_health": "Santé technique",
   "nav.privacy": "Demandes RGPD",
   "nav.verifications": "Vérifications",
   "nav.missions": "Missions",

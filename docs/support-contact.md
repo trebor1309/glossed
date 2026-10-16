@@ -20,7 +20,8 @@ Configure these Supabase Edge Function secrets before enabling the public form:
 For the initial launch, `CONTACT_EMAIL_TO` should be `contact@ewcs.be`. Do not
 publish `support@glossed.app`, `pro@glossed.app`, `press@glossed.app` or
 `jobs@glossed.app` until the corresponding mailbox or forwarding aliases have
-been created and tested.
+been created and tested. The inbound and reply-as acceptance procedure for
+`support@glossed.app` is defined in `docs/beta-readiness-runbook.md`.
 
 ## Failure and abuse behaviour
 

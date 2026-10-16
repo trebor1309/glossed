@@ -29,3 +29,9 @@ verify_jwt = false
 # The gateway validates the administrator JWT. The function then repeats the
 # user lookup and database permission/recent-MFA checks before using Auth Admin.
 verify_jwt = true
+
+[functions.report-client-incident]
+# Reports are also accepted before authentication (for example, when Auth or
+# the initial React tree fails). The handler validates origin and shape, hashes
+# sender metadata and writes only through a service-role-only RPC.
+verify_jwt = false

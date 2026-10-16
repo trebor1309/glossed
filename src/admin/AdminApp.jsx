@@ -24,6 +24,7 @@ import AdminReputationPage from "./AdminReputationPage";
 import AdminReputationDetailPage from "./AdminReputationDetailPage";
 import AdminPrivacyRequestsPage from "./AdminPrivacyRequestsPage";
 import AdminSupportRequestsPage from "./AdminSupportRequestsPage";
+import AdminOperationalHealthPage from "./AdminOperationalHealthPage";
 import { AdminI18nProvider } from "./AdminI18nContext";
 
 const allowedHosts = new Set([
@@ -92,6 +93,14 @@ function AdminWorkspace() {
           element={
             <PermissionRoute permission="support_requests.read">
               <AdminSupportRequestsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="sante-technique"
+          element={
+            <PermissionRoute permission="operations_health.read">
+              <AdminOperationalHealthPage />
             </PermissionRoute>
           }
         />

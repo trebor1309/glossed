@@ -5,12 +5,16 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import "./index.css";
+import AppErrorBoundary from "./components/AppErrorBoundary.jsx";
+import { installGlobalOperationalMonitoring } from "./lib/operationalTelemetry.js";
 
 // ✅ Contexts
 import { UserProvider } from "./context/UserContext.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx"; // ← NEW
 import { GoogleMapsProvider } from "./context/GoogleMapsContext.jsx";
 import { PlatformCapabilitiesProvider } from "./context/PlatformCapabilitiesContext.jsx";
+
+installGlobalOperationalMonitoring();
 
 function Root() {
   return (
@@ -29,8 +33,10 @@ function Root() {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <Root />
-    </BrowserRouter>
+    <AppErrorBoundary>
+      <BrowserRouter>
+        <Root />
+      </BrowserRouter>
+    </AppErrorBoundary>
   </React.StrictMode>
 );

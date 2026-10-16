@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
+import { reportOperationalEvent } from "@/lib/operationalTelemetry";
 
 const GOOGLE_MAPS_SCRIPT_ID = "glossed-google-maps";
 const GOOGLE_MAPS_LIBRARIES = ["places"];
@@ -18,6 +19,15 @@ function GoogleMapsLoader({ apiKey, onStatus }) {
   useEffect(() => {
     onStatus({ isLoaded, error: loadError || null });
   }, [isLoaded, loadError, onStatus]);
+
+  useEffect(() => {
+    if (!loadError) return;
+    reportOperationalEvent({
+      eventType: "maps_load_failure",
+      eventCode: "google_maps_script_load_failure",
+      severity: "error",
+    });
+  }, [loadError]);
 
   return null;
 }
@@ -45,6 +55,11 @@ export function GoogleMapsProvider({ children }) {
     if (!requested || typeof window === "undefined") return undefined;
     const previousHandler = window.gm_authFailure;
     const authFailure = () => {
+      reportOperationalEvent({
+        eventType: "maps_auth_failure",
+        eventCode: "google_maps_browser_key_rejected",
+        severity: "error",
+      });
       setStatus({
         isLoaded: false,
         error: new Error("Google Maps rejected the configured browser key."),
