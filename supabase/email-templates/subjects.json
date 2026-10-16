@@ -1,0 +1,8 @@
+{
+  "confirmation": "Confirm your Glossed account",
+  "recovery": "Reset your Glossed password",
+  "magic_link": "Your secure Glossed sign-in link",
+  "invite": "You are invited to Glossed",
+  "email_change": "Confirm your new Glossed email address",
+  "reauthentication": "{{ .Token }} is your Glossed verification code"
+}

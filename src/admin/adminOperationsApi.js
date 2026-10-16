@@ -60,6 +60,20 @@ export const updateAdminContactRequest = (requestId, caseStatus, note, operation
     p_note: note || null,
     p_operation_id: operationId,
   });
+export const listAdminOperationalHealth = ({ status = "open", eventType = "all" } = {}) =>
+  rpc("admin_list_operational_health", {
+    p_status: status,
+    p_event_type: eventType,
+    p_limit: 50,
+    p_offset: 0,
+  });
+export const updateAdminOperationalEvent = (eventId, status, note, operationId) =>
+  rpc("admin_update_operational_event", {
+    p_event_id: eventId,
+    p_status: status,
+    p_note: note || null,
+    p_operation_id: operationId,
+  });
 export async function getAdminUser(userId) {
   const [detail, controls] = await Promise.all([
     rpc("admin_get_user_detail", { p_user_id: userId }),

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { googlePlacesUnavailableMessage, useGoogleMaps } from "@/context/GoogleMapsContext";
+import { reportOperationalEvent } from "@/lib/operationalTelemetry";
 
 export default function AddressAutocomplete({
   label = "Address",
@@ -95,11 +96,21 @@ export default function AddressAutocomplete({
         });
       } catch (placeError) {
         console.error("Unable to load the selected Google place:", placeError);
+        reportOperationalEvent({
+          eventType: "maps_widget_failure",
+          eventCode: "google_place_details_failure",
+          severity: "warning",
+        });
         setSelectionError("Unable to use this suggestion. Please choose another address.");
       }
     };
 
     const handleGoogleError = () => {
+      reportOperationalEvent({
+        eventType: "maps_widget_failure",
+        eventCode: "google_places_widget_failure",
+        severity: "warning",
+      });
       setSelectionError("Address suggestions are temporarily unavailable.");
     };
 
